@@ -1,6 +1,6 @@
 {
   "name": "@angular/cli",
-  "version": "1.0.1",
+  "version": "1.1.0-beta.0",
   "description": "CLI tool for Angular",
   "main": "packages/@angular/cli/lib/cli/index.js",
   "trackingCode": "UA-8594346-19",
@@ -95,7 +95,7 @@
     "typescript": "~2.2.0",
     "url-loader": "^0.5.7",
     "walk-sync": "^0.3.1",
-    "webpack": "~2.2.0",
+    "webpack": "~2.3.0",
     "webpack-dev-server": "~2.4.2",
     "webpack-merge": "^2.4.0",
     "zone.js": "^0.8.4"
