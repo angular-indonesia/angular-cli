@@ -141,6 +141,9 @@ class JsonWebpackSerializer {
         case webpack.NoEmitOnErrorsPlugin:
           this._addImport('webpack', 'NoEmitOnErrorsPlugin');
           break;
+        case webpack.NamedModulesPlugin:
+          this._addImport('webpack', 'NamedModulesPlugin');
+          break;
         case (<any>webpack).HashedModuleIdsPlugin:
           this._addImport('webpack', 'HashedModuleIdsPlugin');
           break;
@@ -462,6 +465,7 @@ export default Task.extend({
 
         // Update all loaders from webpack, plus postcss plugins.
         [
+          'webpack',
           'autoprefixer',
           'css-loader',
           'cssnano',

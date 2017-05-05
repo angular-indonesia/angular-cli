@@ -75,7 +75,6 @@ export default Task.extend({
         ui.writeLine('  for information on working with HMR for Webpack.');
         entryPoints.push('webpack/hot/dev-server');
         webpackConfig.plugins.push(new webpack.HotModuleReplacementPlugin());
-        webpackConfig.plugins.push(new webpack.NamedModulesPlugin());
         if (serveTaskOptions.extractCss) {
           ui.writeLine(oneLine`
             ${chalk.yellow('NOTICE')} (HMR) does not allow for CSS hot reload when used
@@ -161,6 +160,11 @@ export default Task.extend({
     }
 
     webpackDevServerConfiguration.hot = serveTaskOptions.hmr;
+
+    // set publicPath property to be sent on webpack server config
+    if (serveTaskOptions.deployUrl) {
+      webpackDevServerConfiguration.publicPath = serveTaskOptions.deployUrl;
+    }
 
     if (serveTaskOptions.target === 'production') {
       ui.writeLine(chalk.red(stripIndents`
