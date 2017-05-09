@@ -11,7 +11,7 @@ export interface GetOptions {
 
 const GetCommand = Command.extend({
   name: 'get',
-  description: 'Get a value from the configuration.',
+  description: 'Get a value from the configuration. Example: ng get [key]',
   works: 'everywhere',
 
   availableOptions: [
@@ -37,7 +37,7 @@ const GetCommand = Command.extend({
       if (value === null || value === undefined) {
         throw new SilentError('Value cannot be found.');
       } else if (typeof value == 'object') {
-        console.log(JSON.stringify(value));
+        console.log(JSON.stringify(value, null, 2));
       } else {
         console.log(value);
       }
