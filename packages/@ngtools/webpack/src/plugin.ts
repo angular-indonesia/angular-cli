@@ -341,7 +341,11 @@ export class AotPlugin implements Tapable {
           cb();
         }
       });
+    });
+
+    compiler.plugin('normal-module-factory', (nmf: any) => {
       compiler.resolvers.normal.apply(new PathsPlugin({
+        nmf,
         tsConfigPath: this._tsConfigPath,
         compilerOptions: this._compilerOptions,
         compilerHost: this._compilerHost
@@ -512,7 +516,8 @@ export class AotPlugin implements Tapable {
             if (this.skipCodeGeneration) {
               this._lazyRoutes[k] = lazyRoute;
             } else {
-              const lr = path.relative(this.basePath, lazyRoute.replace(/\.ts$/, '.ngfactory.ts'));
+              const factoryPath = lazyRoute.replace(/(\.d)?\.ts$/, '.ngfactory.ts');
+              const lr = path.relative(this.basePath, factoryPath);
               this._lazyRoutes[k + '.ngfactory'] = path.join(this.genDir, lr);
             }
           });
