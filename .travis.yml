@@ -14,14 +14,6 @@ env:
 
 
 matrix:
-  allow_failures:
-    - env: nightly
-    - env: ng2
-    - node_js: "7"
-    - node_js: "8"
-
-
-matrix:
   fast_finish: true
   allow_failures:
     - env: nightly
@@ -40,12 +32,20 @@ matrix:
       env: test
     - node_js: "6"
       os: linux
-      script: node tests/run_e2e.js "--glob=tests/build/**"
-      env: build
+      script: node tests/run_e2e.js "--ignore=**/tests/build/**" --nb-shards=4 --shard=0 --nosilent
+      env: e2e-0
     - node_js: "6"
       os: linux
-      script: travis_wait 120 node tests/run_e2e.js "--ignore=**/tests/build/**"
-      env: e2e
+      script: node tests/run_e2e.js "--ignore=**/tests/build/**" --nb-shards=4 --shard=1 --nosilent
+      env: e2e-1
+    - node_js: "6"
+      os: linux
+      script: node tests/run_e2e.js "--ignore=**/tests/build/**" --nb-shards=4 --shard=2 --nosilent
+      env: e2e-2
+    - node_js: "6"
+      os: linux
+      script: node tests/run_e2e.js "--ignore=**/tests/build/**" --nb-shards=4 --shard=3 --nosilent
+      env: e2e-3
     - node_js: "6"
       os: linux
       script: node tests/run_e2e.js --eject "--glob=tests/build/**"
@@ -56,18 +56,26 @@ matrix:
       os: linux
       script: node tests/run_e2e.js --ng2 "--glob=tests/{build,test,misc}/**"
       env: ng2
+      on:
+        all_branches: true
     - node_js: "6"
       os: linux
       script: node tests/run_e2e.js "--nightly --glob=tests/{build,test,misc}/**"
       env: nightly
+      on:
+        all_branches: true
     - node_js: "7"
       os: linux
       script: node tests/run_e2e.js "--glob=tests/{build,test,misc}/**"
       env: node7
+      on:
+        all_branches: true
     - node_js: "8"
       os: linux
       script: node tests/run_e2e.js "--glob=tests/build/**"
       env: node8
+      on:
+        all_branches: true
 
     - stage: deploy
       script: skip
@@ -75,6 +83,7 @@ matrix:
       deploy:
       - provider: script
         script: node scripts/git-builds.js
+        skip_cleanup: true
         on:
           all_branches: true
     - stage: deploy
@@ -83,6 +92,7 @@ matrix:
       deploy:
       - provider: script
         script: node scripts/publish/publish.js
+        skip_cleanup: true
         on:
           tags: true
 
