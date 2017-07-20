@@ -9,7 +9,7 @@ const Command = require('../ember-cli/lib/models/command');
 const config = CliConfig.fromProject() || CliConfig.fromGlobal();
 const buildConfigDefaults = config.getPaths('defaults.build', [
   'sourcemaps', 'baseHref', 'progress', 'poll', 'deleteOutputPath', 'preserveSymlinks',
-  'showCircularDependencies'
+  'showCircularDependencies', 'commonChunk', 'namedChunks'
 ]);
 
 // defaults for BuildOptions
@@ -48,9 +48,16 @@ export const baseBuildCommandOptions: any = [
   {
     name: 'vendor-chunk',
     type: Boolean,
-    default: true,
     aliases: ['vc'],
     description: 'Use a separate bundle containing only vendor libraries.'
+  },
+  {
+    name: 'common-chunk',
+    type: Boolean,
+    default: buildConfigDefaults['common-chunk'] === undefined ?
+      true : buildConfigDefaults['common-chunk'],
+    aliases: ['cc'],
+    description: 'Use a separate bundle containing code used across multiple bundles.'
   },
   {
     name: 'base-href',
@@ -151,6 +158,21 @@ export const baseBuildCommandOptions: any = [
     aliases: ['scd'],
     description: 'Show circular dependency warnings on builds.',
     default: buildConfigDefaults['showCircularDependencies']
+  },
+  {
+    name: 'build-optimizer',
+    type: Boolean,
+    default: false,
+    aliases: ['bo'],
+    description: '(Experimental) Enables @angular-devkit/build-optimizer '
+    + 'optimizations when using `--aot`.'
+  },
+  {
+    name: 'named-chunks',
+    type: Boolean,
+    aliases: ['nc'],
+    description: 'Use file name for lazy loaded chunks.',
+    default: buildConfigDefaults['namedChunks']
   }
 ];
 
@@ -176,6 +198,11 @@ const BuildCommand = Command.extend({
   run: function (commandOptions: BuildTaskOptions) {
     // Check angular version.
     Version.assertAngularVersionIs2_3_1OrHigher(this.project.root);
+
+    // Default vendor chunk to false when build optimizer is on.
+    if (commandOptions.vendorChunk === undefined) {
+      commandOptions.vendorChunk = !commandOptions.buildOptimizer;
+    }
 
     const BuildTask = require('../tasks/build').default;
 

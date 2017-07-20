@@ -1,5 +1,5 @@
 import {readFile, writeFile} from './fs';
-import {silentExecAndWaitForOutputToMatch, silentNpm, ng} from './process';
+import {execAndWaitForOutputToMatch, silentNpm, ng} from './process';
 import {getGlobalVariable} from './env';
 
 const packages = require('../../../lib/packages').packages;
@@ -25,7 +25,7 @@ export function updateTsConfig(fn: (json: any) => any | void) {
 
 
 export function ngServe(...args: string[]) {
-  return silentExecAndWaitForOutputToMatch('ng',
+  return execAndWaitForOutputToMatch('ng',
     ['serve', ...args],
     /webpack: bundle is now VALID|webpack: Compiled successfully./);
 }
@@ -108,7 +108,7 @@ export function useNg2() {
       'experimentalDecorators': true,
       'target': 'es5',
       'lib': [
-        'es2016',
+        'es2017',
         'dom'
       ],
       'outDir': '../out-tsc/app',
@@ -130,7 +130,7 @@ export function useNg2() {
       'emitDecoratorMetadata': true,
       'experimentalDecorators': true,
       'lib': [
-        'es2016',
+        'es2017',
         'dom'
       ],
       'outDir': '../out-tsc/spec',
@@ -159,7 +159,7 @@ export function useNg2() {
       'emitDecoratorMetadata': true,
       'experimentalDecorators': true,
       'lib': [
-        'es2016'
+        'es2017'
       ],
       'outDir': '../out-tsc/e2e',
       'module': 'commonjs',
