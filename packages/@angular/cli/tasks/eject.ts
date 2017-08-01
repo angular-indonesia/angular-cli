@@ -287,7 +287,7 @@ class JsonWebpackSerializer {
         return v;
       } else if (typeof v == 'string') {
         if (v === path.join(this._root, 'node_modules')) {
-          return this._serializeRegExp(/\/node_modules\//);
+          return this._serializeRegExp(/(\\|\/)node_modules(\\|\/)/);
         }
         return this._relativePath('process.cwd()', path.relative(this._root, v));
       } else {
@@ -507,6 +507,8 @@ export default Task.extend({
           'cssnano',
           'exports-loader',
           'file-loader',
+          'html-webpack-plugin',
+          'json-loader',
           'karma-sourcemap-loader',
           'less-loader',
           'postcss-loader',
