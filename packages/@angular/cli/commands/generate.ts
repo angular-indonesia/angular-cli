@@ -137,10 +137,15 @@ export default Command.extend({
       dryRun: commandOptions.dryRun
     };
     const parsedPath = dynamicPathParser(dynamicPathOptions);
+    const root = appConfig.root + path.sep;
     commandOptions.sourceDir = appConfig.root;
-    commandOptions.path = parsedPath.dir
-      .replace(appConfig.root + path.sep, '')
-      .replace(separatorRegEx, '/');
+    commandOptions.appRoot = parsedPath.appRoot.startsWith(root)
+      ? parsedPath.appRoot.substr(root.length)
+      : parsedPath.appRoot;
+    commandOptions.path = parsedPath.dir.replace(separatorRegEx, '/');
+    if (parsedPath.dir.startsWith(root)) {
+      commandOptions.path = commandOptions.path.substr(root.length);
+    }
 
     const cwd = this.project.root;
     const schematicName = rawArgs[0];
