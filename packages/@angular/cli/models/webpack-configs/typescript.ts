@@ -14,6 +14,10 @@ const webpackLoader: string = g['angularCliIsLocal']
 
 function _createAotPlugin(wco: WebpackConfigOptions, options: any) {
   const { appConfig, projectRoot, buildOptions } = wco;
+  options.compilerOptions = options.compilerOptions || {};
+  if (wco.buildOptions.preserveSymlinks) {
+    options.compilerOptions.preserveSymlinks = true;
+  }
 
   // Read the environment, and set it in the compiler host.
   let hostReplacementPaths: any = {};
@@ -83,7 +87,7 @@ function _createAotPlugin(wco: WebpackConfigOptions, options: any) {
   }
 }
 
-export const getNonAotConfig = function(wco: WebpackConfigOptions) {
+export function getNonAotConfig(wco: WebpackConfigOptions) {
   const { appConfig, projectRoot } = wco;
   const tsConfigPath = path.resolve(projectRoot, appConfig.root, appConfig.tsconfig);
 
@@ -91,9 +95,9 @@ export const getNonAotConfig = function(wco: WebpackConfigOptions) {
     module: { rules: [{ test: /\.ts$/, loader: webpackLoader }] },
     plugins: [ _createAotPlugin(wco, { tsConfigPath, skipCodeGeneration: true }) ]
   };
-};
+}
 
-export const getAotConfig = function(wco: WebpackConfigOptions) {
+export function getAotConfig(wco: WebpackConfigOptions) {
   const { projectRoot, buildOptions, appConfig } = wco;
   const tsConfigPath = path.resolve(projectRoot, appConfig.root, appConfig.tsconfig);
   const testTsConfigPath = path.resolve(projectRoot, appConfig.root, appConfig.testTsconfig);
@@ -119,9 +123,9 @@ export const getAotConfig = function(wco: WebpackConfigOptions) {
     module: { rules: [{ test: /\.ts$/, use: [...boLoader, webpackLoader] }] },
     plugins: [ _createAotPlugin(wco, pluginOptions) ]
   };
-};
+}
 
-export const getNonAotTestConfig = function(wco: WebpackConfigOptions) {
+export function getNonAotTestConfig(wco: WebpackConfigOptions) {
   const { projectRoot, appConfig } = wco;
   const tsConfigPath = path.resolve(projectRoot, appConfig.root, appConfig.testTsconfig);
   const appTsConfigPath = path.resolve(projectRoot, appConfig.root, appConfig.tsconfig);
@@ -137,4 +141,4 @@ export const getNonAotTestConfig = function(wco: WebpackConfigOptions) {
     module: { rules: [{ test: /\.ts$/, loader: webpackLoader }] },
     plugins: [ _createAotPlugin(wco, pluginOptions) ]
   };
-};
+}
