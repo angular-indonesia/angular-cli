@@ -15,6 +15,7 @@ import {Tapable} from './webpack';
 import {PathsPlugin} from './paths-plugin';
 import {findLazyRoutes, LazyRouteMap} from './lazy_routes';
 import {VirtualFileSystemDecorator} from './virtual_file_system_decorator';
+import {time, timeEnd} from './benchmark';
 
 
 /**
@@ -110,6 +111,7 @@ export class AotPlugin implements Tapable {
   get discoveredLazyRoutes() { return this._discoveredLazyRoutes; }
 
   private _setupOptions(options: AotPluginOptions) {
+    time('AotPlugin._setupOptions');
     // Fill in the missing options.
     if (!options.hasOwnProperty('tsConfigPath')) {
       throw new Error('Must specify "tsConfigPath" in the configuration of @ngtools/webpack.');
@@ -289,9 +291,11 @@ export class AotPlugin implements Tapable {
       }
       this._missingTranslation = options.missingTranslation;
     }
+    timeEnd('AotPlugin._setupOptions');
   }
 
   private _findLazyRoutesInAst(): LazyRouteMap {
+    time('AotPlugin._findLazyRoutesInAst');
     const result: LazyRouteMap = Object.create(null);
     const changedFilePaths = this._compilerHost.getChangedFilePaths();
     for (const filePath of changedFilePaths) {
@@ -313,17 +317,21 @@ export class AotPlugin implements Tapable {
         }
       }
     }
+    timeEnd('AotPlugin._findLazyRoutesInAst');
     return result;
   }
 
   private _getLazyRoutesFromNgtools() {
     try {
-      return __NGTOOLS_PRIVATE_API_2.listLazyRoutes({
+      time('AotPlugin._getLazyRoutesFromNgtools');
+      const result = __NGTOOLS_PRIVATE_API_2.listLazyRoutes({
         program: this._program,
         host: this._compilerHost,
         angularCompilerOptions: this._angularCompilerOptions,
         entryModule: this._entryModule
       });
+      timeEnd('AotPlugin._getLazyRoutesFromNgtools');
+      return result;
     } catch (err) {
       // We silence the error that the @angular/router could not be found. In that case, there is
       // basically no route supported by the app itself.
@@ -517,6 +525,7 @@ export class AotPlugin implements Tapable {
   }
 
   private _make(compilation: any, cb: (err?: any, request?: any) => void) {
+    time('AotPlugin._make');
     this._compilation = compilation;
     if (this._compilation._ngToolsWebpackPluginInstance) {
       return cb(new Error('An @ngtools/webpack plugin already exist for this compilation.'));
@@ -532,6 +541,7 @@ export class AotPlugin implements Tapable {
           return;
         }
 
+        time('AotPlugin._make.codeGen');
         // Create the Code Generator.
         return __NGTOOLS_PRIVATE_API_2.codeGen({
           basePath: this._basePath,
@@ -545,7 +555,8 @@ export class AotPlugin implements Tapable {
           missingTranslation: this.missingTranslation,
 
           readResource: (path: string) => this._resourceLoader.get(path)
-        });
+        })
+        .then(() => timeEnd('AotPlugin._make.codeGen'));
       })
       .then(() => {
         // Get the ngfactory that were created by the previous step, and add them to the root
@@ -561,16 +572,21 @@ export class AotPlugin implements Tapable {
         // transitive modules, which include files that might just have been generated.
         // This needs to happen after the code generator has been created for generated files
         // to be properly resolved.
+        time('AotPlugin._make.createProgram');
         this._program = ts.createProgram(
           this._rootFilePath, this._compilerOptions, this._compilerHost, this._program);
+        timeEnd('AotPlugin._make.createProgram');
       })
       .then(() => {
         // Re-diagnose changed files.
+        time('AotPlugin._make.diagnose');
         const changedFilePaths = this._compilerHost.getChangedFilePaths();
         changedFilePaths.forEach(filePath => this.diagnose(filePath));
+        timeEnd('AotPlugin._make.diagnose');
       })
       .then(() => {
         if (this._typeCheck) {
+          time('AotPlugin._make._typeCheck');
           const diagnostics = this._program.getGlobalDiagnostics();
           if (diagnostics.length > 0) {
             const message = diagnostics
@@ -589,11 +605,13 @@ export class AotPlugin implements Tapable {
 
             throw new Error(message);
           }
+          timeEnd('AotPlugin._make._typeCheck');
         }
       })
       .then(() => {
         // We need to run the `listLazyRoutes` the first time because it also navigates libraries
         // and other things that we might miss using the findLazyRoutesInAst.
+        time('AotPlugin._make._discoveredLazyRoutes');
         this._discoveredLazyRoutes = this.firstRun
           ? this._getLazyRoutesFromNgtools()
           : this._findLazyRoutesInAst();
@@ -615,6 +633,7 @@ export class AotPlugin implements Tapable {
               this._lazyRoutes[k + '.ngfactory'] = path.join(this.genDir, lr);
             }
           });
+        timeEnd('AotPlugin._make._discoveredLazyRoutes');
       })
       .then(() => {
         if (this._compilation.errors == 0) {
@@ -623,10 +642,12 @@ export class AotPlugin implements Tapable {
           this._failedCompilation = true;
         }
 
+        timeEnd('AotPlugin._make');
         cb();
       }, (err: any) => {
         this._failedCompilation = true;
         compilation.errors.push(err.stack);
+        timeEnd('AotPlugin._make');
         cb();
       });
   }

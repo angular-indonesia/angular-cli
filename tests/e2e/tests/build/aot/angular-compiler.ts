@@ -1,6 +1,7 @@
 import { ng, npm } from '../../../utils/process';
 import { updateJsonFile } from '../../../utils/project';
 import { expectFileToMatch, rimraf, moveFile } from '../../../utils/fs';
+import { expectToFail } from '../../../utils/utils';
 import { getGlobalVariable } from '../../../utils/env';
 import { expectToFail } from '../../../utils/utils';
 
@@ -32,20 +33,23 @@ export default function () {
       devDependencies['typescript'] = '2.4.2';
     }))
     .then(() => npm('install'))
+    .then(() => ng('build'))
+    .then(() => expectToFail(() => expectFileToMatch('dist/main.bundle.js',
+      /bootstrapModuleFactory.*\/\* AppModuleNgFactory \*\//)))
     .then(() => ng('build', '--aot'))
     .then(() => expectFileToMatch('dist/main.bundle.js',
       /bootstrapModuleFactory.*\/\* AppModuleNgFactory \*\//))
 
     // tests for register_locale_data transformer
     .then(() => rimraf('dist'))
-    .then(() => ng('build', '--aot', '--locale=fr'))
+    .then(() => ng('build', '--locale=fr'))
     .then(() => expectFileToMatch('dist/main.bundle.js',
       /registerLocaleData/))
     .then(() => expectFileToMatch('dist/main.bundle.js',
       /angular_common_locales_fr/))
     .then(() => rimraf('dist'))
     .then(() => expectToFail(() =>
-      ng('build', '--aot', '--locale=no-locale')))
+      ng('build', '--locale=no-locale')))
 
     // Cleanup
     .then(() => {

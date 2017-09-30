@@ -1,6 +1,6 @@
 {
   "name": "@angular/cli",
-  "version": "1.5.0-beta.1",
+  "version": "1.5.0-beta.2",
   "description": "CLI tool for Angular",
   "main": "packages/@angular/cli/lib/cli/index.js",
   "trackingCode": "UA-8594346-19",
@@ -41,9 +41,9 @@
   },
   "homepage": "https://github.com/angular/angular-cli",
   "dependencies": {
-    "@angular-devkit/build-optimizer": "~0.0.18",
-    "@angular-devkit/schematics": "~0.0.21",
-    "@schematics/angular": "~0.0.30",
+    "@angular-devkit/build-optimizer": "~0.0.23",
+    "@angular-devkit/schematics": "~0.0.25",
+    "@schematics/angular": "~0.0.38",
     "autoprefixer": "^6.5.3",
     "chalk": "^2.0.1",
     "circular-dependency-plugin": "^3.0.0",
@@ -89,6 +89,7 @@
     "style-loader": "^0.13.1",
     "stylus": "^0.54.5",
     "stylus-loader": "^3.0.1",
+    "tree-kill": "^1.0.0",
     "typescript": "~2.4.2",
     "uglifyjs-webpack-plugin": "1.0.0-beta.1",
     "url-loader": "^0.5.7",
@@ -138,7 +139,6 @@
     "tar": "^3.1.5",
     "temp": "0.8.3",
     "through": "^2.3.6",
-    "tree-kill": "^1.0.0",
     "ts-node": "^3.2.0",
     "tslint": "^5.1.0",
     "walk-sync": "^0.3.1"
