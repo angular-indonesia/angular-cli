@@ -1,10 +1,8 @@
-// @ignoreDep @angular/compiler-cli
 import * as fs from 'fs';
 import { fork, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as ts from 'typescript';
 
-const { __NGTOOLS_PRIVATE_API_2, VERSION } = require('@angular/compiler-cli');
 const ContextElementDependency = require('webpack/lib/dependencies/ContextElementDependency');
 const NodeWatchFileSystem = require('webpack/lib/node/NodeWatchFileSystem');
 const treeKill = require('tree-kill');
@@ -29,6 +27,9 @@ import { time, timeEnd } from './benchmark';
 import { InitMessage, UpdateMessage } from './type_checker';
 import { gatherDiagnostics, hasErrors } from './gather_diagnostics';
 import {
+  CompilerCliIsSupported,
+  __NGTOOLS_PRIVATE_API_2,
+  VERSION,
   DEFAULT_ERROR_CODE,
   UNKNOWN_ERROR_CODE,
   SOURCE,
@@ -41,7 +42,7 @@ import {
   createCompilerHost,
   formatDiagnostics,
   EmitFlags,
-} from './ngtools_api2';
+} from './ngtools_api';
 
 
 /**
@@ -106,6 +107,7 @@ export class AngularCompilerPlugin implements Tapable {
   private _typeCheckerProcess: ChildProcess;
 
   constructor(options: AngularCompilerPluginOptions) {
+    CompilerCliIsSupported();
     this._options = Object.assign({}, options);
     this._setupOptions(this._options);
   }
@@ -121,7 +123,7 @@ export class AngularCompilerPlugin implements Tapable {
   }
 
   static isSupported() {
-    return parseInt(VERSION.major) >= 5;
+    return VERSION && parseInt(VERSION.major) >= 5;
   }
 
   private _setupOptions(options: AngularCompilerPluginOptions) {
@@ -433,7 +435,10 @@ export class AngularCompilerPlugin implements Tapable {
       this._JitMode, this._tsFilenames));
 
     // Cleanup.
-    const killTypeCheckerProcess = () => treeKill(this._typeCheckerProcess.pid, 'SIGTERM');
+    const killTypeCheckerProcess = () => {
+      treeKill(this._typeCheckerProcess.pid, 'SIGTERM');
+      process.exit();
+    };
     process.on('exit', killTypeCheckerProcess);
     process.on('SIGINT', killTypeCheckerProcess);
     process.on('uncaughtException', killTypeCheckerProcess);
@@ -569,7 +574,7 @@ export class AngularCompilerPlugin implements Tapable {
     this._donePromise = Promise.resolve()
       .then(() => {
         // Create a new process for the type checker.
-        if (!this._firstRun && !this._typeCheckerProcess) {
+        if (this._forkTypeChecker && !this._firstRun && !this._typeCheckerProcess) {
           this._createForkedTypeChecker();
         }
       })
@@ -781,7 +786,7 @@ export class AngularCompilerPlugin implements Tapable {
 
         if (this._firstRun || !this._forkTypeChecker) {
           allDiagnostics.push(...gatherDiagnostics(this._program, this._JitMode,
-            'AngularCompilerPluginOptions'));
+            'AngularCompilerPlugin._emit.ts'));
         }
 
         if (!hasErrors(allDiagnostics)) {
@@ -812,7 +817,7 @@ export class AngularCompilerPlugin implements Tapable {
 
         if (this._firstRun || !this._forkTypeChecker) {
           allDiagnostics.push(...gatherDiagnostics(this._program, this._JitMode,
-            'AngularCompilerPluginOptions'));
+            'AngularCompilerPlugin._emit.ng'));
         }
 
         if (!hasErrors(allDiagnostics)) {
