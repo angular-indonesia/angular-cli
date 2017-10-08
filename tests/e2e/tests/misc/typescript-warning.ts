@@ -1,4 +1,4 @@
-import { ng, npm } from '../../utils/process';
+import { ng, silentNpm } from '../../utils/process';
 import { getGlobalVariable } from '../../utils/env';
 
 
@@ -15,15 +15,8 @@ export default function () {
   }
 
   return Promise.resolve()
-    .then(() => npm('uninstall', 'typescript', '--no-save'))
-    .then(() => ng('build'))
-    .catch((err) => {
-      if (!err.message.match('Versions of @angular/compiler-cli and typescript could not')) {
-        throw new Error('Expected to have missing dependency error in output.');
-      }
-    })
     // Warning should show.
-    .then(() => npm('install', `typescript@${unsupportedTsVersion}`, '--no-save'))
+    .then(() => silentNpm('install', `typescript@${unsupportedTsVersion}`, '--no-save'))
     .then(() => ng('build'))
     .then((output) => {
       if (!output.stdout.match('Using this version can result in undefined behaviour')) {
@@ -49,6 +42,6 @@ export default function () {
     })
     .then(() => ng('set', 'warnings.typescriptMismatch=true'))
     // Cleanup
-    .then(() => npm('install'));
+    .then(() => silentNpm('install'));
 }
 

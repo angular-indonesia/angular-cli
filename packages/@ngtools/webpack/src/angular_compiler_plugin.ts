@@ -86,6 +86,7 @@ export class AngularCompilerPlugin implements Tapable {
   private _program: ts.Program | Program;
   private _compilerHost: WebpackCompilerHost;
   private _angularCompilerHost: WebpackCompilerHost & CompilerHost;
+  private _resourceLoader: WebpackResourceLoader;
   // Contains `moduleImportPath#exportName` => `fullModulePath`.
   private _lazyRoutes: LazyRouteMap = Object.create(null);
   private _tsConfigPath: string;
@@ -100,7 +101,6 @@ export class AngularCompilerPlugin implements Tapable {
   private _donePromise: Promise<void> | null;
   private _compiler: any = null;
   private _compilation: any = null;
-  private _failedCompilation = false;
 
   // TypeChecker process.
   private _forkTypeChecker = true;
@@ -114,7 +114,6 @@ export class AngularCompilerPlugin implements Tapable {
 
   get options() { return this._options; }
   get done() { return this._donePromise; }
-  get failedCompilation() { return this._failedCompilation; }
   get entryModule() {
     const splitted = this._entryModule.split('#');
     const path = splitted[0];
@@ -192,6 +191,12 @@ export class AngularCompilerPlugin implements Tapable {
       tsConfigJson.exclude = tsConfigJson.exclude.concat(options.exclude);
     }
 
+    // Add extra includes.
+    if (options.hasOwnProperty('include') && Array.isArray(options.include)) {
+      tsConfigJson.include = tsConfigJson.include || [];
+      tsConfigJson.include.push(...options.include);
+    }
+
     // Parse the tsconfig contents.
     const tsConfig = ts.parseJsonConfigFileContent(
       tsConfigJson, ts.sys, basePath, undefined, this._tsConfigPath);
@@ -212,13 +217,17 @@ export class AngularCompilerPlugin implements Tapable {
       this._compilerOptions.sourceMap = true;
       this._compilerOptions.inlineSources = true;
       this._compilerOptions.inlineSourceMap = false;
-      this._compilerOptions.sourceRoot = basePath;
+      this._compilerOptions.mapRoot = undefined;
+      // We will set the source to the full path of the file in the loader, so we don't
+      // need sourceRoot here.
+      this._compilerOptions.sourceRoot = undefined;
     } else {
       this._compilerOptions.sourceMap = false;
       this._compilerOptions.sourceRoot = undefined;
       this._compilerOptions.inlineSources = undefined;
       this._compilerOptions.inlineSourceMap = undefined;
       this._compilerOptions.mapRoot = undefined;
+      this._compilerOptions.sourceRoot = undefined;
     }
 
     // Compose Angular Compiler Options.
@@ -267,6 +276,10 @@ export class AngularCompilerPlugin implements Tapable {
     this._compilerHost = new WebpackCompilerHost(this._compilerOptions, this._basePath);
     this._compilerHost.enableCaching();
 
+    // Create and set a new WebpackResourceLoader.
+    this._resourceLoader = new WebpackResourceLoader();
+    this._compilerHost.setResourceLoader(this._resourceLoader);
+
     // Override some files in the FileSystem.
     if (this._options.hostOverrideFileSystem) {
       for (const filePath of Object.keys(this._options.hostOverrideFileSystem)) {
@@ -283,6 +296,7 @@ export class AngularCompilerPlugin implements Tapable {
       }
     }
 
+    // Set platform.
     this._platform = options.platform || PLATFORM.Browser;
     timeEnd('AngularCompilerPlugin._setupOptions');
   }
@@ -311,13 +325,19 @@ export class AngularCompilerPlugin implements Tapable {
       this._updateForkedTypeChecker(changedTsFiles);
     }
 
-    if (this._JitMode) {
+    // We want to allow emitting with errors on the first run so that imports can be added
+    // to the webpack dependency tree and rebuilds triggered by file edits.
+    const compilerOptions = {
+      ...this._angularCompilerOptions,
+      noEmitOnError: !this._firstRun
+    };
 
+    if (this._JitMode) {
       // Create the TypeScript program.
       time('AngularCompilerPlugin._createOrUpdateProgram.ts.createProgram');
       this._program = ts.createProgram(
         this._tsFilenames,
-        this._angularCompilerOptions,
+        compilerOptions,
         this._angularCompilerHost,
         this._program as ts.Program
       );
@@ -329,7 +349,7 @@ export class AngularCompilerPlugin implements Tapable {
       // Create the Angular program.
       this._program = createProgram({
         rootNames: this._tsFilenames,
-        options: this._angularCompilerOptions,
+        options: compilerOptions,
         host: this._angularCompilerHost,
         oldProgram: this._program as Program
       });
@@ -527,7 +547,6 @@ export class AngularCompilerPlugin implements Tapable {
     compiler.plugin('done', () => {
       this._donePromise = null;
       this._compilation = null;
-      this._failedCompilation = false;
     });
 
     // TODO: consider if it's better to remove this plugin and instead make it wait on the
@@ -563,13 +582,11 @@ export class AngularCompilerPlugin implements Tapable {
       return cb(new Error('An @ngtools/webpack plugin already exist for this compilation.'));
     }
 
+    // Set a private variable for this plugin instance.
     this._compilation._ngToolsWebpackPluginInstance = this;
 
-    // Create the resource loader with the webpack compilation.
-    time('AngularCompilerPlugin._make.setResourceLoader');
-    const resourceLoader = new WebpackResourceLoader(compilation);
-    this._compilerHost.setResourceLoader(resourceLoader);
-    timeEnd('AngularCompilerPlugin._make.setResourceLoader');
+    // Update the resource loader with the new webpack compilation.
+    this._resourceLoader.update(compilation);
 
     this._donePromise = Promise.resolve()
       .then(() => {
@@ -604,7 +621,6 @@ export class AngularCompilerPlugin implements Tapable {
         timeEnd('AngularCompilerPlugin._make');
         cb();
       }, (err: any) => {
-        this._failedCompilation = true;
         compilation.errors.push(err.stack);
         timeEnd('AngularCompilerPlugin._make');
         cb();
@@ -726,8 +742,6 @@ export class AngularCompilerPlugin implements Tapable {
           // Reset changed files on successful compilation.
           if (emitResult && !emitResult.emitSkipped && this._compilation.errors.length === 0) {
             this._compilerHost.resetChangedFileTracker();
-          } else {
-            this._failedCompilation = true;
           }
         }
         timeEnd('AngularCompilerPlugin._update');
@@ -789,7 +803,9 @@ export class AngularCompilerPlugin implements Tapable {
             'AngularCompilerPlugin._emit.ts'));
         }
 
-        if (!hasErrors(allDiagnostics)) {
+        // Always emit on the first run, so that imports are processed by webpack and the user
+        // can trigger a rebuild by editing any file.
+        if (!hasErrors(allDiagnostics) || this._firstRun) {
           sourceFiles.forEach((sf) => {
             const timeLabel = `AngularCompilerPlugin._emit.ts+${sf.fileName}+.emit`;
             time(timeLabel);
@@ -820,7 +836,9 @@ export class AngularCompilerPlugin implements Tapable {
             'AngularCompilerPlugin._emit.ng'));
         }
 
-        if (!hasErrors(allDiagnostics)) {
+        // Always emit on the first run, so that imports are processed by webpack and the user
+        // can trigger a rebuild by editing any file.
+        if (!hasErrors(allDiagnostics) || this._firstRun) {
           time('AngularCompilerPlugin._emit.ng.emit');
           const extractI18n = !!this._angularCompilerOptions.i18nOutFile;
           const emitFlags = extractI18n ? EmitFlags.I18nBundle : EmitFlags.Default;

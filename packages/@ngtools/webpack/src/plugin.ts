@@ -62,7 +62,6 @@ export class AotPlugin implements Tapable {
   private _donePromise: Promise<void> | null;
   private _compiler: any = null;
   private _compilation: any = null;
-  private _failedCompilation = false;
 
   private _typeCheck = true;
   private _skipCodeGeneration = false;
@@ -90,7 +89,6 @@ export class AotPlugin implements Tapable {
   get compilerHost() { return this._compilerHost; }
   get compilerOptions() { return this._compilerOptions; }
   get done() { return this._donePromise; }
-  get failedCompilation() { return this._failedCompilation; }
   get entryModule() {
     const splitted = this._entryModule.split('#');
     const path = splitted[0];
@@ -255,6 +253,8 @@ export class AotPlugin implements Tapable {
     // We enable caching of the filesystem in compilerHost _after_ the program has been created,
     // because we don't want SourceFile instances to be cached past this point.
     this._compilerHost.enableCaching();
+
+    this._resourceLoader = new WebpackResourceLoader();
 
     if (options.entryModule) {
       this._entryModule = options.entryModule;
@@ -426,7 +426,6 @@ export class AotPlugin implements Tapable {
     compiler.plugin('done', () => {
       this._donePromise = null;
       this._compilation = null;
-      this._failedCompilation = false;
     });
 
     compiler.plugin('after-resolvers', (compiler: any) => {
@@ -533,7 +532,7 @@ export class AotPlugin implements Tapable {
 
     this._compilation._ngToolsWebpackPluginInstance = this;
 
-    this._resourceLoader = new WebpackResourceLoader(compilation);
+    this._resourceLoader.update(compilation);
 
     this._donePromise = Promise.resolve()
       .then(() => {
@@ -638,14 +637,11 @@ export class AotPlugin implements Tapable {
       .then(() => {
         if (this._compilation.errors == 0) {
           this._compilerHost.resetChangedFileTracker();
-        } else {
-          this._failedCompilation = true;
         }
 
         timeEnd('AotPlugin._make');
         cb();
       }, (err: any) => {
-        this._failedCompilation = true;
         compilation.errors.push(err.stack);
         timeEnd('AotPlugin._make');
         cb();
