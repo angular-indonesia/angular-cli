@@ -4,7 +4,6 @@ import * as path from 'path';
 import * as ts from 'typescript';
 
 const ContextElementDependency = require('webpack/lib/dependencies/ContextElementDependency');
-const NodeWatchFileSystem = require('webpack/lib/node/NodeWatchFileSystem');
 const treeKill = require('tree-kill');
 
 import { WebpackResourceLoader } from './resource_loader';
@@ -12,7 +11,10 @@ import { WebpackCompilerHost } from './compiler_host';
 import { Tapable } from './webpack';
 import { PathsPlugin } from './paths-plugin';
 import { findLazyRoutes, LazyRouteMap } from './lazy_routes';
-import { VirtualFileSystemDecorator } from './virtual_file_system_decorator';
+import {
+  VirtualFileSystemDecorator,
+  VirtualWatchFileSystemDecorator
+} from './virtual_file_system_decorator';
 import { resolveEntryModuleFromMain } from './entry_resolver';
 import {
   TransformOperation,
@@ -21,6 +23,7 @@ import {
   exportNgFactory,
   exportLazyModuleMap,
   registerLocaleData,
+  findResources,
   replaceResources,
 } from './transformers';
 import { time, timeEnd } from './benchmark';
@@ -43,6 +46,7 @@ import {
   formatDiagnostics,
   EmitFlags,
 } from './ngtools_api';
+import { findAstNodes } from './transformers/ast_helpers';
 
 
 /**
@@ -85,6 +89,7 @@ export class AngularCompilerPlugin implements Tapable {
   private _tsFilenames: string[];
   private _program: ts.Program | Program;
   private _compilerHost: WebpackCompilerHost;
+  private _moduleResolutionCache: ts.ModuleResolutionCache;
   private _angularCompilerHost: WebpackCompilerHost & CompilerHost;
   private _resourceLoader: WebpackResourceLoader;
   // Contains `moduleImportPath#exportName` => `fullModulePath`.
@@ -296,6 +301,9 @@ export class AngularCompilerPlugin implements Tapable {
       }
     }
 
+    // Use an identity function as all our paths are absolute already.
+    this._moduleResolutionCache = ts.createModuleResolutionCache(this._basePath, x => x);
+
     // Set platform.
     this._platform = options.platform || PLATFORM.Browser;
     timeEnd('AngularCompilerPlugin._setupOptions');
@@ -478,7 +486,7 @@ export class AngularCompilerPlugin implements Tapable {
     compiler.plugin('environment', () => {
       compiler.inputFileSystem = new VirtualFileSystemDecorator(
         compiler.inputFileSystem, this._compilerHost);
-      compiler.watchFileSystem = new NodeWatchFileSystem(compiler.inputFileSystem);
+      compiler.watchFileSystem = new VirtualWatchFileSystemDecorator(compiler.inputFileSystem);
     });
 
     // Add lazy modules to the context module for @angular/core
@@ -773,6 +781,41 @@ export class AngularCompilerPlugin implements Tapable {
       outputText: this._compilerHost.readFile(outputFile),
       sourceMap: this._compilerHost.readFile(outputFile + '.map')
     };
+  }
+
+  getDependencies(fileName: string): string[] {
+    const resolvedFileName = this._compilerHost.resolve(fileName);
+    const sourceFile = this._compilerHost.getSourceFile(resolvedFileName, ts.ScriptTarget.Latest);
+    if (!sourceFile) {
+      return [];
+    }
+
+    const options = this._compilerOptions;
+    const host = this._compilerHost;
+    const cache = this._moduleResolutionCache;
+
+    const esImports = findAstNodes<ts.ImportDeclaration>(null, sourceFile,
+      ts.SyntaxKind.ImportDeclaration)
+      .map(decl => {
+        const moduleName = (decl.moduleSpecifier as ts.StringLiteral).text;
+        const resolved = ts.resolveModuleName(moduleName, resolvedFileName, options, host, cache);
+
+        if (resolved.resolvedModule) {
+          return resolved.resolvedModule.resolvedFileName;
+        } else {
+          return null;
+        }
+      })
+      .filter(x => x);
+
+    const resourceImports = findResources(sourceFile)
+      .map((resourceReplacement) => resourceReplacement.resourcePaths)
+      .reduce((prev, curr) => prev.concat(curr), [])
+      .map((resourcePath) => path.resolve(path.dirname(resolvedFileName), resourcePath))
+      .reduce((prev, curr) =>
+        prev.concat(...this._resourceLoader.getResourceDependencies(curr)), []);
+
+    return [...esImports, ...resourceImports];
   }
 
   // This code mostly comes from `performCompilation` in `@angular/compiler-cli`.

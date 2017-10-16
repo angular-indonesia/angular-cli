@@ -431,6 +431,28 @@ function _getResourcesUrls(refactor: TypeScriptFileRefactor): string[] {
 }
 
 
+function _getImports(refactor: TypeScriptFileRefactor,
+                     compilerOptions: ts.CompilerOptions,
+                     host: ts.ModuleResolutionHost,
+                     cache: ts.ModuleResolutionCache): string[] {
+  const containingFile = refactor.fileName;
+
+  return refactor.findAstNodes(null, ts.SyntaxKind.ImportDeclaration, false)
+    .map((clause: ts.ImportDeclaration) => {
+      const moduleName = (clause.moduleSpecifier as ts.StringLiteral).text;
+      const resolved = ts.resolveModuleName(
+        moduleName, containingFile, compilerOptions, host, cache);
+
+      if (resolved.resolvedModule) {
+        return resolved.resolvedModule.resolvedFileName;
+      } else {
+        return null;
+      }
+    })
+    .filter(x => x);
+}
+
+
 /**
  * Recursively calls diagnose on the plugins for all the reverse dependencies.
  * @private
@@ -561,6 +583,19 @@ export function ngcLoader(this: LoaderContext & { _compilation: any }, source: s
           if (result.outputText === undefined) {
             throw new Error('TypeScript compilation failed.');
           }
+
+          // Dependencies must use system path separator.
+          const dependencies = plugin.getDependencies(sourceFileName);
+          dependencies.forEach(dep => this.addDependency(dep.replace(/\//g, path.sep)));
+
+          // Also add the original file dependencies to virtual files.
+          const virtualFilesRe = /\.(?:ngfactory|css\.shim\.ngstyle)\.js$/;
+          if (virtualFilesRe.test(sourceFileName)) {
+            const originalFile = sourceFileName.replace(virtualFilesRe, '.ts');
+            const origDependencies = plugin.getDependencies(originalFile);
+            origDependencies.forEach(dep => this.addDependency(dep.replace(/\//g, path.sep)));
+          }
+
           cb(null, result.outputText, result.sourceMap);
         })
         .catch(err => {
@@ -577,6 +612,12 @@ export function ngcLoader(this: LoaderContext & { _compilation: any }, source: s
       const refactor = new TypeScriptFileRefactor(
         sourceFileName, plugin.compilerHost, plugin.program, source);
 
+      // Force a few compiler options to make sure we get the result we want.
+      const compilerOptions: ts.CompilerOptions = Object.assign({}, plugin.compilerOptions, {
+        inlineSources: true,
+        inlineSourceMap: false,
+        sourceRoot: plugin.basePath
+      });
 
       Promise.resolve()
         .then(() => {
@@ -615,6 +656,9 @@ export function ngcLoader(this: LoaderContext & { _compilation: any }, source: s
           _getResourcesUrls(refactor).forEach((url: string) => {
             this.addDependency(path.resolve(path.dirname(sourceFileName), url));
           });
+          // Dependencies must use system path separator.
+          _getImports(refactor, compilerOptions, plugin.compilerHost, plugin.moduleResolutionCache)
+            .forEach((dep) => this.addDependency(dep.replace(/\//g, path.sep)));
           timeEnd(timeLabel + '.ngcLoader.AotPlugin.addDependency');
         })
         .then(() => {
@@ -641,13 +685,6 @@ export function ngcLoader(this: LoaderContext & { _compilation: any }, source: s
             }
             timeEnd(timeLabel + '.ngcLoader.AotPlugin.getDiagnostics');
           }
-
-          // Force a few compiler options to make sure we get the result we want.
-          const compilerOptions: ts.CompilerOptions = Object.assign({}, plugin.compilerOptions, {
-            inlineSources: true,
-            inlineSourceMap: false,
-            sourceRoot: plugin.basePath
-          });
 
           time(timeLabel + '.ngcLoader.AotPlugin.transpile');
           const result = refactor.transpile(compilerOptions);
