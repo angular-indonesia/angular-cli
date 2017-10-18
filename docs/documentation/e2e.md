@@ -11,9 +11,12 @@
 ng e2e
 ```
 
-End-to-end tests are run via [Protractor] (https://angular.github.io/protractor/).
+End-to-end tests are run via [Protractor](https://angular.github.io/protractor/).
 
 ## Options
+
+Please note that options that are supported by `ng serve` are also supported by `ng e2e`
+
 <details>
   <summary>config</summary>
   <p>
