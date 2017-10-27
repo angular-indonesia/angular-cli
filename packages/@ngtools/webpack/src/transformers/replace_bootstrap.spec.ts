@@ -1,3 +1,4 @@
+// @ignoreDep typescript
 import * as ts from 'typescript';
 import { oneLine, stripIndent } from 'common-tags';
 import { transformTypescript } from './ast_helpers';
@@ -19,22 +20,61 @@ describe('@ngtools/webpack transformers', () => {
 
         platformBrowserDynamic().bootstrapModule(AppModule);
       `;
+
+      // tslint:disable:max-line-length
       const output = stripIndent`
         import { enableProdMode } from '@angular/core';
         import { environment } from './environments/environment';
 
-        import { AppModuleNgFactory } from "./app/app.module.ngfactory";
-        import { platformBrowser } from "@angular/platform-browser";
+        import * as __NgCli_bootstrap_1 from "./app/app.module.ngfactory";
+        import * as __NgCli_bootstrap_2 from "@angular/platform-browser";
+
+        if (environment.production) {
+          enableProdMode();
+        }
+        __NgCli_bootstrap_2.platformBrowser().bootstrapModuleFactory(__NgCli_bootstrap_1.AppModuleNgFactory);
+      `;
+      // tslint:enable:max-line-length
+
+      const transformOpsCb = (sourceFile: ts.SourceFile) => replaceBootstrap(sourceFile,
+        { path: '/project/src/app/app.module', className: 'AppModule' });
+      const result = transformTypescript(input, transformOpsCb);
+
+      expect(oneLine`${result}`).toEqual(oneLine`${output}`);
+    });
+
+    it('should replace bootstrap when barrel files are used', () => {
+      const input = stripIndent`
+        import { enableProdMode } from '@angular/core';
+        import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
+
+        import { AppModule } from './app';
+        import { environment } from './environments/environment';
 
         if (environment.production) {
           enableProdMode();
         }
 
-        platformBrowser().bootstrapModuleFactory(AppModuleNgFactory);
+        platformBrowserDynamic().bootstrapModule(AppModule);
       `;
 
-      const transformOpsCb = (sourceFile: ts.SourceFile) =>
-        replaceBootstrap(sourceFile, { path: '/app.module', className: 'AppModule' });
+      // tslint:disable:max-line-length
+      const output = stripIndent`
+        import { enableProdMode } from '@angular/core';
+        import { environment } from './environments/environment';
+
+        import * as __NgCli_bootstrap_1 from "./app/app.module.ngfactory";
+        import * as __NgCli_bootstrap_2 from "@angular/platform-browser";
+
+        if (environment.production) {
+          enableProdMode();
+        }
+        __NgCli_bootstrap_2.platformBrowser().bootstrapModuleFactory(__NgCli_bootstrap_1.AppModuleNgFactory);
+      `;
+      // tslint:enable:max-line-length
+
+      const transformOpsCb = (sourceFile: ts.SourceFile) => replaceBootstrap(sourceFile,
+        { path: '/project/src/app/app.module', className: 'AppModule' });
       const result = transformTypescript(input, transformOpsCb);
 
       expect(oneLine`${result}`).toEqual(oneLine`${output}`);

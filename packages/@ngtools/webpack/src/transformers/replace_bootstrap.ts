@@ -1,7 +1,9 @@
+// @ignoreDep typescript
 import * as ts from 'typescript';
+import { relative, dirname } from 'path';
 
 import { findAstNodes } from './ast_helpers';
-import { insertImport } from './insert_import';
+import { insertStarImport } from './insert_import';
 import { removeImport } from './remove_import';
 import {
   ReplaceNodeOperation,
@@ -15,7 +17,7 @@ export function replaceBootstrap(
 ): TransformOperation[] {
   const ops: TransformOperation[] = [];
 
-  // Find all identifiers using the entry module class name.
+  // Find all identifiers.
   const entryModuleIdentifiers = findAstNodes<ts.Identifier>(null, sourceFile,
     ts.SyntaxKind.Identifier, true)
     .filter(identifier => identifier.getText() === entryModule.className);
@@ -24,27 +26,8 @@ export function replaceBootstrap(
     return [];
   }
 
-  // Get the module path from the import.
-  let modulePath: string;
-  entryModuleIdentifiers.forEach((entryModuleIdentifier) => {
-    // TODO: only supports `import {A, B, C} from 'modulePath'` atm, add other import support later.
-    if (entryModuleIdentifier.parent.kind !== ts.SyntaxKind.ImportSpecifier) {
-      return;
-    }
-
-    const importSpec = entryModuleIdentifier.parent as ts.ImportSpecifier;
-    const moduleSpecifier = importSpec.parent.parent.parent.moduleSpecifier;
-
-    if (moduleSpecifier.kind !== ts.SyntaxKind.StringLiteral) {
-      return;
-    }
-
-    modulePath = (moduleSpecifier as ts.StringLiteral).text;
-  });
-
-  if (!modulePath) {
-    return [];
-  }
+  const relativeEntryModulePath = relative(dirname(sourceFile.fileName), entryModule.path);
+  const normalizedEntryModulePath = `./${relativeEntryModulePath}`.replace(/\\/g, '/');
 
   // Find the bootstrap calls.
   const removedEntryModuleIdentifiers: ts.Identifier[] = [];
@@ -83,18 +66,21 @@ export function replaceBootstrap(
 
     const platformBrowserDynamicIdentifier = innerCallExpr.expression as ts.Identifier;
 
+    const idPlatformBrowser = ts.createUniqueName('__NgCli_bootstrap_');
+    const idNgFactory = ts.createUniqueName('__NgCli_bootstrap_');
+
     // Add the transform operations.
     const factoryClassName = entryModule.className + 'NgFactory';
-    const factoryModulePath = modulePath + '.ngfactory';
+    const factoryModulePath = normalizedEntryModulePath + '.ngfactory';
     ops.push(
       // Replace the entry module import.
-      ...insertImport(sourceFile, factoryClassName, factoryModulePath),
+      ...insertStarImport(sourceFile, idNgFactory, factoryModulePath),
       new ReplaceNodeOperation(sourceFile, entryModuleIdentifier,
-        ts.createIdentifier(factoryClassName)),
+        ts.createPropertyAccess(idNgFactory, ts.createIdentifier(factoryClassName))),
       // Replace the platformBrowserDynamic import.
-      ...insertImport(sourceFile, 'platformBrowser', '@angular/platform-browser'),
+      ...insertStarImport(sourceFile, idPlatformBrowser, '@angular/platform-browser'),
       new ReplaceNodeOperation(sourceFile, platformBrowserDynamicIdentifier,
-        ts.createIdentifier('platformBrowser')),
+        ts.createPropertyAccess(idPlatformBrowser, 'platformBrowser')),
       new ReplaceNodeOperation(sourceFile, bootstrapModuleIdentifier,
         ts.createIdentifier('bootstrapModuleFactory')),
     );

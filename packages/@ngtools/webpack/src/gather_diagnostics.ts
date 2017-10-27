@@ -1,3 +1,4 @@
+// @ignoreDep typescript
 import * as ts from 'typescript';
 
 import { time, timeEnd } from './benchmark';
@@ -70,12 +71,6 @@ export function gatherDiagnostics(
     checkOtherDiagnostics = checkOtherDiagnostics &&
       checkDiagnostics(angularProgram.getTsSemanticDiagnostics(undefined, cancellationToken));
     timeEnd(`${benchmarkLabel}.gatherDiagnostics.ng.getTsSemanticDiagnostics`);
-
-    // Check Angular structural diagnostics.
-    time(`${benchmarkLabel}.gatherDiagnostics.ng.getNgStructuralDiagnostics`);
-    checkOtherDiagnostics = checkOtherDiagnostics &&
-      checkDiagnostics(angularProgram.getNgStructuralDiagnostics(cancellationToken));
-    timeEnd(`${benchmarkLabel}.gatherDiagnostics.ng.getNgStructuralDiagnostics`);
 
     // Check Angular semantic diagnostics
     time(`${benchmarkLabel}.gatherDiagnostics.ng.getNgSemanticDiagnostics`);
