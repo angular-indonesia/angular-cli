@@ -28,7 +28,7 @@ $ npm install --save @angular/platform-server @nguniversal/module-map-ngfactory-
 
 ## Step 1: Prepare your App for Universal rendering
 
-The first thing you need to do is make your `AppModule` compatible with Universal by addding `.withServerTransition()` and an application ID to your `BrowserModule` import:
+The first thing you need to do is make your `AppModule` compatible with Universal by adding `.withServerTransition()` and an application ID to your `BrowserModule` import:
 
 
 ### src/app/app.module.ts:
@@ -136,7 +136,7 @@ Then, remove the `"polyfills"` key - those aren't needed on the server, and adju
   "apps": [
     {
       // Keep your original application config intact here, this is app 0
-      // -EXCEPT- for outDir, udpate it to dist/browser
+      // -EXCEPT- for outDir, update it to dist/browser
       "outDir": "dist/browser" // <-- update this
     },
     {
@@ -185,14 +185,14 @@ With these steps complete, you should be able to build a server bundle for your 
 $ ng build --prod
 ...
 # This builds the server bundle in dist/server/
-$ ng build --prod --app 1 --output
+$ ng build --prod --app 1 --output-hashing=false
 
 # outputs:
 Date: 2017-07-24T22:42:09.739Z
 Hash: 9cac7d8e9434007fd8da
 Time: 4933ms
-chunk {0} main.988d7a161bd984b7eb54.bundle.js (main) 9.49 kB [entry] [rendered]
-chunk {1} styles.d41d8cd98f00b204e980.bundle.css (styles) 0 bytes [entry] [rendered]
+chunk {0} main.bundle.js (main) 9.49 kB [entry] [rendered]
+chunk {1} styles.bundle.css (styles) 0 bytes [entry] [rendered]
 ```
 
 ---
