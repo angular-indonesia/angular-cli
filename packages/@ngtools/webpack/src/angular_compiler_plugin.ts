@@ -21,6 +21,7 @@ import {
   replaceBootstrap,
   exportNgFactory,
   exportLazyModuleMap,
+  removeDecorators,
   registerLocaleData,
   findResources,
   replaceResources,
@@ -637,10 +638,14 @@ export class AngularCompilerPlugin implements Tapable {
     const isMainPath = (fileName: string) => fileName === this._mainPath;
     const getEntryModule = () => this.entryModule;
     const getLazyRoutes = () => this._lazyRoutes;
+    const getTypeChecker = () => this._getTsProgram().getTypeChecker();
 
     if (this._JitMode) {
       // Replace resources in JIT.
       this._transformers.push(replaceResources(isAppPath));
+    } else {
+      // Remove unneeded angular decorators.
+      this._transformers.push(removeDecorators(isAppPath, getTypeChecker));
     }
 
     if (this._platform === PLATFORM.Browser) {
@@ -654,7 +659,7 @@ export class AngularCompilerPlugin implements Tapable {
 
       if (!this._JitMode) {
         // Replace bootstrap in browser AOT.
-        this._transformers.push(replaceBootstrap(isAppPath, getEntryModule));
+        this._transformers.push(replaceBootstrap(isAppPath, getEntryModule, getTypeChecker));
       }
     } else if (this._platform === PLATFORM.Server) {
       this._transformers.push(exportLazyModuleMap(isMainPath, getLazyRoutes));
