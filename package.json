@@ -1,6 +1,6 @@
 {
   "name": "@angular/cli",
-  "version": "1.6.0-rc.1",
+  "version": "1.6.0-rc.2",
   "description": "CLI tool for Angular",
   "main": "packages/@angular/cli/lib/cli/index.js",
   "trackingCode": "UA-8594346-19",
@@ -42,8 +42,8 @@
   "homepage": "https://github.com/angular/angular-cli",
   "dependencies": {
     "@angular-devkit/build-optimizer": "~0.0.34",
-    "@angular-devkit/schematics": "~0.0.38",
-    "@schematics/angular": "~0.1.8",
+    "@angular-devkit/schematics": "~0.0.39",
+    "@schematics/angular": "~0.1.9",
     "autoprefixer": "^6.5.3",
     "chalk": "~2.2.0",
     "circular-dependency-plugin": "^4.2.1",
@@ -94,7 +94,7 @@
     "typescript": "~2.4.2",
     "uglifyjs-webpack-plugin": "~1.1.2",
     "url-loader": "^0.6.2",
-    "webpack": "~3.9.1",
+    "webpack": "~3.10.0",
     "webpack-concat-plugin": "^1.4.2",
     "webpack-dev-middleware": "~1.12.0",
     "webpack-dev-server": "~2.9.3",
