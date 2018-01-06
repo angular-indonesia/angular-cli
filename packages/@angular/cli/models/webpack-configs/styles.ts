@@ -12,6 +12,7 @@ const postcssUrl = require('postcss-url');
 const autoprefixer = require('autoprefixer');
 const ExtractTextPlugin = require('extract-text-webpack-plugin');
 const customProperties = require('postcss-custom-properties');
+const postcssImports = require('postcss-import');
 
 /**
  * Enumerate loaders and their dependencies from this file to let the dependency validator
@@ -29,6 +30,12 @@ const customProperties = require('postcss-custom-properties');
  * require('sass-loader')
  */
 
+interface PostcssUrlAsset {
+  url: string;
+  hash: string;
+  absolutePath: string;
+}
+
 export function getStylesConfig(wco: WebpackConfigOptions) {
   const { projectRoot, buildOptions, appConfig } = wco;
 
@@ -44,17 +51,47 @@ export function getStylesConfig(wco: WebpackConfigOptions) {
   const baseHref = wco.buildOptions.baseHref || '';
   const deployUrl = wco.buildOptions.deployUrl || '';
 
-  const postcssPluginCreator = function() {
+  const postcssPluginCreator = function(loader: webpack.loader.LoaderContext) {
     return [
+      postcssImports({
+        resolve: (url: string, context: string) => {
+          return new Promise<string>((resolve, reject) => {
+            loader.resolve(context, url, (err: Error, result: string) => {
+              if (err) {
+                reject(err);
+                return;
+              }
+
+              resolve(result);
+            });
+          });
+        },
+        load: (filename: string) => {
+          return new Promise<string>((resolve, reject) => {
+            loader.fs.readFile(filename, (err: Error, data: Buffer) => {
+              if (err) {
+                reject(err);
+                return;
+              }
+
+              const content = data.toString();
+              resolve(content);
+            });
+          });
+        }
+      }),
       postcssUrl({
-        filter: ({ url }: { url: string }) => url.startsWith('~'),
-        url: ({ url }: { url: string }) => path.join(projectRoot, 'node_modules', url.substr(1)),
+        filter: ({ url }: PostcssUrlAsset) => url.startsWith('~'),
+        url: ({ url }: PostcssUrlAsset) => {
+          const fullPath = path.join(projectRoot, 'node_modules', url.substr(1));
+          return path.relative(loader.context, fullPath).replace(/\\/g, '/');
+        }
       }),
       postcssUrl([
         {
           // Only convert root relative URLs, which CSS-Loader won't process into require().
-          filter: ({ url }: { url: string }) => url.startsWith('/') && !url.startsWith('//'),
-          url: ({ url }: { url: string }) => {
+          filter: ({ url }: PostcssUrlAsset) => url.startsWith('/') && !url.startsWith('//'),
+          url: ({ url }: PostcssUrlAsset) => {
             if (deployUrl.match(/:\/\//) || deployUrl.startsWith('/')) {
               // If deployUrl is absolute or root relative, ignore baseHref & use deployUrl as is.
               return `${deployUrl.replace(/\/$/, '')}${url}`;
@@ -71,7 +108,7 @@ export function getStylesConfig(wco: WebpackConfigOptions) {
         },
         {
           // TODO: inline .cur if not supporting IE (use browserslist to check)
-          filter: (asset: any) => !asset.hash && !asset.absolutePath.endsWith('.cur'),
+          filter: (asset: PostcssUrlAsset) => !asset.hash && !asset.absolutePath.endsWith('.cur'),
           url: 'inline',
           // NOTE: maxSize is in KB
           maxSize: 10
@@ -85,7 +122,8 @@ export function getStylesConfig(wco: WebpackConfigOptions) {
     variableImports: {
       'autoprefixer': 'autoprefixer',
       'postcss-url': 'postcssUrl',
-      'postcss-custom-properties': 'customProperties'
+      'postcss-custom-properties': 'customProperties',
+      'postcss-import': 'postcssImports',
     },
     variables: { minimizeCss, baseHref, deployUrl, projectRoot }
   };
@@ -158,7 +196,7 @@ export function getStylesConfig(wco: WebpackConfigOptions) {
       loader: 'css-loader',
       options: {
         sourceMap: cssSourceMap,
-        importLoaders: 1,
+        import: false,
       }
     },
     {
