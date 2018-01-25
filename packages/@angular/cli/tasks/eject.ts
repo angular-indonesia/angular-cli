@@ -225,6 +225,7 @@ class JsonWebpackSerializer {
           break;
         case CircularDependencyPlugin:
           this.variableImports['circular-dependency-plugin'] = 'CircularDependencyPlugin';
+          args.cwd = this._escape('projectRoot');
           break;
         case AotPlugin:
           args = this._aotPluginSerialize(plugin);
@@ -264,11 +265,13 @@ class JsonWebpackSerializer {
             // CopyWebpackPlugin doesn't have a constructor nor save args.
             this.variableImports['copy-webpack-plugin'] = 'CopyWebpackPlugin';
             const patternOptions = plugin['copyWebpackPluginPatterns'].map((pattern: any) => {
-              if (!pattern.context) {
-                return pattern;
+              if (pattern.context) {
+                pattern.context = path.relative(process.cwd(), pattern.context);
               }
-              const context = path.relative(process.cwd(), pattern.context);
-              return { ...pattern, context };
+              if (pattern.from && pattern.from.glob) {
+                pattern.from.glob = path.relative(process.cwd(), pattern.from.glob);
+              }
+              return pattern;
             });
             const patternsSerialized = serializer(patternOptions);
             const optionsSerialized = serializer(plugin['copyWebpackPluginOptions']) || 'undefined';
@@ -285,7 +288,6 @@ class JsonWebpackSerializer {
   private _resolveReplacer(value: any) {
     this.variableImports['rxjs/_esm5/path-mapping'] = 'rxPaths';
     return Object.assign({}, value, {
-      modules: value.modules.map((x: string) => './' + path.relative(this._root, x)),
       alias: this._escape('rxPaths()')
     });
   }
@@ -315,24 +317,39 @@ class JsonWebpackSerializer {
       if (loader.match(/\/node_modules\/extract-text-webpack-plugin\//)) {
         return 'extract-text-webpack-plugin';
       } else if (loader.match(/@ngtools\/webpack\/src\/index.ts/)) {
-        // return '@ngtools/webpack';
+        return '@ngtools/webpack';
       }
     } else {
       if (loader.loader) {
         loader.loader = this._loaderReplacer(loader.loader);
       }
-      if (loader.loader === 'postcss-loader' && !this._postcssProcessed) {
-        const args: any = loader.options.plugins[postcssArgs];
+      if (loader.loader === 'postcss-loader') {
+        if (!this._postcssProcessed) {
+          const args: any = loader.options.plugins[postcssArgs];
 
+        Object.keys(args.imports)
+          .forEach(key => this._addImport(key, args.imports[key]));
         Object.keys(args.variableImports)
           .forEach(key => this.variableImports[key] = args.variableImports[key]);
         Object.keys(args.variables)
-          .forEach(key => this.variables[key] = JSON.stringify(args.variables[key]));
+          .forEach(key => {
+            const value = args.variables[key];
+            if (value === process.cwd()) {
+              this.variables[key] = 'process.cwd()';
+            } else if (typeof value == 'string' && value.startsWith(process.cwd())) {
+              this.variables[key] = 'process.cwd() + '
+                                  + JSON.stringify(value.substr(process.cwd().length));
+            } else {
+              this.variables[key] = JSON.stringify(value);
+            }
+          });
 
-        this.variables['postcssPlugins'] = loader.options.plugins;
+          this.variables['postcssPlugins'] = loader.options.plugins;
+
+          this._postcssProcessed = true;
+        }
+
         loader.options.plugins = this._escape('postcssPlugins');
-
-        this._postcssProcessed = true;
       }
     }
     return loader;
@@ -356,13 +373,16 @@ class JsonWebpackSerializer {
     };
 
     if (value[pluginArgs]) {
+      const options = value[pluginArgs];
+      options.use = options.use.map((loader: any) => this._loaderReplacer(loader));
+
       return {
         include: Array.isArray(value.include)
           ? value.include.map((x: any) => replaceExcludeInclude(x))
           : replaceExcludeInclude(value.include),
         test: this._serializeRegExp(value.test),
         loaders: this._escape(
-          `ExtractTextPlugin.extract(${JSON.stringify(value[pluginArgs], null, 2)})`)
+          `ExtractTextPlugin.extract(${JSON.stringify(options, null, 2)})`)
       };
     }
 
@@ -581,6 +601,8 @@ export default Task.extend({
 
         // Update all loaders from webpack, plus postcss plugins.
         [
+          '@angular-devkit/core',
+          '@ngtools/webpack',
           'webpack',
           'autoprefixer',
           'css-loader',
@@ -588,6 +610,7 @@ export default Task.extend({
           'file-loader',
           'html-webpack-plugin',
           'json-loader',
+          'karma-cli',
           'karma-sourcemap-loader',
           'less-loader',
           'postcss-import',
