@@ -103,6 +103,7 @@ export class AngularCompilerPlugin implements Tapable {
   private _platform: PLATFORM;
   private _JitMode = false;
   private _emitSkipped = true;
+  private _changedFileExtensions = new Set(['ts', 'html', 'css']);
 
   // Webpack plugin.
   private _firstRun = true;
@@ -292,9 +293,22 @@ export class AngularCompilerPlugin implements Tapable {
       .filter(k => this._compilerHost.fileExists(k));
   }
 
+  updateChangedFileExtensions(extension: string) {
+    if (extension) {
+      this._changedFileExtensions.add(extension);
+    }
+  }
+
   private _getChangedCompilationFiles() {
     return this._compilerHost.getChangedFilePaths()
-      .filter(k => /\.(?:ts|html|css|scss|sass|less|styl)$/.test(k));
+      .filter(k => {
+        for (const ext of this._changedFileExtensions) {
+          if (k.endsWith(ext)) {
+            return true;
+          }
+        }
+        return false;
+      });
   }
 
   private _createOrUpdateProgram() {
@@ -600,19 +614,21 @@ export class AngularCompilerPlugin implements Tapable {
       this._donePromise = null;
     });
 
-    // TODO: consider if it's better to remove this plugin and instead make it wait on the
-    // VirtualFileSystemDecorator.
     compiler.plugin('after-resolvers', (compiler: any) => {
-      // Virtual file system.
-      // Wait for the plugin to be done when requesting `.ts` files directly (entry points), or
-      // when the issuer is a `.ts` or `.ngfactory.js` file.
-      compiler.resolvers.normal.plugin('before-resolve', (request: any, cb: () => void) => {
-        if (this.done && (request.request.endsWith('.ts')
-          || (request.context.issuer && /\.ts|ngfactory\.js$/.test(request.context.issuer)))) {
-          this.done.then(() => cb(), () => cb());
-        } else {
-          cb();
-        }
+      compiler.plugin('normal-module-factory', (nmf: any) => {
+        // Virtual file system.
+        // TODO: consider if it's better to remove this plugin and instead make it wait on the
+        // VirtualFileSystemDecorator.
+        // Wait for the plugin to be done when requesting `.ts` files directly (entry points), or
+        // when the issuer is a `.ts` or `.ngfactory.js` file.
+        nmf.plugin('before-resolve', (request: any, callback: any) => {
+          if (this.done && (request.request.endsWith('.ts')
+              || (request.context.issuer && /\.ts|ngfactory\.js$/.test(request.context.issuer)))) {
+            this.done.then(() => callback(null, request), () => callback(null, request));
+          } else {
+            callback(null, request);
+          }
+        });
       });
     });
 
@@ -877,12 +893,16 @@ export class AngularCompilerPlugin implements Tapable {
     const resourceImports = findResources(sourceFile)
       .map((resourceReplacement) => resourceReplacement.resourcePaths)
       .reduce((prev, curr) => prev.concat(curr), [])
-      .map((resourcePath) => path.resolve(path.dirname(resolvedFileName), resourcePath))
-      .reduce((prev, curr) =>
-        prev.concat(...this.getResourceDependencies(curr)), []);
+      .map((resourcePath) => path.resolve(path.dirname(resolvedFileName), resourcePath));
 
     // These paths are meant to be used by the loader so we must denormalize them.
-    return [...esImports, ...resourceImports].map((p) => this._compilerHost.denormalizePath(p));
+    const uniqueDependencies =  new Set([
+      ...esImports,
+      ...resourceImports,
+      ...this.getResourceDependencies(resolvedFileName)
+    ].map((p) => this._compilerHost.denormalizePath(p)));
+
+    return [...uniqueDependencies];
   }
 
   getResourceDependencies(fileName: string): string[] {
