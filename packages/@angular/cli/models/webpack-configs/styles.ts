@@ -1,9 +1,6 @@
 import * as webpack from 'webpack';
 import * as path from 'path';
-import {
-  CleanCssWebpackPlugin,
-  SuppressExtractedTextChunksWebpackPlugin,
-} from '../../plugins/webpack';
+import { SuppressExtractedTextChunksWebpackPlugin } from '../../plugins/webpack';
 import { extraEntryParser, getOutputHashFormat } from './utils';
 import { WebpackConfigOptions } from '../webpack-config';
 import { pluginArgs, postcssArgs } from '../../tasks/eject';
@@ -45,8 +42,6 @@ export function getStylesConfig(wco: WebpackConfigOptions) {
 
   // Maximum resource size to inline (KiB)
   const maximumInlineSize = 10;
-  // Minify/optimize css in production.
-  const minimizeCss = buildOptions.target === 'production';
   // determine hashing format
   const hashFormat = getOutputHashFormat(buildOptions.outputHashing);
   // Convert absolute resource URLs to account for base-href and deploy-url.
@@ -270,20 +265,14 @@ export function getStylesConfig(wco: WebpackConfigOptions) {
   if (buildOptions.extractCss) {
     // extract global css from js files into own css file
     extraPlugins.push(
-      new ExtractTextPlugin({ filename: `[name]${hashFormat.extract}.bundle.css` }));
+      new ExtractTextPlugin({ filename: `[name]${hashFormat.extract}.css` }));
     // suppress empty .js files in css only entry points
     extraPlugins.push(new SuppressExtractedTextChunksWebpackPlugin());
   }
 
-  if (minimizeCss) {
-    extraPlugins.push(new CleanCssWebpackPlugin({
-      sourceMap: cssSourceMap,
-      // component styles retain their original file name
-      test: (file) => /\.(?:css|scss|sass|less|styl)$/.test(file),
-    }));
-  }
-
   return {
+    // Workaround stylus-loader defect: https://github.com/shama/stylus-loader/issues/189
+    loader: { stylus: {} },
     entry: entryPoints,
     module: { rules },
     plugins: [].concat(extraPlugins)
