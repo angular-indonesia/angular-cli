@@ -76,7 +76,7 @@ export function getBrowserConfig(wco: WebpackConfigOptions) {
 
   if (buildOptions.extractLicenses) {
     extraPlugins.push(new LicenseWebpackPlugin({
-      pattern: /^(MIT|ISC|BSD.*)$/,
+      pattern: /.*/,
       suppressErrors: true,
       perChunkOutput: false,
       outputFilename: `3rdpartylicenses.txt`
@@ -124,16 +124,6 @@ export function getBrowserConfig(wco: WebpackConfigOptions) {
         deployUrl: buildOptions.deployUrl,
       }),
     ]),
-    node: {
-      fs: 'empty',
-      global: true,
-      crypto: 'empty',
-      tls: 'empty',
-      net: 'empty',
-      process: true,
-      module: false,
-      clearImmediate: false,
-      setImmediate: false
-    }
+    node: false,
   };
 }
