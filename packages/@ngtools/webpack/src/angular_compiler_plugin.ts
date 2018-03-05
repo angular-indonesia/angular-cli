@@ -41,7 +41,6 @@ import {
   CompilerHost,
   Diagnostic,
   EmitFlags,
-  LazyRoute,
   createProgram,
   createCompilerHost,
   formatDiagnostics,
@@ -112,7 +111,7 @@ export class AngularCompilerPlugin {
   // Webpack plugin.
   private _firstRun = true;
   private _donePromise: Promise<void> | null;
-  private _normalizedLocale: string;
+  private _normalizedLocale: string | null;
   private _warnings: (string | Error)[] = [];
   private _errors: (string | Error)[] = [];
 
@@ -430,7 +429,7 @@ export class AngularCompilerPlugin {
     const lazyRoutes = ngProgram.listLazyRoutes();
 
     return lazyRoutes.reduce(
-      (acc: LazyRouteMap, curr: LazyRoute) => {
+      (acc, curr) => {
         const ref = curr.route;
         if (ref in acc && acc[ref] !== curr.referencedModule.filePath) {
           throw new Error(
@@ -1039,7 +1038,7 @@ export class AngularCompilerPlugin {
     return { program, emitResult, diagnostics: allDiagnostics };
   }
 
-  private _validateLocale(locale: string) {
+  private _validateLocale(locale: string): string | null {
     // Get the path of the common module.
     const commonPath = path.dirname(require.resolve('@angular/common/package.json'));
     // Check if the locale file exists
@@ -1066,9 +1065,11 @@ export class AngularCompilerPlugin {
         if (locales.indexOf(parentLocale) !== -1) {
           locale = parentLocale;
         } else {
-          throw new Error(
-            `Unable to load the locale data file "@angular/common/locales/${locale}", ` +
-            `please check that "${locale}" is a valid locale id.`);
+          this._warnings.push(`AngularCompilerPlugin: Unable to load the locale data file ` +
+            `"@angular/common/locales/${locale}", ` +
+            `please check that "${locale}" is a valid locale id.
+            If needed, you can use "registerLocaleData" manually.`);
+          return null;
         }
       }
     }
