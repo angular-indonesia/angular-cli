@@ -7,6 +7,10 @@ import {expectToFail} from '../../utils/utils';
 
 
 export default function() {
+  // TODO(architect): The common chunk seems to have a different name in devkit/build-webpack.
+  // Investigate, validate, then delete this test.
+  return;
+
   return Promise.resolve();
 
   let oldNumberOfFiles = 0;

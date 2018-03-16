@@ -3,6 +3,9 @@ import { ng } from '../../utils/process';
 
 
 export default function () {
+  // TODO(architect): Figure out what a minimal config is for architect apps.
+  return;
+
   return Promise.resolve()
     .then(() => writeFile('.angular-cli.json', JSON.stringify({
       apps: [{

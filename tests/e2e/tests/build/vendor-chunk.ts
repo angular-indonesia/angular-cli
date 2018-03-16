@@ -4,8 +4,10 @@ import {expectToFail} from '../../utils/utils';
 
 
 export default function() {
+  // TODO(architect): Delete this test. It is now in devkit/build-webpack.
+
   return ng('build')
     .then(() => expectFileToExist('dist/vendor.js'))
-    .then(() => ng('build', '--no-vendor-chunk'))
+    .then(() => ng('build', '--vendor-chunk=false'))
     .then(() => expectToFail(() => expectFileToExist('dist/vendor.js')));
 }

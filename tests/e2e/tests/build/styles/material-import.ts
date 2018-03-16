@@ -7,6 +7,8 @@ import { stripIndents } from 'common-tags';
 import { updateJsonFile } from '../../../utils/project';
 
 export default function () {
+  // TODO(architect): Delete this test. It is now in devkit/build-webpack.
+
   const extensions = ['css', 'scss', 'less', 'styl'];
   let promise: Promise<any> = Promise.resolve()
     .then(() => silentNpm('install', '@angular/material@5.0.4'));
@@ -29,7 +31,7 @@ export default function () {
         .then(() => replaceInFile('src/app/app.component.ts',
           './app.component.css', `./app.component.${ext}`))
         // run build app
-        .then(() => ng('build', '--extract-css', '--sourcemaps'))
+        .then(() => ng('build', '--extract-css', '--source-map'))
         .then(() => writeMultipleFiles({
           [`src/styles.${ext}`]: stripIndents`
             @import "@angular/material/prebuilt-themes/indigo-pink.css";

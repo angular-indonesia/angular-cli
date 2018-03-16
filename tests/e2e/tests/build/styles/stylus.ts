@@ -10,6 +10,8 @@ import { stripIndents } from 'common-tags';
 import { updateJsonFile } from '../../../utils/project';
 
 export default function () {
+  // TODO(architect): Delete this test. It is now in devkit/build-webpack.
+
   return writeMultipleFiles({
     'src/styles.styl': stripIndents`
       @import './imported-styles.styl';
@@ -32,7 +34,7 @@ export default function () {
     }))
     .then(() => replaceInFile('src/app/app.component.ts',
       './app.component.css', './app.component.styl'))
-    .then(() => ng('build', '--extract-css', '--sourcemaps'))
+    .then(() => ng('build', '--extract-css', '--source-map'))
     .then(() => expectFileToMatch('dist/styles.css',
       /body\s*{\s*background-color: #00f;\s*}/))
     .then(() => expectFileToMatch('dist/styles.css',

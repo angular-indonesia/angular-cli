@@ -5,6 +5,8 @@ import { expectToFail } from '../../utils/utils';
 const integrityRe = /integrity="\w+-[A-Za-z0-9\/\+=]+"/;
 
 export default async function() {
+  // TODO(architect): Delete this test. It is now in devkit/build-webpack.
+
   // WEBPACK4_DISABLED - disabled pending a webpack 4 version
   return;
 
