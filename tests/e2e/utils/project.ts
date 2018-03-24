@@ -5,7 +5,7 @@ import { getGlobalVariable } from './env';
 const packages = require('../../../lib/packages').packages;
 
 
-const tsConfigPath = 'src/tsconfig.app.json';
+const tsConfigPath = 'projects/test-project/tsconfig.app.json';
 
 
 export function updateJsonFile(filePath: string, fn: (json: any) => any | void) {
@@ -44,10 +44,10 @@ export function createProject(name: string, ...args: string[]) {
     .then(() => argv['ng2'] ? useNg2() : Promise.resolve())
     .then(() => argv['ng4'] ? useNg4() : Promise.resolve())
     .then(() => argv.nightly || argv['ng-sha'] ? useSha() : Promise.resolve())
-    // TODO(architect): remove the changes to karma config when schematics are in
-    .then(() => replaceInFile('karma.conf.js', /@angular\/cli/g, '@angular-devkit/build-webpack'))
-    .then(() => replaceInFile('karma.conf.js', 'reports',
-      `dir: require('path').join(__dirname, 'coverage'), reports`))
+// TODO(architect): remove the changes to karma config when schematics are in
+// .then(() => replaceInFile('karma.conf.js', /@angular\/cli/g, '@angular-devkit/build-webpack'))
+// .then(() => replaceInFile('karma.conf.js', 'reports',
+//   `dir: require('path').join(__dirname, 'coverage'), reports`))
     .then(() => console.log(`Project ${name} created... Installing npm.`))
     .then(() => silentNpm('install'));
 }
@@ -132,10 +132,42 @@ export function useSha() {
   }
 }
 
+export function useNgVersion(version: string) {
+  return updateJsonFile('package.json', json => {
+    // Install over the project with nightly builds.
+    Object.keys(json['dependencies'] || {})
+      .filter(name => name.match(/^@angular\//))
+      .forEach(name => {
+        const pkgName = name.split(/\//)[1];
+        if (pkgName == 'cli') {
+          return;
+        }
+        json['dependencies'][`@angular/${pkgName}`] = version;
+      });
+
+    Object.keys(json['devDependencies'] || {})
+      .filter(name => name.match(/^@angular\//))
+      .forEach(name => {
+        const pkgName = name.split(/\//)[1];
+        if (pkgName == 'cli') {
+          return;
+        }
+        json['devDependencies'][`@angular/${pkgName}`] = version;
+      });
+    // TODO: determine the appropriate version for the Angular version
+    if (version.startsWith('^5')) {
+      json['devDependencies']['typescript'] = '~2.5.0';
+    } else {
+      json['devDependencies']['typescript'] = '~2.7.0';
+      json['dependencies']['rxjs'] = '6.0.0-beta.0';
+    }
+  });
+}
+
 export function useCIDefaults() {
-  return updateJsonFile('.angular.json', workspaceJson => {
+  return updateJsonFile('angular.json', workspaceJson => {
     // Disable progress reporting on CI to reduce spam.
-    const appArchitect = workspaceJson.projects.app.architect;
+    const appArchitect = workspaceJson.projects['test-project'].architect;
     appArchitect.build.options.progress = false;
     appArchitect.test.options.progress = false;
   });
@@ -159,7 +191,7 @@ export function useCIChrome() {
     `))
     // Not a problem if the file can't be found.
     .catch(() => null)
-    .then(() => replaceInFile('karma.conf.js', `browsers: ['Chrome'],`,
+    .then(() => replaceInFile('projects/test-project/karma.conf.js', `browsers: ['Chrome'],`,
       `browsers: ['ChromeCI'],
       customLaunchers: {
         ChromeCI: {
