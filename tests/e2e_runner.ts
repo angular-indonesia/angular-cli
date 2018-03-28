@@ -96,53 +96,31 @@ const allSetups = glob.sync(path.join(e2eRoot, 'setup/**/*.ts'), { nodir: true }
 const allTests = glob.sync(path.join(e2eRoot, testGlob), { nodir: true, ignore: argv.ignore })
   .map(name => path.relative(e2eRoot, name))
   // TODO: UPDATE TESTS
-  .filter(name => !name.endsWith('/basic/build.ts'))
-  .filter(name => !name.endsWith('/basic/e2e.ts'))
+  // Replace windows slashes.
+  .map(name => name.replace(/\\/g, '/'))
   .filter(name => !name.endsWith('/build-app-shell-with-schematic.ts'))
-  .filter(name => !name.endsWith('/build-app-shell.ts'))
   .filter(name => !name.endsWith('/bundle-budgets.ts'))
-  .filter(name => !name.endsWith('/build/environment.ts'))
-  .filter(name => !name.endsWith('/platform-server.ts'))
   .filter(name => !name.endsWith('/service-worker.ts'))
-  .filter(name => !name.endsWith('/typescript-2_4.ts'))
-  .filter(name => !name.endsWith('/typescript-2_7.ts'))
-  .filter(name => !name.endsWith('/output-hashing.ts'))
   .filter(name => !name.endsWith('/new-minimal.ts'))
-  .filter(name => !name.endsWith('/loaders-resolution.ts'))
-  .filter(name => !name.endsWith('/module-resolution.ts'))
-  .filter(name => !name.endsWith('/test-environment.ts'))
-  .filter(name => !name.endsWith('/build/css-urls.ts'))
-  .filter(name => !name.endsWith('/build/deploy-url.ts'))
-  .filter(name => !name.endsWith('/different-file-format.ts'))
-  .filter(name => !name.endsWith('/loaders.ts'))
-  .filter(name => !name.endsWith('/misc/lazy-module.ts'))
   // IS this test still valid? \/
   .filter(name => !name.endsWith('/module-id.ts'))
-  // index.html in wrong dir in dist (currently in src)
-  .filter(name => !name.endsWith('/scripts-array.ts'))
-  .filter(name => !name.endsWith('/styles-array.ts'))
-  .filter(name => !name.endsWith('/base-href.ts'))
-  .filter(name => !name.endsWith('/third-party/bootstrap'))
-  .filter(name => !name.endsWith('/extract-css.ts'))
-  .filter(name => !name.endsWith('/fallback.ts'))
-  .filter(name => !name.endsWith('/no-angular-router.ts'))
-  .filter(name => !name.endsWith('/build/output-dir.ts'))
-  .filter(name => !name.endsWith('/build/polyfills.ts'))
-  .filter(name => !name.endsWith('/build/prod-build.ts'))
-  // favicon not moving
-  .filter(name => !name.endsWith('/inline-urls.ts'))
-  // .filter(name => !name.endsWith('/misc/assets.ts'))
+  // Do we want to support this?
+  .filter(name => !name.endsWith('different-file-format.ts'))
+  // Not sure what this test is meant to test, but with depedency changes it is not valid anymore.
+  .filter(name => !name.endsWith('loaders-resolution.ts'))
   // TODO:CONFIG READING
   .filter(name => !name.endsWith('/component-flat.ts'))
   .filter(name => !name.endsWith('/component-not-flat.ts'))
   .filter(name => !name.endsWith('/component-prefix.ts'))
   .filter(name => !name.endsWith('/directive-prefix.ts'))
-  // CONFIG COMMAND
-  .filter(name => !name.startsWith('tests/commands/config'))
   // NEW COMMAND
-  .filter(name => !name.startsWith('tests/commands/new'))
+  .filter(name => !name.includes('tests/commands/new/'))
   // NEEDS devkit change
   .filter(name => !name.endsWith('/existing-directory.ts'))
+  // ngtools/webpack is now in devkit and needs to be tested there
+  .filter(name => !name.endsWith('/packages/webpack/server-ng5.ts'))
+  .filter(name => !name.endsWith('/packages/webpack/test-ng5.ts'))
+  .filter(name => !name.endsWith('/packages/webpack/weird-ng5.ts'))
   .sort();
 
 const shardId = ('shard' in argv) ? argv['shard'] : null;
