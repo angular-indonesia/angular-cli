@@ -20,6 +20,13 @@ export interface ConfigOptions {
   global?: boolean;
 }
 
+const validCliPaths = new Map([
+  ['cli.warnings.versionMismatch', 'boolean'],
+  ['cli.warnings.typescriptMismatch', 'boolean'],
+  ['cli.defaultCollection', 'string'],
+  ['cli.packageManager', 'string'],
+]);
+
 /**
  * Splits a JSON path string into fragments. Fragments can be used to get the value referenced
  * by the path. For example, a path of "a[3].foo.bar[2]" would give you a fragment array of
@@ -120,17 +127,18 @@ export default class ConfigCommand extends Command {
   public readonly description = 'Get/set configuration values.';
   public readonly arguments = ['jsonPath', 'value'];
   public readonly options: Option[] = [
-    // {
-    //   name: 'global',
-    //   type: Boolean,
-    //   'default': false,
-    //   aliases: ['g'],
-    //   description: 'Get/set the value in the global configuration (in your home directory).'
-    // }
+    {
+      name: 'global',
+      type: Boolean,
+      'default': false,
+      aliases: ['g'],
+      description: 'Get/set the value in the global configuration (in your home directory).'
+    }
   ];
 
   public run(options: ConfigOptions) {
-    const config = (getWorkspace() as {} as { _workspace: WorkspaceJson});
+    const level = options.global ? 'global' : 'local';
+    const config = (getWorkspace(level) as {} as { _workspace: WorkspaceJson});
 
     if (!config) {
       throw new SilentError('No config found.');
@@ -156,12 +164,28 @@ export default class ConfigCommand extends Command {
   }
 
   private set(options: ConfigOptions) {
-    const [config, configPath] = getWorkspaceRaw();
+    if (!options.jsonPath || !options.jsonPath.trim()) {
+      throw new Error('Invalid Path.');
+    }
+    if (options.global
+        && !options.jsonPath.startsWith('schematics.')
+        && !validCliPaths.has(options.jsonPath)) {
+      throw new Error('Invalid Path.');
+    }
+
+    const [config, configPath] = getWorkspaceRaw(options.global ? 'global' : 'local');
 
     // TODO: Modify & save without destroying comments
     const configValue = config.value;
 
     const value = parseJson(options.value, JsonParseMode.Loose);
+    const pathType = validCliPaths.get(options.jsonPath);
+    if (pathType) {
+      if (typeof value != pathType) {
+        throw new Error(`Invalid value type; expected a ${pathType}.`);
+      }
+    }
+
     const result = setValueFromPath(configValue, options.jsonPath, value);
 
     if (result === undefined) {
@@ -175,7 +199,7 @@ export default class ConfigCommand extends Command {
       throw new SilentError();
     }
 
-    const output = JSON.stringify(configValue);
+    const output = JSON.stringify(configValue, null, 2);
     writeFileSync(configPath, output);
   }
 
