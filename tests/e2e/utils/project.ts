@@ -5,7 +5,7 @@ import { getGlobalVariable } from './env';
 const packages = require('../../../lib/packages').packages;
 
 
-const tsConfigPath = 'projects/test-project/tsconfig.app.json';
+const tsConfigPath = 'tsconfig.json';
 
 
 export function updateJsonFile(filePath: string, fn: (json: any) => any | void) {
@@ -39,7 +39,8 @@ export function createProject(name: string, ...args: string[]) {
     .then(() => ng('new', name, '--skip-install', ...args))
     .then(() => process.chdir(name))
     .then(() => useBuiltPackages())
-    .then(() => useCIChrome())
+    .then(() => useCIChrome('e2e'))
+    .then(() => useCIChrome('src'))
     .then(() => useCIDefaults())
     .then(() => argv['ng2'] ? useNg2() : Promise.resolve())
     .then(() => argv['ng4'] ? useNg4() : Promise.resolve())
@@ -153,9 +154,10 @@ export function useNgVersion(version: string) {
     // TODO: determine the appropriate version for the Angular version
     if (version.startsWith('^5')) {
       json['devDependencies']['typescript'] = '~2.5.0';
+      json['dependencies']['rxjs'] = '5.5.8';
     } else {
       json['devDependencies']['typescript'] = '~2.7.0';
-      json['dependencies']['rxjs'] = '6.0.0-beta.3';
+      json['dependencies']['rxjs'] = '6.0.0-rc.0';
     }
   });
 }
@@ -169,13 +171,13 @@ export function useCIDefaults() {
   });
 }
 
-export function useCIChrome(projectDir = 'test-project') {
+export function useCIChrome(projectDir: string) {
   // There's a race condition happening in Chrome. Enabling logging in chrome used by
   // protractor actually fixes it. Logging is piped to a file so it doesn't affect our setup.
   // --no-sandbox is needed for Circle CI.
   // Travis can use headless chrome, but not appveyor.
   return Promise.resolve()
-    .then(() => replaceInFile(`projects/${projectDir}-e2e/protractor.conf.js`,
+    .then(() => replaceInFile(`${projectDir}/protractor.conf.js`,
       `'browserName': 'chrome'`,
       `'browserName': 'chrome',
         chromeOptions: {
@@ -188,7 +190,7 @@ export function useCIChrome(projectDir = 'test-project') {
     `))
     // Not a problem if the file can't be found.
     .catch(() => null)
-    .then(() => replaceInFile(`projects/${projectDir}/karma.conf.js`, `browsers: ['Chrome'],`,
+    .then(() => replaceInFile(`${projectDir}/karma.conf.js`, `browsers: ['Chrome'],`,
       `browsers: ['ChromeCI'],
       customLaunchers: {
         ChromeCI: {
