@@ -11,19 +11,21 @@ const SilentError = require('silent-error');
 export default class AddCommand extends SchematicCommand {
   readonly name = 'add';
   readonly description = 'Add support for a library to your project.';
+  readonly allowPrivateSchematics = true;
   scope = CommandScope.inProject;
   arguments = ['collection'];
   options: Option[] = [];
 
   private async _parseSchematicOptions(collectionName: string): Promise<any> {
-    const availableOptions: Option[] = await this.getOptions({
+    const schematicOptions = await this.getOptions({
       schematicName: 'ng-add',
       collectionName,
     });
 
-    const options = this.options.concat(availableOptions || []);
+    const options = this.options.concat(schematicOptions.options);
+    const args = schematicOptions.arguments.map(arg => arg.name);
 
-    return parseOptions(this._rawArgs, options, [], this.argStrategy);
+    return parseOptions(this._rawArgs, options, args, this.argStrategy);
   }
 
   validate(options: any) {
