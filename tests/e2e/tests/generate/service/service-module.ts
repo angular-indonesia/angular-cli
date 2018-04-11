@@ -10,15 +10,12 @@ export default function() {
 
   return ng('generate', 'service', 'test-service', '--module', 'app.module.ts')
     .then(() => expectFileToMatch(servicePath, /import { AppModule } from '.\/app.module'/))
-    .then(() => expectFileToMatch(servicePath, /providedIn: AppModule,/))
+    .then(() => expectFileToMatch(servicePath, /providedIn: AppModule/))
 
     .then(() => process.chdir(join('src', 'app')))
     .then(() => ng('generate', 'service', 'test-service2', '--module', 'app.module.ts'))
     .then(() => process.chdir('../..'))
     .then(() => expectFileToMatch(service2Path, /import { AppModule } from '.\/app.module'/))
-    .then(() => expectFileToMatch(service2Path, /providedIn: AppModule,/));
-
-    // Try to run the unit tests.
-    // TODO: re-enable when updated to Angular v6
-    // .then(() => ng('build'));
+    .then(() => expectFileToMatch(service2Path, /providedIn: AppModule/))
+    .then(() => ng('build'));
 }

@@ -21,6 +21,7 @@ export interface RunSchematicOptions {
   debug?: boolean;
   dryRun: boolean;
   force: boolean;
+  showNothingDone?: boolean;
 }
 
 export interface GetOptionsOptions {
@@ -143,7 +144,7 @@ export abstract class SchematicCommand extends Command {
       }
     });
 
-    return new Promise((resolve, reject) => {
+    return new Promise<number | void>((resolve) => {
       workflow.execute({
         collection: collectionName,
         schematic: schematicName,
@@ -164,13 +165,14 @@ export abstract class SchematicCommand extends Command {
             this.logger.fatal(err.message);
           }
 
-          reject(1);
+          resolve(1);
         },
         complete: () => {
           // Output the logging queue, no error happened.
           loggingQueue.forEach(log => this.logger.info(log));
 
-          if (nothingDone) {
+          const showNothingDone = !(options.showNothingDone === false);
+          if (nothingDone && showNothingDone) {
             this.logger.info('Nothing to be done.');
           }
           if (dryRun) {
