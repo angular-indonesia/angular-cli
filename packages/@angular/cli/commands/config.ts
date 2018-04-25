@@ -9,7 +9,6 @@ import {
   experimental,
   parseJson,
 } from '@angular-devkit/core';
-import { WorkspaceJson } from '@angular-devkit/core/src/workspace';
 
 const SilentError = require('silent-error');
 
@@ -122,6 +121,33 @@ function setValueFromPath<T extends JsonArray | JsonObject>(
   }
 }
 
+function normalizeValue(value: string, path: string): JsonValue {
+  const cliOptionType = validCliPaths.get(path);
+  if (cliOptionType) {
+    switch (cliOptionType) {
+      case 'boolean':
+        if (value.trim() === 'true') {
+          return true;
+        } else if (value.trim() === 'false') {
+          return false;
+        }
+        break;
+      case 'number':
+        const numberValue = Number(value);
+        if (!Number.isNaN(numberValue)) {
+          return numberValue;
+        }
+        break;
+      case 'string':
+        return value;
+    }
+
+    throw new Error(`Invalid value type; expected a ${cliOptionType}.`);
+  }
+
+  return parseJson(value, JsonParseMode.Loose);
+}
+
 export default class ConfigCommand extends Command {
   public readonly name = 'config';
   public readonly description = 'Get/set configuration values.';
@@ -138,7 +164,8 @@ export default class ConfigCommand extends Command {
 
   public run(options: ConfigOptions) {
     const level = options.global ? 'global' : 'local';
-    const config = (getWorkspace(level) as {} as { _workspace: WorkspaceJson});
+    const config =
+      (getWorkspace(level) as {} as { _workspace: experimental.workspace.WorkspaceSchema });
 
     if (!config) {
       throw new SilentError('No config found.');
@@ -151,7 +178,7 @@ export default class ConfigCommand extends Command {
     }
   }
 
-  private get(config: experimental.workspace.WorkspaceJson, options: ConfigOptions) {
+  private get(config: experimental.workspace.WorkspaceSchema, options: ConfigOptions) {
     const value = options.jsonPath ? getValueFromPath(config as any, options.jsonPath) : config;
 
     if (value === undefined) {
@@ -178,14 +205,7 @@ export default class ConfigCommand extends Command {
     // TODO: Modify & save without destroying comments
     const configValue = config.value;
 
-    const value = parseJson(options.value, JsonParseMode.Loose);
-    const pathType = validCliPaths.get(options.jsonPath);
-    if (pathType) {
-      if (typeof value != pathType) {
-        throw new Error(`Invalid value type; expected a ${pathType}.`);
-      }
-    }
-
+    const value = normalizeValue(options.value, options.jsonPath);
     const result = setValueFromPath(configValue, options.jsonPath, value);
 
     if (result === undefined) {
