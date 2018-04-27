@@ -11,7 +11,7 @@ export default class UpdateCommand extends SchematicCommand {
   public readonly name = 'update';
   public readonly description = 'Updates your application and its dependencies.';
   public static aliases: string[] = [];
-  public readonly scope = CommandScope.inProject;
+  public readonly scope = CommandScope.everywhere;
   public arguments: string[] = [ 'packages' ];
   public options: Option[] = [
     // Remove the --force flag.
@@ -39,10 +39,18 @@ export default class UpdateCommand extends SchematicCommand {
   }
 
   public async run(options: UpdateOptions) {
+    const schematicOptions: any = { ...options };
+    if (schematicOptions._[0] == '@angular/cli'
+        && !schematicOptions.migrateOnly
+        && !schematicOptions.from) {
+      schematicOptions.migrateOnly = true;
+      schematicOptions.from = '1.0.0';
+    }
+
     return this.runSchematic({
       collectionName: this.collectionName,
       schematicName: this.schematicName,
-      schematicOptions: options,
+      schematicOptions,
       dryRun: options.dryRun,
       force: false,
       showNothingDone: false,
