@@ -1,4 +1,4 @@
-import { existsSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import {
@@ -7,8 +7,10 @@ import {
   JsonValue,
   experimental,
   normalize,
+  parseJson,
   parseJsonAst,
   virtualFs,
+  JsonObject,
 } from '@angular-devkit/core';
 import { NodeJsSyncHost } from '@angular-devkit/core/node';
 import { findUp } from './find-up';
@@ -155,7 +157,88 @@ export function getPackageManager(): string {
     }
   }
 
+  // Only check legacy if updated workspace is not found.
+  if (!workspace) {
+    const legacyPackageManager = getLegacyPackageManager();
+    if (legacyPackageManager !== null) {
+      return legacyPackageManager;
+    }
+  }
   return 'npm';
+}
+
+export function migrateLegacyGlobalConfig(): boolean {
+  const homeDir = os.homedir();
+  if (homeDir) {
+    const legacyGlobalConfigPath = path.join(homeDir, '.angular-cli.json');
+    if (existsSync(legacyGlobalConfigPath)) {
+      const content = readFileSync(legacyGlobalConfigPath, 'utf-8');
+      const legacy = parseJson(content, JsonParseMode.Loose);
+      if (!legacy || typeof legacy != 'object' || Array.isArray(legacy)) {
+        return false;
+      }
+
+      const cli: JsonObject = {};
+
+      if (legacy.packageManager && typeof legacy.packageManager == 'string'
+          && legacy.packageManager !== 'default') {
+        cli['packageManager'] = legacy.packageManager;
+      }
+
+      if (legacy.defaults && typeof legacy.defaults == 'object' && !Array.isArray(legacy.defaults)
+          && legacy.defaults.schematics && typeof legacy.defaults.schematics == 'object'
+          && !Array.isArray(legacy.defaults.schematics)
+          && typeof legacy.defaults.schematics.collection == 'string') {
+        cli['defaultCollection'] = legacy.defaults.schematics.collection;
+      }
+
+      if (legacy.warnings && typeof legacy.warnings == 'object'
+          && !Array.isArray(legacy.warnings)) {
+
+        let warnings: JsonObject = {};
+        if (typeof legacy.warnings.versionMismatch == 'boolean') {
+          warnings['versionMismatch'] = legacy.warnings.versionMismatch;
+        }
+        if (typeof legacy.warnings.typescriptMismatch == 'boolean') {
+          warnings['typescriptMismatch'] = legacy.warnings.typescriptMismatch;
+        }
+
+        if (Object.getOwnPropertyNames(warnings).length > 0) {
+          cli['warnings'] = warnings;
+        }
+      }
+
+      if (Object.getOwnPropertyNames(cli).length > 0) {
+        const globalPath = path.join(homeDir, globalFileName);
+        writeFileSync(globalPath, JSON.stringify({ version: 1, cli }, null, 2));
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+// Fallback, check for packageManager in config file in v1.* global config.
+function getLegacyPackageManager(): string | null {
+  const homeDir = os.homedir();
+  if (homeDir) {
+    const legacyGlobalConfigPath = path.join(homeDir, '.angular-cli.json');
+    if (existsSync(legacyGlobalConfigPath)) {
+      const content = readFileSync(legacyGlobalConfigPath, 'utf-8');
+
+      const legacy = parseJson(content, JsonParseMode.Loose);
+      if (!legacy || typeof legacy != 'object' || Array.isArray(legacy)) {
+        return null;
+      }
+
+      if (legacy.packageManager && typeof legacy.packageManager === 'string'
+          && legacy.packageManager !== 'default') {
+        return legacy.packageManager;
+      }
+    }
+  }
+  return null;
 }
 
 export function getDefaultSchematicCollection(): string {

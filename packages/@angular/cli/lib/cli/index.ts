@@ -2,7 +2,7 @@ import * as path from 'path';
 import { filter } from 'rxjs/operators';
 import { logging, terminal } from '@angular-devkit/core';
 import { runCommand } from '../../models/command-runner';
-import { findUp } from '../../utilities/find-up';
+import { getProjectDetails } from '../../utilities/project';
 
 
 function loadCommands() {
@@ -33,6 +33,10 @@ function loadCommands() {
     'help': require('../../commands/help').default,
     'version': require('../../commands/version').default,
     'doc': require('../../commands/doc').default,
+
+    // deprecated
+    'get': require('../../commands/getset').default,
+    'set': require('../../commands/getset').default,
   };
 }
 
@@ -49,15 +53,12 @@ export default async function(options: any) {
     loggingSubscription = initializeLogging(logger);
   }
 
-  const possibleConfigNames = ['angular.json', '.angular.json'];
-  const workspacePath = findUp(possibleConfigNames, process.cwd());
-  const projectRoot = workspacePath !== null
-    ? path.dirname(workspacePath)
-    : process.cwd();
+  let projectDetails = getProjectDetails();
+  if (projectDetails === null) {
+    projectDetails = { root: process.cwd() };
+  }
   const context = {
-    project: {
-      root: projectRoot
-    }
+    project: projectDetails
   };
 
   try {
