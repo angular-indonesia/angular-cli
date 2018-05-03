@@ -11,7 +11,7 @@ Default applications are created in a directory of the same name, with an initia
 <details>
   <summary>dry-run</summary>
   <p>
-    <code>--dry-run</code> (alias: <code>-d</code>) 
+    <code>--dry-run</code> (alias: <code>-d</code>)
   </p>
   <p>
     Run through without making any changes.
@@ -20,7 +20,7 @@ Default applications are created in a directory of the same name, with an initia
 <details>
   <summary>force</summary>
   <p>
-    <code>--force</code> (alias: <code>-f</code>) 
+    <code>--force</code> (alias: <code>-f</code>)
   </p>
   <p>
     Forces overwriting of files.
@@ -29,7 +29,7 @@ Default applications are created in a directory of the same name, with an initia
 <details>
   <summary>verbose</summary>
   <p>
-    <code>--verbose</code> (alias: <code>-v</code>) 
+    <code>--verbose</code> (alias: <code>-v</code>)
   </p>
   <p>
     Adds more details to output logging.
@@ -38,7 +38,7 @@ Default applications are created in a directory of the same name, with an initia
 <details>
   <summary>collection</summary>
   <p>
-    <code>--collection</code> (alias: <code>-c</code>) 
+    <code>--collection</code> (alias: <code>-c</code>)
   </p>
   <p>
     Schematics collection to use.
@@ -47,7 +47,7 @@ Default applications are created in a directory of the same name, with an initia
 <details>
   <summary>inline-style</summary>
   <p>
-    <code>--inline-style</code> (alias: <code>-s</code>) 
+    <code>--inline-style</code> (alias: <code>-s</code>)
   </p>
   <p>
     Specifies if the style will be in the ts file.
@@ -56,7 +56,7 @@ Default applications are created in a directory of the same name, with an initia
 <details>
   <summary>inline-template</summary>
   <p>
-    <code>--inline-template</code> (alias: <code>-t</code>) 
+    <code>--inline-template</code> (alias: <code>-t</code>)
   </p>
   <p>
     Specifies if the template will be in the ts file.
@@ -65,7 +65,7 @@ Default applications are created in a directory of the same name, with an initia
 <details>
   <summary>view-encapsulation</summary>
   <p>
-    <code>--view-encapsulation</code> 
+    <code>--view-encapsulation</code>
   </p>
   <p>
     Specifies the view encapsulation strategy.
@@ -74,7 +74,7 @@ Default applications are created in a directory of the same name, with an initia
 <details>
   <summary>routing</summary>
   <p>
-    <code>--routing</code> 
+    <code>--routing</code>
   </p>
   <p>
     Generates a routing module.
@@ -83,7 +83,7 @@ Default applications are created in a directory of the same name, with an initia
 <details>
   <summary>prefix</summary>
   <p>
-    <code>--prefix</code> (alias: <code>-p</code>) 
+    <code>--prefix</code> (alias: <code>-p</code>)
   </p>
   <p>
     The prefix to apply to generated selectors.
@@ -92,7 +92,7 @@ Default applications are created in a directory of the same name, with an initia
 <details>
   <summary>style</summary>
   <p>
-    <code>--style</code> 
+    <code>--style</code>
   </p>
   <p>
     The file extension to be used for style files.
@@ -101,7 +101,7 @@ Default applications are created in a directory of the same name, with an initia
 <details>
   <summary>skip-tests</summary>
   <p>
-    <code>--skip-tests</code> (alias: <code>-S</code>) 
+    <code>--skip-tests</code> (alias: <code>-S</code>)
   </p>
   <p>
     Skip creating spec files.
@@ -110,7 +110,7 @@ Default applications are created in a directory of the same name, with an initia
 <details>
   <summary>skip-package-json</summary>
   <p>
-    <code>--skip-package-json</code> 
+    <code>--skip-package-json</code>
   </p>
   <p>
     Do not add dependencies to package.json.
