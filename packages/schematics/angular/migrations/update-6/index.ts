@@ -724,6 +724,60 @@ function updateTsLintConfig(): Rule {
   };
 }
 
+function updateRootTsConfig(): Rule {
+  return (host: Tree, context: SchematicContext) => {
+    const tsConfigPath = '/tsconfig.json';
+    const buffer = host.read(tsConfigPath);
+    if (!buffer) {
+      return;
+    }
+
+    const tsCfgAst = parseJsonAst(buffer.toString(), JsonParseMode.Loose);
+    if (tsCfgAst.kind !== 'object') {
+      throw new SchematicsException('Invalid root tsconfig. Was expecting an object');
+    }
+
+    const compilerOptionsAstNode = findPropertyInAstObject(tsCfgAst, 'compilerOptions');
+    if (!compilerOptionsAstNode || compilerOptionsAstNode.kind != 'object') {
+      throw new SchematicsException(
+        'Invalid root tsconfig "compilerOptions" property; expected an object.',
+      );
+    }
+
+    if (
+      findPropertyInAstObject(compilerOptionsAstNode, 'baseUrl') &&
+      findPropertyInAstObject(compilerOptionsAstNode, 'module')
+    ) {
+      return host;
+    }
+
+    const compilerOptions = compilerOptionsAstNode.value;
+    const { baseUrl = './', module = 'es2015'} = compilerOptions;
+
+    const validBaseUrl = ['./', '', '.'];
+    if (!validBaseUrl.includes(baseUrl as string)) {
+      const formattedBaseUrl = validBaseUrl.map(x => `'${x}'`).join(', ');
+      context.logger.warn(tags.oneLine
+        `Root tsconfig option 'baseUrl' is not one of: ${formattedBaseUrl}.
+        This might cause unexpected behaviour when generating libraries.`,
+      );
+    }
+
+    if (module !== 'es2015') {
+      context.logger.warn(
+        `Root tsconfig option 'module' is not 'es2015'. This might cause unexpected behaviour.`,
+      );
+    }
+
+    compilerOptions.module = module;
+    compilerOptions.baseUrl = baseUrl;
+
+    host.overwrite(tsConfigPath, JSON.stringify(tsCfgAst.value, null, 2));
+
+    return host;
+  };
+}
+
 export default function (): Rule {
   return (host: Tree, context: SchematicContext) => {
     if (host.exists('/.angular.json') || host.exists('/angular.json')) {
@@ -748,6 +802,7 @@ export default function (): Rule {
       migrateConfiguration(config, context.logger),
       updateSpecTsConfig(config),
       updatePackageJson(config),
+      updateRootTsConfig(),
       updateTsLintConfig(),
       (host: Tree, context: SchematicContext) => {
         context.logger.warn(tags.oneLine`Some configuration options have been changed,
