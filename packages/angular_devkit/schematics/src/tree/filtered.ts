@@ -8,7 +8,7 @@
 import { FilePredicate, Tree } from './interface';
 import { VirtualTree } from './virtual';
 
-
+// TODO: Remove this along with VirtualTree in 7.0
 export class FilteredTree extends VirtualTree {
   constructor(tree: Tree, filter: FilePredicate<boolean> = () => true) {
     super();
