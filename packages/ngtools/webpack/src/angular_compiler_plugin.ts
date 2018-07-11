@@ -208,7 +208,7 @@ export class AngularCompilerPlugin {
 
     this._rootNames = config.rootNames.concat(...this._singleFileIncludes);
     this._compilerOptions = { ...config.options, ...options.compilerOptions };
-    this._basePath = config.options.basePath || '';
+    this._basePath = config.options.basePath || basePath || '';
 
     // Overwrite outDir so we can find generated files next to their .ts origin in compilerHost.
     this._compilerOptions.outDir = '';
@@ -902,12 +902,10 @@ export class AngularCompilerPlugin {
   }
 
   writeI18nOutFile() {
-    function _recursiveMkDir(p: string): Promise<void> {
-      if (fs.existsSync(p)) {
-        return Promise.resolve();
-      } else {
-        return _recursiveMkDir(path.dirname(p))
-          .then(() => fs.mkdirSync(p));
+    function _recursiveMkDir(p: string) {
+      if (!fs.existsSync(p)) {
+        _recursiveMkDir(path.dirname(p));
+        fs.mkdirSync(p);
       }
     }
 
@@ -916,8 +914,8 @@ export class AngularCompilerPlugin {
       const i18nOutFilePath = path.resolve(this._basePath, this._compilerOptions.i18nOutFile);
       const i18nOutFileContent = this._compilerHost.readFile(i18nOutFilePath);
       if (i18nOutFileContent) {
-        _recursiveMkDir(path.dirname(i18nOutFilePath))
-          .then(() => fs.writeFileSync(i18nOutFilePath, i18nOutFileContent));
+        _recursiveMkDir(path.dirname(i18nOutFilePath));
+        fs.writeFileSync(i18nOutFilePath, i18nOutFileContent);
       }
     }
   }
