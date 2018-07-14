@@ -7,7 +7,7 @@
  */
 // tslint:disable
 // TODO: cleanup this file, it's copied as is from Angular CLI.
-import { tags, virtualFs } from '@angular-devkit/core';
+import { virtualFs } from '@angular-devkit/core';
 import { Stats } from 'fs';
 import * as path from 'path';
 import {
@@ -28,9 +28,9 @@ const webpackLoader: string = g['_DevKitIsLocal']
 function _createAotPlugin(
   wco: WebpackConfigOptions,
   options: any,
-  host: virtualFs.Host<Stats>,
+  _host: virtualFs.Host<Stats>,
   useMain = true,
-  extract = false
+  extract = false,
 ) {
   const { root, buildOptions } = wco;
   options.compilerOptions = options.compilerOptions || {};
@@ -62,6 +62,13 @@ function _createAotPlugin(
     }
   }
 
+  const hostReplacementPaths: { [replace: string]: string } = {};
+  if (buildOptions.fileReplacements) {
+    for (const replacement of buildOptions.fileReplacements) {
+      hostReplacementPaths[replacement.replace] = replacement.with;
+    }
+  }
+
   const pluginOptions: AngularCompilerPluginOptions = {
     mainPath: useMain ? path.join(root, buildOptions.main) : undefined,
     ...i18nFileAndFormat,
@@ -70,11 +77,11 @@ function _createAotPlugin(
     missingTranslation: buildOptions.i18nMissingTranslation,
     sourceMap: buildOptions.sourceMap,
     additionalLazyModules,
+    hostReplacementPaths,
     nameLazyFiles: buildOptions.namedChunks,
     forkTypeChecker: buildOptions.forkTypeChecker,
     contextElementDependencyConstructor: require('webpack/lib/dependencies/ContextElementDependency'),
     ...options,
-    host,
   };
   return new AngularCompilerPlugin(pluginOptions);
 }

@@ -5,7 +5,7 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import { dirname, normalize, resolve, virtualFs } from '@angular-devkit/core';
+import { Path, dirname, getSystemPath, normalize, resolve, virtualFs } from '@angular-devkit/core';
 import { ChildProcess, ForkOptions, fork } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -57,6 +57,7 @@ import {
   NodeWatchFileSystemInterface,
   NormalModuleFactoryRequest,
 } from './webpack';
+import { WebpackInputHost } from './webpack-input-host';
 
 const treeKill = require('tree-kill');
 
@@ -76,7 +77,7 @@ export interface AngularCompilerPluginOptions {
   entryModule?: string;
   mainPath?: string;
   skipCodeGeneration?: boolean;
-  hostReplacementPaths?: { [path: string]: string };
+  hostReplacementPaths?: { [path: string]: string } | ((path: string) => string);
   forkTypeChecker?: boolean;
   // TODO: remove singleFileIncludes for 2.0, this is just to support old projects that did not
   // include 'polyfills.ts' in `tsconfig.spec.json'.
@@ -287,40 +288,6 @@ export class AngularCompilerPlugin {
     // in the compilation. In that case, we can pass the right one as an option to the plugin.
     this._contextElementDependencyConstructor = options.contextElementDependencyConstructor
       || require('webpack/lib/dependencies/ContextElementDependency');
-
-    // Create the webpack compiler host.
-    const webpackCompilerHost = new WebpackCompilerHost(
-      this._compilerOptions,
-      this._basePath,
-      this._options.host,
-    );
-    webpackCompilerHost.enableCaching();
-
-    // Create and set a new WebpackResourceLoader.
-    this._resourceLoader = new WebpackResourceLoader();
-    webpackCompilerHost.setResourceLoader(this._resourceLoader);
-
-    // Use the WebpackCompilerHost with a resource loader to create an AngularCompilerHost.
-    this._compilerHost = createCompilerHost({
-      options: this._compilerOptions,
-      tsHost: webpackCompilerHost,
-    }) as CompilerHost & WebpackCompilerHost;
-
-    // Override some files in the FileSystem with paths from the actual file system.
-    if (this._options.hostReplacementPaths) {
-      for (const filePath of Object.keys(this._options.hostReplacementPaths)) {
-        const replacementFilePath = this._options.hostReplacementPaths[filePath];
-        const content = this._compilerHost.readFile(replacementFilePath);
-        if (content) {
-          this._compilerHost.writeFile(filePath, content, false);
-        }
-      }
-    }
-
-    // Resolve mainPath if provided.
-    if (options.mainPath) {
-      this._mainPath = this._compilerHost.resolve(options.mainPath);
-    }
 
     // Use entryModule if available in options, otherwise resolve it from mainPath after program
     // creation.
@@ -612,6 +579,56 @@ export class AngularCompilerPlugin {
         watchFileSystem: NodeWatchFileSystemInterface,
       };
 
+      let host: virtualFs.Host<fs.Stats> = this._options.host || new WebpackInputHost(
+        compilerWithFileSystems.inputFileSystem,
+      );
+
+      let replacements: Map<Path, Path> | ((path: Path) => Path) | undefined;
+      if (this._options.hostReplacementPaths) {
+        if (typeof this._options.hostReplacementPaths == 'function') {
+          const replacementResolver = this._options.hostReplacementPaths;
+          replacements = path => normalize(replacementResolver(getSystemPath(path)));
+          host = new class extends virtualFs.ResolverHost<fs.Stats> {
+            _resolve(path: Path) {
+              return normalize(replacementResolver(getSystemPath(path)));
+            }
+          }(host);
+        } else {
+          replacements = new Map();
+          const aliasHost = new virtualFs.AliasHost(host);
+          for (const from in this._options.hostReplacementPaths) {
+            const normalizedFrom = normalize(from);
+            const normalizedWith = normalize(this._options.hostReplacementPaths[from]);
+            aliasHost.aliases.set(normalizedFrom, normalizedWith);
+            replacements.set(normalizedFrom, normalizedWith);
+          }
+          host = aliasHost;
+        }
+      }
+
+      // Create the webpack compiler host.
+      const webpackCompilerHost = new WebpackCompilerHost(
+        this._compilerOptions,
+        this._basePath,
+        host,
+      );
+      webpackCompilerHost.enableCaching();
+
+      // Create and set a new WebpackResourceLoader.
+      this._resourceLoader = new WebpackResourceLoader();
+      webpackCompilerHost.setResourceLoader(this._resourceLoader);
+
+      // Use the WebpackCompilerHost with a resource loader to create an AngularCompilerHost.
+      this._compilerHost = createCompilerHost({
+        options: this._compilerOptions,
+        tsHost: webpackCompilerHost,
+      }) as CompilerHost & WebpackCompilerHost;
+
+      // Resolve mainPath if provided.
+      if (this._options.mainPath) {
+        this._mainPath = this._compilerHost.resolve(this._options.mainPath);
+      }
+
       const inputDecorator = new VirtualFileSystemDecorator(
         compilerWithFileSystems.inputFileSystem,
         this._compilerHost,
@@ -619,6 +636,7 @@ export class AngularCompilerPlugin {
       compilerWithFileSystems.inputFileSystem = inputDecorator;
       compilerWithFileSystems.watchFileSystem = new VirtualWatchFileSystemDecorator(
         inputDecorator,
+        replacements,
       );
     });
 
