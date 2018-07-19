@@ -154,45 +154,13 @@ export function resolveWithPaths(
 
   // If TypeScript gives us a `.d.ts`, it is probably a node module
   if (moduleFilePath.endsWith('.d.ts')) {
-    const pathNoExtension = moduleFilePath.slice(0, -5);
-    const pathDirName = path.dirname(moduleFilePath);
-    const packageRootPath = path.join(pathDirName, 'package.json');
-    const jsFilePath = `${pathNoExtension}.js`;
-
-    if (host.fileExists(pathNoExtension)) {
-      // This is mainly for secondary entry points
-      // ex: 'node_modules/@angular/core/testing.d.ts' -> 'node_modules/@angular/core/testing'
-      request.request = pathNoExtension;
-    } else {
-      const packageJsonContent = host.readFile(packageRootPath);
-      let newRequest: string | undefined;
-
-      if (packageJsonContent) {
-        try {
-          const packageJson = JSON.parse(packageJsonContent);
-
-          // Let webpack resolve the correct module format IIF there is a module resolution field
-          // in the package.json. These are all official fields that Angular uses.
-          if (typeof packageJson.main == 'string'
-              || typeof packageJson.browser == 'string'
-              || typeof packageJson.module == 'string'
-              || typeof packageJson.es2015 == 'string'
-              || typeof packageJson.fesm5 == 'string'
-              || typeof packageJson.fesm2015 == 'string') {
-            newRequest = pathDirName;
-          }
-        } catch {
-          // Ignore exceptions and let it fall through (ie. if package.json file is invalid).
-        }
-      }
-
-      if (newRequest === undefined && host.fileExists(jsFilePath)) {
-        // Otherwise, if there is a file with a .js extension use that
-        newRequest = jsFilePath;
-      }
-
-      if (newRequest !== undefined) {
-        request.request = newRequest;
+    // If in a package, let webpack resolve the package
+    const packageRootPath = path.join(path.dirname(moduleFilePath), 'package.json');
+    if (!host.fileExists(packageRootPath)) {
+      // Otherwise, if there is a file with a .js extension use that
+      const jsFilePath = moduleFilePath.slice(0, -5) + '.js';
+      if (host.fileExists(jsFilePath)) {
+        request.request = jsFilePath;
       }
     }
 
