@@ -27,18 +27,25 @@ export class InvalidPipeException extends BaseException {
 }
 
 
-export const kPathTemplateComponentRE = /__(.+?)__/g;
-export const kPathTemplatePipeRE = /@([^@]+)/;
-
-
-export type TemplateValue = boolean | string | number | undefined;
-export type TemplatePipeFunction = (x: string) => TemplateValue;
-export type TemplateOptions = {
-  [key: string]: TemplateValue | TemplateOptions | TemplatePipeFunction,
+export type PathTemplateValue = boolean | string | number | undefined;
+export type PathTemplatePipeFunction = (x: string) => PathTemplateValue;
+export type PathTemplateData = {
+  [key: string]: PathTemplateValue | PathTemplateData | PathTemplatePipeFunction,
 };
 
 
-export function applyContentTemplate<T extends TemplateOptions>(options: T): FileOperator {
+export interface PathTemplateOptions {
+  // Interpolation start and end strings.
+  interpolationStart: string;
+  // Interpolation start and end strings.
+  interpolationEnd: string;
+
+  // Separator for pipes. Do not specify to remove pipe support.
+  pipeSeparator?: string;
+}
+
+
+export function applyContentTemplate<T>(options: T): FileOperator {
   return (entry: FileEntry) => {
     const {path, content} = entry;
     if (isBinary(content)) {
@@ -53,57 +60,96 @@ export function applyContentTemplate<T extends TemplateOptions>(options: T): Fil
 }
 
 
-export function contentTemplate<T extends TemplateOptions>(options: T): Rule {
+export function contentTemplate<T>(options: T): Rule {
   return forEach(applyContentTemplate(options));
 }
 
 
-export function applyPathTemplate<T extends TemplateOptions>(options: T): FileOperator {
+export function applyPathTemplate<T extends PathTemplateData>(
+  data: T,
+  options: PathTemplateOptions = {
+    interpolationStart: '__',
+    interpolationEnd: '__',
+    pipeSeparator: '@',
+  },
+): FileOperator {
+  const is = options.interpolationStart;
+  const ie = options.interpolationEnd;
+  const isL = is.length;
+  const ieL = ie.length;
+
   return (entry: FileEntry) => {
-    let path = entry.path;
+    let path = entry.path as string;
     const content = entry.content;
     const original = path;
 
-    // Path template.
-    path = normalize(path.replace(kPathTemplateComponentRE, (_, match) => {
-      const [name, ...pipes] = match.split(kPathTemplatePipeRE);
-      const value = typeof options[name] == 'function'
-        ? (options[name] as TemplatePipeFunction).call(options, original)
-        : options[name];
+    let start = path.indexOf(is);
+    // + 1 to have at least a length 1 name. `____` is not valid.
+    let end = path.indexOf(ie, start + isL + 1);
 
-      if (value === undefined) {
-        throw new OptionIsNotDefinedException(name);
+    while (start != -1 && end != -1) {
+      const match = path.substring(start + isL, end);
+      let replacement = data[match];
+
+      if (!options.pipeSeparator) {
+        if (typeof replacement == 'function') {
+          replacement = replacement.call(data, original);
+        }
+
+        if (replacement === undefined) {
+          throw new OptionIsNotDefinedException(match);
+        }
+      } else {
+        const [name, ...pipes] = match.split(options.pipeSeparator);
+        replacement = data[name];
+
+        if (typeof replacement == 'function') {
+          replacement = replacement.call(data, original);
+        }
+
+        if (replacement === undefined) {
+          throw new OptionIsNotDefinedException(name);
+        }
+
+        replacement = pipes.reduce((acc: string, pipe: string) => {
+          if (!pipe) {
+            return acc;
+          }
+          if (!(pipe in data)) {
+            throw new UnknownPipeException(pipe);
+          }
+          if (typeof data[pipe] != 'function') {
+            throw new InvalidPipeException(pipe);
+          }
+
+          // Coerce to string.
+          return '' + (data[pipe] as PathTemplatePipeFunction)(acc);
+        }, '' + replacement);
       }
 
-      return pipes.reduce((acc: string, pipe: string) => {
-        if (!pipe) {
-          return acc;
-        }
-        if (!(pipe in options)) {
-          throw new UnknownPipeException(pipe);
-        }
-        if (typeof options[pipe] != 'function') {
-          throw new InvalidPipeException(pipe);
-        }
+      path = path.substring(0, start) + replacement + path.substring(end + ieL);
 
-        // Coerce to string.
-        return '' + (options[pipe] as TemplatePipeFunction)(acc);
-      }, '' + value);
-    }));
+      start = path.indexOf(options.interpolationStart);
+      // See above.
+      end = path.indexOf(options.interpolationEnd, start + isL + 1);
+    }
 
-    return { path, content };
+    return { path: normalize(path), content };
   };
 }
 
 
-export function pathTemplate<T extends TemplateOptions>(options: T): Rule {
+export function pathTemplate<T extends PathTemplateData>(options: T): Rule {
   return forEach(applyPathTemplate(options));
 }
 
 
-export function template<T extends TemplateOptions>(options: T): Rule {
+export function template<T>(options: T): Rule {
   return chain([
     contentTemplate(options),
-    pathTemplate(options),
+    // Force cast to PathTemplateData. We need the type for the actual pathTemplate() call,
+    // but in this case we cannot do anything as contentTemplate are more permissive.
+    // Since values are coerced to strings in PathTemplates it will be fine in the end.
+    pathTemplate(options as {} as PathTemplateData),
   ]);
 }

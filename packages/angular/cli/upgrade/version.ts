@@ -7,6 +7,7 @@
  */
 
 import { tags, terminal } from '@angular-devkit/core';
+import { resolve } from '@angular-devkit/core/node';
 import * as path from 'path';
 import { SemVer, satisfies } from 'semver';
 import { isWarningEnabled } from '../utilities/config';
@@ -53,9 +54,13 @@ export class Version {
     };
 
     try {
-      const resolveOptions = { paths: [ path.join(projectRoot, 'node_modules'), projectRoot ] };
-      const angularPackagePath = require.resolve('@angular/core/package.json', resolveOptions);
-      const rxjsPackagePath = require.resolve('rxjs/package.json', resolveOptions);
+      const resolveOptions = {
+        basedir: projectRoot,
+        checkGlobal: false,
+        checkLocal: true,
+      };
+      const angularPackagePath = resolve('@angular/core/package.json', resolveOptions);
+      const rxjsPackagePath = resolve('rxjs/package.json', resolveOptions);
 
       if (!isInside(projectRoot, angularPackagePath)
           || !isInside(projectRoot, rxjsPackagePath)) {
@@ -150,7 +155,9 @@ export class Version {
       { compiler: '>=5.0.0-beta.0 <5.1.0', typescript: '>=2.4.2 <2.5.0' },
       { compiler: '>=5.1.0-beta.0 <5.2.0', typescript: '>=2.4.2 <2.6.0' },
       { compiler: '>=5.2.0-beta.0 <6.0.0', typescript: '>=2.4.2 <2.7.0' },
-      { compiler: '>=6.0.0-beta.0 <7.0.0', typescript: '>=2.7.0 <2.8.0' },
+      { compiler: '>=6.0.0-beta.0 <6.1.0-beta.0', typescript: '>=2.7.0 <2.8.0' },
+      { compiler: '>=6.1.0-beta.0 <6.1.0-rc.0', typescript: '>=2.7.2 <2.9.0' },
+      { compiler: '>=6.1.0-rc.0 <7.0.0', typescript: '>=2.7.2 <2.10.0' },
     ];
 
     const currentCombo = versionCombos.find((combo) => satisfies(compilerVersion, combo.compiler));

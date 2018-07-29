@@ -5,15 +5,20 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-
-// tslint:disable:no-global-tslint-disable no-any
 import {
   Architect,
   BuildEvent,
   BuilderDescription,
   TargetSpecifier,
 } from '@angular-devkit/architect';
-import { JsonObject, experimental, schema, strings } from '@angular-devkit/core';
+import {
+  JsonObject,
+  UnknownException,
+  experimental,
+  schema,
+  strings,
+  tags,
+} from '@angular-devkit/core';
 import { NodeJsSyncHost, createConsoleLogger } from '@angular-devkit/core/node';
 import { of } from 'rxjs';
 import { from } from 'rxjs';
@@ -90,19 +95,53 @@ export abstract class ArchitectCommand extends Command<ArchitectCommandOptions> 
       const projectNames = this.getProjectNamesByTarget(this.target);
       const { overrides } = this._makeTargetSpecifier(options);
       if (projectNames.length > 1 && Object.keys(overrides || {}).length > 0) {
-        throw new Error('Architect commands with multiple targets cannot specify overrides.'
-          + `'${this.target}' would be run on the following projects: ${projectNames.join()}`);
+        // Verify that all builders are the same, otherwise error out (since the meaning of an
+        // option could vary from builder to builder).
+
+        const builders: string[] = [];
+        for (const projectName of projectNames) {
+          const targetSpec: TargetSpecifier = this._makeTargetSpecifier(options);
+          const targetDesc = this._architect.getBuilderConfiguration({
+            project: projectName,
+            target: targetSpec.target,
+          });
+
+          if (builders.indexOf(targetDesc.builder) == -1) {
+            builders.push(targetDesc.builder);
+          }
+        }
+
+        if (builders.length > 1) {
+          throw new Error(tags.oneLine`
+            Architect commands with command line overrides cannot target different builders. The
+            '${this.target}' target would run on projects ${projectNames.join()} which have the
+            following builders: ${'\n  ' + builders.join('\n  ')}
+          `);
+        }
       }
     }
 
     return true;
   }
 
-  protected mapArchitectOptions(schema: any) {
+  protected mapArchitectOptions(schema: JsonObject) {
     const properties = schema.properties;
+    if (typeof properties != 'object' || properties === null || Array.isArray(properties)) {
+      throw new UnknownException('Invalid schema.');
+    }
     const keys = Object.keys(properties);
     keys
-      .map(key => ({ ...properties[key], ...{ name: strings.dasherize(key) } }))
+      .map(key => {
+        const value = properties[key];
+        if (typeof value != 'object') {
+          throw new UnknownException('Invalid schema.');
+        }
+
+        return {
+          ...value,
+          name: strings.dasherize(key),
+        } as any; // tslint:disable-line:no-any
+      })
       .map(opt => {
         let type;
         const schematicType = opt.type;
