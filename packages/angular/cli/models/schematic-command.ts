@@ -86,7 +86,7 @@ export abstract class SchematicCommand extends Command {
   private _originalOptions: Option[];
   private _engineHost: FileSystemEngineHostBase;
   private _engine: Engine<FileSystemCollectionDesc, FileSystemSchematicDesc>;
-  private _workFlow: workflow.BaseWorkflow;
+  private _workflow: workflow.BaseWorkflow;
   argStrategy = ArgumentStrategy.Nothing;
 
   constructor(
@@ -103,20 +103,18 @@ export abstract class SchematicCommand extends Command {
   protected readonly coreOptions: Option[] = [
     {
       name: 'dryRun',
-      type: Boolean,
+      type: 'boolean',
       default: false,
       aliases: ['d'],
       description: 'Run through without making any changes.',
     },
     {
       name: 'force',
-      type: Boolean,
+      type: 'boolean',
       default: false,
       aliases: ['f'],
       description: 'Forces overwriting of files.',
     }];
-
-  readonly arguments = ['project'];
 
   public async initialize(_options: any) {
     this._loadWorkspace();
@@ -166,7 +164,7 @@ export abstract class SchematicCommand extends Command {
   /*
    * Runtime hook to allow specifying customized workflow
    */
-  protected getWorkFlow(options: RunSchematicOptions): workflow.BaseWorkflow {
+  protected getWorkflow(options: RunSchematicOptions): workflow.BaseWorkflow {
     const {force, dryRun} = options;
     const fsHost = new virtualFs.ScopedHost(
         new NodeJsSyncHost(), normalize(this.project.root));
@@ -182,12 +180,12 @@ export abstract class SchematicCommand extends Command {
     );
   }
 
-  private _getWorkFlow(options: RunSchematicOptions): workflow.BaseWorkflow {
-    if (!this._workFlow) {
-      this._workFlow = this.getWorkFlow(options);
+  private _getWorkflow(options: RunSchematicOptions): workflow.BaseWorkflow {
+    if (!this._workflow) {
+      this._workflow = this.getWorkflow(options);
     }
 
-    return this._workFlow;
+    return this._workflow;
   }
 
   protected runSchematic(options: RunSchematicOptions) {
@@ -196,7 +194,7 @@ export abstract class SchematicCommand extends Command {
     let nothingDone = true;
     let loggingQueue: string[] = [];
     let error = false;
-    const workflow = this._getWorkFlow(options);
+    const workflow = this._getWorkflow(options);
 
     const workingDir = process.cwd().replace(this.project.root, '').replace(/\\/g, '/');
     const pathOptions = this.setPathOptions(schematicOptions, workingDir);
@@ -204,9 +202,21 @@ export abstract class SchematicCommand extends Command {
     const defaultOptions = this.readDefaults(collectionName, schematicName, schematicOptions);
     schematicOptions = { ...schematicOptions, ...defaultOptions };
 
+    // Remove all of the original arguments which have already been parsed
+
+    const argumentCount = this._originalOptions
+      .filter(opt => {
+        let isArgument = false;
+        if (opt.$default !== undefined && opt.$default.$source === 'argv') {
+          isArgument = true;
+        }
+
+        return isArgument;
+      })
+      .length;
+
     // Pass the rest of the arguments as the smart default "argv". Then delete it.
-    // Removing the first item which is the schematic name.
-    const rawArgs = schematicOptions._;
+    const rawArgs = schematicOptions._.slice(argumentCount);
     workflow.registry.addSmartDefaultProvider('argv', (schema: JsonObject) => {
       if ('index' in schema) {
         return rawArgs[Number(schema['index'])];
@@ -333,7 +343,7 @@ export abstract class SchematicCommand extends Command {
     return opts;
   }
 
-  protected getOptions(options: GetOptionsOptions): Promise<GetOptionsResult> {
+  protected getOptions(options: GetOptionsOptions): Promise<Option[]> {
     // Make a copy.
     this._originalOptions = [...this.options];
 
@@ -346,10 +356,7 @@ export abstract class SchematicCommand extends Command {
     this._deAliasedName = schematic.description.name;
 
     if (!schematic.description.schemaJson) {
-      return Promise.resolve({
-        options: [],
-        arguments: [],
-      });
+      return Promise.resolve([]);
     }
 
     const properties = schematic.description.schemaJson.properties;
@@ -357,24 +364,12 @@ export abstract class SchematicCommand extends Command {
     const availableOptions = keys
       .map(key => ({ ...properties[key], ...{ name: strings.dasherize(key) } }))
       .map(opt => {
-        let type;
-        const schematicType = opt.type;
-        switch (opt.type) {
-          case 'string':
-            type = String;
-            break;
-          case 'boolean':
-            type = Boolean;
-            break;
-          case 'integer':
-          case 'number':
-            type = Number;
-            break;
-
-          // Ignore arrays / objects.
-          default:
-            return null;
+        const types = ['string', 'boolean', 'integer', 'number'];
+        // Ignore arrays / objects.
+        if (types.indexOf(opt.type) === -1) {
+          return null;
         }
+
         let aliases: string[] = [];
         if (opt.alias) {
           aliases = [...aliases, opt.alias];
@@ -387,8 +382,6 @@ export abstract class SchematicCommand extends Command {
         return {
           ...opt,
           aliases,
-          type,
-          schematicType,
           default: undefined, // do not carry over schematics defaults
           schematicDefault,
           hidden: opt.visible === false,
@@ -396,31 +389,7 @@ export abstract class SchematicCommand extends Command {
       })
       .filter(x => x);
 
-    const schematicOptions = availableOptions
-      .filter(opt => opt.$default === undefined || opt.$default.$source !== 'argv');
-
-    const schematicArguments = availableOptions
-      .filter(opt => opt.$default !== undefined && opt.$default.$source === 'argv')
-      .sort((a, b) => {
-        if (a.$default.index === undefined) {
-          return 1;
-        }
-        if (b.$default.index === undefined) {
-          return -1;
-        }
-        if (a.$default.index == b.$default.index) {
-          return 0;
-        } else if (a.$default.index > b.$default.index) {
-          return 1;
-        } else {
-          return -1;
-        }
-      });
-
-    return Promise.resolve({
-      options: schematicOptions,
-      arguments: schematicArguments,
-    });
+    return Promise.resolve(availableOptions);
   }
 
   private _loadWorkspace() {
