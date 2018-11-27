@@ -14,8 +14,7 @@ import {
 } from '@angular-devkit/architect';
 import { WebpackDevServerBuilder } from '@angular-devkit/build-webpack';
 import { Path, getSystemPath, resolve, tags, virtualFs } from '@angular-devkit/core';
-import { existsSync, readFileSync } from 'fs';
-import * as fs from 'fs';
+import { Stats, existsSync, readFileSync } from 'fs';
 import * as path from 'path';
 import { Observable, throwError } from 'rxjs';
 import { concatMap, map, tap } from 'rxjs/operators';
@@ -52,14 +51,18 @@ export interface DevServerBuilderOptions {
   aot?: boolean;
   sourceMap?: boolean;
   vendorSourceMap?: boolean;
+  /**@deprecated */
   evalSourceMap?: boolean;
   vendorChunk?: boolean;
   commonChunk?: boolean;
   baseHref?: string;
+  deployUrl?: string;
   progress?: boolean;
   poll?: number;
+  verbose?: boolean;
 }
 
+type DevServerBuilderOptionsKeys = Extract<keyof DevServerBuilderOptions, string>;
 
 export class DevServerBuilder implements Builder<DevServerBuilderOptions> {
 
@@ -69,7 +72,7 @@ export class DevServerBuilder implements Builder<DevServerBuilderOptions> {
     const options = builderConfig.options;
     const root = this.context.workspace.root;
     const projectRoot = resolve(root, builderConfig.root);
-    const host = new virtualFs.AliasHost(this.context.host as virtualFs.Host<fs.Stats>);
+    const host = new virtualFs.AliasHost(this.context.host as virtualFs.Host<Stats>);
     const webpackDevServerBuilder = new WebpackDevServerBuilder({ ...this.context, host });
     let browserOptions: BrowserBuilderSchema;
     let first = true;
@@ -175,7 +178,7 @@ export class DevServerBuilder implements Builder<DevServerBuilderOptions> {
   buildWebpackConfig(
     root: Path,
     projectRoot: Path,
-    host: virtualFs.Host<fs.Stats>,
+    host: virtualFs.Host<Stats>,
     browserOptions: BrowserBuilderSchema,
   ) {
     const browserBuilder = new BrowserBuilder(this.context);
@@ -210,7 +213,7 @@ export class DevServerBuilder implements Builder<DevServerBuilderOptions> {
         index: `${servePath}/${path.basename(browserOptions.index)}`,
         disableDotRule: true,
         htmlAcceptHeaders: ['text/html', 'application/xhtml+xml'],
-      },
+      } as WebpackDevServer.HistoryApiFallbackConfig,
       stats: false,
       compress: browserOptions.optimization,
       watchOptions: {
@@ -225,6 +228,7 @@ export class DevServerBuilder implements Builder<DevServerBuilderOptions> {
       disableHostCheck: options.disableHostCheck,
       publicPath: servePath,
       hot: options.hmr,
+      contentBase: false,
     };
 
     if (options.ssl) {
@@ -392,23 +396,31 @@ export class DevServerBuilder implements Builder<DevServerBuilderOptions> {
     const architect = this.context.architect;
     const [project, target, configuration] = options.browserTarget.split(':');
 
-    const overrides = {
-      // Override browser build watch setting.
-      watch: options.watch,
+    const overridesOptions: DevServerBuilderOptionsKeys[] = [
+      'watch',
+      'optimization',
+      'aot',
+      'sourceMap',
+      'vendorSourceMap',
+      'evalSourceMap',
+      'vendorChunk',
+      'commonChunk',
+      'baseHref',
+      'progress',
+      'poll',
+      'verbose',
+      'deployUrl',
+    ];
 
-      // Update the browser options with the same options we support in serve, if defined.
-      ...(options.optimization !== undefined ? { optimization: options.optimization } : {}),
-      ...(options.aot !== undefined ? { aot: options.aot } : {}),
-      ...(options.sourceMap !== undefined ? { sourceMap: options.sourceMap } : {}),
-      ...(options.vendorSourceMap !== undefined ?
-         { vendorSourceMap: options.vendorSourceMap } : {}),
-      ...(options.evalSourceMap !== undefined ? { evalSourceMap: options.evalSourceMap } : {}),
-      ...(options.vendorChunk !== undefined ? { vendorChunk: options.vendorChunk } : {}),
-      ...(options.commonChunk !== undefined ? { commonChunk: options.commonChunk } : {}),
-      ...(options.baseHref !== undefined ? { baseHref: options.baseHref } : {}),
-      ...(options.progress !== undefined ? { progress: options.progress } : {}),
-      ...(options.poll !== undefined ? { poll: options.poll } : {}),
-    };
+    // remove options that are undefined or not to be overrriden
+    const overrides = (Object.keys(options) as DevServerBuilderOptionsKeys[])
+      .filter(key => options[key] !== undefined && overridesOptions.includes(key))
+      .reduce<Partial<BrowserBuilderSchema>>((previous, key) => (
+        {
+          ...previous,
+          [key]: options[key],
+        }
+      ), {});
 
     const browserTargetSpec = { project, target, configuration, overrides };
     const builderConfig = architect.getBuilderConfiguration<BrowserBuilderSchema>(

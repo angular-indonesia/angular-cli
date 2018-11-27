@@ -6,7 +6,6 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import { SchematicTestRunner, UnitTestTree } from '@angular-devkit/schematics/testing';
-import * as path from 'path';
 import { Schema as ApplicationOptions } from '../application/schema';
 import { Schema as WorkspaceOptions } from '../workspace/schema';
 import { Schema as ServiceWorkerOptions } from './schema';
@@ -15,7 +14,7 @@ import { Schema as ServiceWorkerOptions } from './schema';
 describe('Service Worker Schematic', () => {
   const schematicRunner = new SchematicTestRunner(
     '@schematics/angular',
-    path.join(__dirname, '../collection.json'),
+    require.resolve('../collection.json'),
   );
   const defaultOptions: ServiceWorkerOptions = {
     project: 'bar',
@@ -46,11 +45,12 @@ describe('Service Worker Schematic', () => {
     appTree = schematicRunner.runSchematic('application', appOptions, appTree);
   });
 
-  it('should update the proudction configuration', () => {
+  it('should update the production configuration', () => {
     const tree = schematicRunner.runSchematic('service-worker', defaultOptions, appTree);
     const configText = tree.readContent('/angular.json');
     const config = JSON.parse(configText);
-    const swFlag = config.projects.bar.targets.build.configurations.production.serviceWorker;
+    const swFlag = config.projects.bar.architect
+      .build.configurations.production.serviceWorker;
     expect(swFlag).toEqual(true);
   });
 
@@ -59,7 +59,8 @@ describe('Service Worker Schematic', () => {
     const tree = schematicRunner.runSchematic('service-worker', options, appTree);
     const configText = tree.readContent('/angular.json');
     const config = JSON.parse(configText);
-    const swFlag = config.projects.bar.targets.build.options.serviceWorker;
+    const swFlag = config.projects.bar.architect
+      .build.options.serviceWorker;
     expect(swFlag).toEqual(true);
   });
 

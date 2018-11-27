@@ -6,7 +6,6 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import {
-  JsonObject,
   Path,
   basename,
   experimental,
@@ -33,67 +32,46 @@ import {
 import * as ts from 'typescript';
 import { findNode, getDecoratorMetadata } from '../utility/ast-utils';
 import { InsertChange } from '../utility/change';
-import { getWorkspace } from '../utility/config';
+import { getWorkspace, updateWorkspace } from '../utility/config';
 import { addPackageJsonDependency, getPackageJsonDependency } from '../utility/dependencies';
 import { findBootstrapModuleCall, findBootstrapModulePath } from '../utility/ng-ast-utils';
-import { getProjectTargets } from '../utility/project-targets';
+import { getProject } from '../utility/project';
+import { getProjectTargets, targetBuildNotFoundError } from '../utility/project-targets';
+import { Builders, WorkspaceTargets } from '../utility/workspace-models';
 import { Schema as UniversalOptions } from './schema';
 
 
-function getWorkspacePath(host: Tree): string {
-  const possibleFiles = [ '/angular.json', '/.angular.json' ];
+function getFileReplacements(target: WorkspaceTargets) {
+  const fileReplacements =
+    target.build &&
+    target.build.configurations &&
+    target.build.configurations.production &&
+    target.build.configurations.production.fileReplacements;
 
-  return possibleFiles.filter(path => host.exists(path))[0];
-}
-
-function getClientProject(
-  host: Tree, options: UniversalOptions,
-): experimental.workspace.WorkspaceProject {
-  const workspace = getWorkspace(host);
-  const clientProject = workspace.projects[options.clientProject];
-  if (!clientProject) {
-    throw new SchematicsException(`Client app ${options.clientProject} not found.`);
-  }
-
-  return clientProject;
-}
-
-function getClientTargets(
-  host: Tree,
-  options: UniversalOptions,
-): experimental.workspace.WorkspaceTool {
-  const clientProject = getClientProject(host, options);
-  const projectTargets = getProjectTargets(clientProject);
-
-  return projectTargets;
+  return fileReplacements || [];
 }
 
 function updateConfigFile(options: UniversalOptions, tsConfigDirectory: Path): Rule {
   return (host: Tree) => {
     const workspace = getWorkspace(host);
-    if (!workspace.projects[options.clientProject]) {
-      throw new SchematicsException(`Client app ${options.clientProject} not found.`);
-    }
-
-    const clientProject = workspace.projects[options.clientProject];
+    const clientProject = getProject(workspace, options.clientProject);
     const projectTargets = getProjectTargets(clientProject);
 
-    const builderOptions: JsonObject = {
-      outputPath: `dist/${options.clientProject}-server`,
-      main: `${clientProject.root}src/main.server.ts`,
-      tsConfig: join(tsConfigDirectory, `${options.tsconfigFileName}.json`),
+    projectTargets.server = {
+      builder: Builders.Server,
+      options: {
+        outputPath: `dist/${options.clientProject}-server`,
+        main: `${clientProject.root}src/main.server.ts`,
+        tsConfig: join(tsConfigDirectory, `${options.tsconfigFileName}.json`),
+      },
+      configurations: {
+        production: {
+          fileReplacements: getFileReplacements(projectTargets),
+        },
+      },
     };
-    const serverTarget: JsonObject = {
-      builder: '@angular-devkit/build-angular:server',
-      options: builderOptions,
-    };
-    projectTargets.server = serverTarget;
 
-    const workspacePath = getWorkspacePath(host);
-
-    host.overwrite(workspacePath, JSON.stringify(workspace, null, 2));
-
-    return host;
+    return updateWorkspace(workspace);
   };
 }
 
@@ -118,7 +96,10 @@ function findBrowserModuleImport(host: Tree, modulePath: string): ts.Node {
 
 function wrapBootstrapCall(options: UniversalOptions): Rule {
   return (host: Tree) => {
-    const clientTargets = getClientTargets(host, options);
+    const clientTargets = getProjectTargets(host, options.clientProject);
+    if (!clientTargets.build) {
+      throw targetBuildNotFoundError();
+    }
     const mainPath = normalize('/' + clientTargets.build.options.main);
     let bootstrapCall: ts.Node | null = findBootstrapModuleCall(host, mainPath);
     if (bootstrapCall === null) {
@@ -146,8 +127,11 @@ function wrapBootstrapCall(options: UniversalOptions): Rule {
 
 function addServerTransition(options: UniversalOptions): Rule {
   return (host: Tree) => {
-    const clientProject = getClientProject(host, options);
-    const clientTargets = getClientTargets(host, options);
+    const clientProject = getProject(host, options.clientProject);
+    const clientTargets = getProjectTargets(clientProject);
+    if (!clientTargets.build) {
+      throw targetBuildNotFoundError();
+    }
     const mainPath = normalize('/' + clientTargets.build.options.main);
 
     const bootstrapModuleRelativePath = findBootstrapModulePath(host, mainPath);
@@ -177,7 +161,12 @@ function addDependencies(): Rule {
       ...coreDep,
       name: '@angular/platform-server',
     };
+    const httpDep = {
+      ...coreDep,
+      name: '@angular/http',
+    };
     addPackageJsonDependency(host, platformServerDep);
+    addPackageJsonDependency(host, httpDep);
 
     return host;
   };
@@ -192,8 +181,8 @@ function getTsConfigOutDir(host: Tree, targets: experimental.workspace.Workspace
   const tsConfigContent = tsConfigBuffer.toString();
   const tsConfig = parseJson(tsConfigContent);
   if (tsConfig === null || typeof tsConfig !== 'object' || Array.isArray(tsConfig) ||
-      tsConfig.compilerOptions === null || typeof tsConfig.compilerOptions !== 'object' ||
-      Array.isArray(tsConfig.compilerOptions)) {
+    tsConfig.compilerOptions === null || typeof tsConfig.compilerOptions !== 'object' ||
+    Array.isArray(tsConfig.compilerOptions)) {
     throw new SchematicsException(`Invalid tsconfig - ${tsConfigPath}`);
   }
   const outDir = tsConfig.compilerOptions.outDir;
@@ -203,13 +192,16 @@ function getTsConfigOutDir(host: Tree, targets: experimental.workspace.Workspace
 
 export default function (options: UniversalOptions): Rule {
   return (host: Tree, context: SchematicContext) => {
-    const clientProject = getClientProject(host, options);
+    const clientProject = getProject(host, options.clientProject);
     if (clientProject.projectType !== 'application') {
       throw new SchematicsException(`Universal requires a project type of "application".`);
     }
-    const clientTargets = getClientTargets(host, options);
+    const clientTargets = getProjectTargets(clientProject);
     const outDir = getTsConfigOutDir(host, clientTargets);
-    const tsConfigExtends = basename(clientTargets.build.options.tsConfig);
+    if (!clientTargets.build) {
+      throw targetBuildNotFoundError();
+    }
+    const tsConfigExtends = basename(normalize(clientTargets.build.options.tsConfig));
     const rootInSrc = clientProject.root === '';
     const tsConfigDirectory = join(normalize(clientProject.root), rootInSrc ? 'src' : '');
 
@@ -221,7 +213,7 @@ export default function (options: UniversalOptions): Rule {
       template({
         ...strings,
         ...options as object,
-        stripTsExtension: (s: string) => { return s.replace(/\.ts$/, ''); },
+        stripTsExtension: (s: string) => s.replace(/\.ts$/, ''),
       }),
       move(join(normalize(clientProject.root), 'src')),
     ]);
@@ -230,7 +222,7 @@ export default function (options: UniversalOptions): Rule {
       template({
         ...strings,
         ...options as object,
-        stripTsExtension: (s: string) => { return s.replace(/\.ts$/, ''); },
+        stripTsExtension: (s: string) => s.replace(/\.ts$/, ''),
         outDir,
         tsConfigExtends,
         rootInSrc,

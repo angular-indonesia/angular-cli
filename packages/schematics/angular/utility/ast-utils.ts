@@ -395,7 +395,7 @@ export function addSymbolToNgModuleMetadata(
       // Get the indentation of the last element, if any.
       const text = node.getFullText(source);
       const matches = text.match(/^\r?\n\s*/);
-      if (matches.length > 0) {
+      if (matches && matches.length > 0) {
         toInsert = `,${matches[0]}${metadataField}: [${symbolName}]`;
       } else {
         toInsert = `, ${metadataField}: [${symbolName}]`;
@@ -426,7 +426,7 @@ export function addSymbolToNgModuleMetadata(
   }
 
   if (!node) {
-    console.log('No app module found. Please add your new class to your component.');
+    console.error('No app module found. Please add your new class to your component.');
 
     return [];
   }
@@ -455,8 +455,8 @@ export function addSymbolToNgModuleMetadata(
       position = node.getEnd();
       // Get the indentation of the last element, if any.
       const text = node.getFullText(source);
-      if (text.match('^\r?\r?\n')) {
-        toInsert = `,${text.match(/^\r?\n\s+/)[0]}${metadataField}: [${symbolName}]`;
+      if (text.match(/^\r?\r?\n/)) {
+        toInsert = `,${text.match(/^\r?\n\s*/)[0]}${metadataField}: [${symbolName}]`;
       } else {
         toInsert = `, ${metadataField}: [${symbolName}]`;
       }
@@ -469,7 +469,7 @@ export function addSymbolToNgModuleMetadata(
     // Get the indentation of the last element, if any.
     const text = node.getFullText(source);
     if (text.match(/^\r?\n/)) {
-      toInsert = `,${text.match(/^\r?\n(\r?)\s+/)[0]}${symbolName}`;
+      toInsert = `,${text.match(/^\r?\n(\r?)\s*/)[0]}${symbolName}`;
     } else {
       toInsert = `, ${symbolName}`;
     }
@@ -555,7 +555,7 @@ export function isImported(source: ts.SourceFile,
     .filter(node => node.kind === ts.SyntaxKind.ImportDeclaration)
     .filter((imp: ts.ImportDeclaration) => imp.moduleSpecifier.kind === ts.SyntaxKind.StringLiteral)
     .filter((imp: ts.ImportDeclaration) => {
-      return (<ts.StringLiteral> imp.moduleSpecifier).text === importPath;
+      return (imp.moduleSpecifier as ts.StringLiteral).text === importPath;
     })
     .filter((imp: ts.ImportDeclaration) => {
       if (!imp.importClause) {

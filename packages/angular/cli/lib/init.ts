@@ -43,8 +43,19 @@ function _fromPackageJson(cwd?: string) {
 
 // Check if we need to profile this CLI run.
 if (process.env['NG_CLI_PROFILING']) {
-  const profiler = require('v8-profiler'); // tslint:disable-line:no-implicit-dependencies
+  let profiler: {
+    startProfiling: (name?: string, recsamples?: boolean) => void;
+    stopProfiling: (name?: string) => any; // tslint:disable-line:no-any
+  };
+  try {
+    profiler = require('v8-profiler-node8'); // tslint:disable-line:no-implicit-dependencies
+  } catch (err) {
+    throw new Error(`Could not require 'v8-profiler-node8'. You must install it separetely with` +
+      `'npm install v8-profiler-node8 --no-save.\n\nOriginal error:\n\n${err}`);
+  }
+
   profiler.startProfiling();
+
   const exitHandler = (options: { cleanup?: boolean, exit?: boolean }) => {
     if (options.cleanup) {
       const cpuProfile = profiler.stopProfiling();
@@ -99,7 +110,7 @@ try {
     // Don't show warning colorised on `ng completion`
     if (process.argv[2] !== 'completion') {
         // eslint-disable-next-line no-console
-      console.log(warning);
+      console.error(warning);
     } else {
         // eslint-disable-next-line no-console
       console.error(warning);
@@ -141,6 +152,6 @@ cli({
     process.exit(exitCode);
   })
   .catch((err: Error) => {
-    console.log('Unknown error: ' + err.toString());
+    console.error('Unknown error: ' + err.toString());
     process.exit(127);
   });

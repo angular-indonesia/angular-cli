@@ -1,6 +1,6 @@
 {
-  "title": "Karma Target",
-  "description": "Karma target options for Build Facade.",
+  "title": "Dev Server Target",
+  "description": "Dev Server target options for Build Facade.",
   "type": "object",
   "properties": {
     "browserTarget": {
@@ -39,6 +39,11 @@
       "description": "Opens the url in default browser.",
       "default": false,
       "alias": "o"
+    },
+    "verbose": {
+      "type": "boolean",
+      "description": "Adds more details to output logging.",
+      "default": false
     },
     "liveReload": {
       "type": "boolean",
@@ -97,7 +102,8 @@
     },
     "evalSourceMap": {
       "type": "boolean",
-      "description": "Output in-file eval sourcemaps."
+      "description": "Output in-file eval sourcemaps.",
+      "x-deprecated": true
     },
     "vendorChunk": {
       "type": "boolean",

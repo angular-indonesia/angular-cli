@@ -5,6 +5,7 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
+import { virtualFs } from '@angular-devkit/core';
 import * as ts from 'typescript';
 import { WebpackCompilerHost } from '../compiler_host';
 
@@ -57,7 +58,12 @@ export function createTypescriptContext(content: string) {
   };
 
   // Create compiler host.
-  const compilerHost = new WebpackCompilerHost(compilerOptions, basePath);
+  const compilerHost = new WebpackCompilerHost(
+    compilerOptions,
+    basePath,
+    new virtualFs.SimpleMemoryHost(),
+    false,
+  );
 
   // Add a dummy file to host content.
   compilerHost.writeFile(fileName, content, false);
@@ -91,11 +97,11 @@ export function transformTypescript(
 
   // Log diagnostics if emit wasn't successfull.
   if (emitSkipped) {
-    console.log(diagnostics);
+    console.error(diagnostics);
 
     return null;
   }
 
   // Return the transpiled js.
-  return compilerHost.readFile(fileName.replace(/\.ts$/, '.js'));
+  return compilerHost.readFile(fileName.replace(/\.tsx?$/, '.js'));
 }

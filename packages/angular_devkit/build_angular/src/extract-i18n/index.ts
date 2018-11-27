@@ -38,6 +38,7 @@ export interface ExtractI18nBuilderOptions {
   i18nLocale: string;
   outputPath?: string;
   outFile?: string;
+  progress?: boolean;
 }
 
 export class ExtractI18nBuilder implements Builder<ExtractI18nBuilderOptions> {
@@ -85,12 +86,14 @@ export class ExtractI18nBuilder implements Builder<ExtractI18nBuilderOptions> {
 
         // Extracting i18n uses the browser target webpack config with some specific options.
         const webpackConfig = this.buildWebpackConfig(root, projectRoot, {
-          ...browserOptions,
+          // todo: remove this casting when 'CurrentFileReplacement' is changed to 'FileReplacement'
+          ...(browserOptions as NormalizedBrowserBuilderSchema),
           optimization: false,
           i18nLocale: options.i18nLocale,
           i18nFormat: options.i18nFormat,
           i18nFile: outFile,
           aot: true,
+          progress: options.progress,
           assets: [],
           scripts: [],
           styles: [],
@@ -115,6 +118,7 @@ export class ExtractI18nBuilder implements Builder<ExtractI18nBuilderOptions> {
 
     wco = {
       root: getSystemPath(root),
+      logger: this.context.logger,
       projectRoot: getSystemPath(projectRoot),
       // TODO: use only this.options, it contains all flags and configs items already.
       buildOptions: options,

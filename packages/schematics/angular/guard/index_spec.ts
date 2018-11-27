@@ -6,7 +6,6 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import { SchematicTestRunner, UnitTestTree } from '@angular-devkit/schematics/testing';
-import * as path from 'path';
 import { Schema as ApplicationOptions } from '../application/schema';
 import { Schema as WorkspaceOptions } from '../workspace/schema';
 import { Schema as GuardOptions } from './schema';
@@ -15,7 +14,7 @@ import { Schema as GuardOptions } from './schema';
 describe('Guard Schematic', () => {
   const schematicRunner = new SchematicTestRunner(
     '@schematics/angular',
-    path.join(__dirname, '../collection.json'),
+    require.resolve('../collection.json'),
   );
   const defaultOptions: GuardOptions = {
     name: 'foo',
@@ -47,8 +46,8 @@ describe('Guard Schematic', () => {
   it('should create a guard', () => {
     const tree = schematicRunner.runSchematic('guard', defaultOptions, appTree);
     const files = tree.files;
-    expect(files.indexOf('/projects/bar/src/app/foo.guard.spec.ts')).toBeGreaterThanOrEqual(0);
-    expect(files.indexOf('/projects/bar/src/app/foo.guard.ts')).toBeGreaterThanOrEqual(0);
+    expect(files).toContain('/projects/bar/src/app/foo.guard.spec.ts');
+    expect(files).toContain('/projects/bar/src/app/foo.guard.ts');
   });
 
   it('should respect the spec flag', () => {
@@ -56,8 +55,8 @@ describe('Guard Schematic', () => {
 
     const tree = schematicRunner.runSchematic('guard', options, appTree);
     const files = tree.files;
-    expect(files.indexOf('/projects/bar/src/app/foo.guard.spec.ts')).toEqual(-1);
-    expect(files.indexOf('/projects/bar/src/app/foo.guard.ts')).toBeGreaterThanOrEqual(0);
+    expect(files).not.toContain('/projects/bar/src/app/foo.guard.spec.ts');
+    expect(files).toContain('/projects/bar/src/app/foo.guard.ts');
   });
 
   it('should respect the sourceRoot value', () => {
@@ -65,7 +64,6 @@ describe('Guard Schematic', () => {
     config.projects.bar.sourceRoot = 'projects/bar/custom';
     appTree.overwrite('/angular.json', JSON.stringify(config, null, 2));
     appTree = schematicRunner.runSchematic('guard', defaultOptions, appTree);
-    expect(appTree.files.indexOf('/projects/bar/custom/app/foo.guard.ts'))
-      .toBeGreaterThanOrEqual(0);
+    expect(appTree.files).toContain('/projects/bar/custom/app/foo.guard.ts');
   });
 });

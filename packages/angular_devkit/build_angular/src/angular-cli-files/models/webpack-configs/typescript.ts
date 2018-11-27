@@ -81,6 +81,8 @@ function _createAotPlugin(
     nameLazyFiles: buildOptions.namedChunks,
     forkTypeChecker: buildOptions.forkTypeChecker,
     contextElementDependencyConstructor: require('webpack/lib/dependencies/ContextElementDependency'),
+    logger: wco.logger,
+    directTemplateLoading: true,
     ...options,
   };
   return new AngularCompilerPlugin(pluginOptions);
@@ -110,7 +112,7 @@ export function getAotConfig(
     });
   }
 
-  const test = /(?:\.ngfactory\.js|\.ngstyle\.js|\.ts)$/;
+  const test = /(?:\.ngfactory\.js|\.ngstyle\.js|\.tsx?)$/;
 
   return {
     module: { rules: [{ test, use: loaders }] },

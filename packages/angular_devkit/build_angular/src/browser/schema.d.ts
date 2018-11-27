@@ -49,12 +49,17 @@ export interface BrowserBuilderSchema {
   /**
    * Replace files with other files in the build.
    */
-  fileReplacements: FileReplacements[];
+  fileReplacements: FileReplacement[];
 
   /**
    * Path where output will be placed.
    */
   outputPath: string;
+
+  /**
+   * Path where style resources will be placed (Relative to outputPath).
+   */
+  resourcesOutputPath: string;
 
   /**
    * Build using Ahead of Time compilation.
@@ -72,6 +77,7 @@ export interface BrowserBuilderSchema {
   vendorSourceMap?: boolean;
 
   /**
+    @deprecated
    * Output in-file eval sourcemaps.
    */
   evalSourceMap: boolean;
@@ -192,6 +198,7 @@ export interface BrowserBuilderSchema {
   ngswConfigPath?: string;
 
   /**
+   * @deprecated
    * Flag to prevent building an app shell.
    */
   skipAppShell: boolean;
@@ -222,6 +229,11 @@ export interface BrowserBuilderSchema {
    * Budget thresholds to ensure parts of your application stay within boundaries which you set.
    */
   budgets: Budget[];
+
+  /**
+   * Output profile events for Chrome profiler.
+   */
+  profile: boolean;
 }
 
 export type AssetPattern = string | AssetPatternObject;
@@ -236,6 +248,11 @@ export interface AssetPatternObject {
    * The input path dir in which to apply 'glob'. Defaults to the project root.
    */
   input: string;
+
+  /**
+   * 	An array of globs to ignore.
+   */
+  ignore?: string[];
 
   /**
    * Absolute path within the output.

@@ -5,6 +5,9 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
+
+import { FileReplacement } from '../browser/schema';
+
 export interface BuildWebpackServerSchema {
   /**
    * The name of the TypeScript configuration file.
@@ -47,6 +50,10 @@ export interface BuildWebpackServerSchema {
    */
   outputPath: string;
   /**
+ * Path where style resources will be placed (Relative to outputPath).
+ */
+  resourcesOutputPath: string;
+  /**
    * Generates a 'stats.json' file which can be analyzed using tools such as:
    * #webpack-bundle-analyzer' or https: //webpack.github.io/analyse.
    */
@@ -80,7 +87,7 @@ export interface BuildWebpackServerSchema {
   /**
    * Replace files with other files in the build.
    */
-  fileReplacements: FileReplacements[];
+  fileReplacements: FileReplacement[];
   /**
    * Define the output filename cache-busting hashing mode.
    */
@@ -125,9 +132,9 @@ export interface BuildWebpackServerSchema {
    * Run build when files change.
    */
   watch?: boolean;
-    /**
-   * Enable and define the file watching poll time period in milliseconds.
-   */
+  /**
+ * Enable and define the file watching poll time period in milliseconds.
+ */
   poll?: number;
 }
 

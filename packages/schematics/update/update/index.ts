@@ -20,7 +20,7 @@ import * as semver from 'semver';
 import { getNpmPackageJson } from './npm';
 import { NpmRepositoryPackageJson } from './npm-package-json';
 import { Dependency, JsonSchemaForNpmPackageJsonFiles } from './package-json';
-import { UpdateSchema } from './schema';
+import { Schema as UpdateSchema } from './schema';
 
 type VersionRange = string & { __VERSION_RANGE: void; };
 type PeerVersionTransform = string | ((range: string) => string);
@@ -243,7 +243,7 @@ function _performUpdate(
 
   const toInstall = [...infoMap.values()]
       .map(x => [x.name, x.target, x.installed])
-      // tslint:disable-next-line:non-null-operator
+      // tslint:disable-next-line:no-non-null-assertion
       .filter(([name, target, installed]) => {
         return !!name && !!target && !!installed;
       }) as [string, PackageVersionInfo, PackageVersionInfo][];
@@ -488,7 +488,7 @@ function _usageMessage(
 
   logger.info('\n');
   logger.info('There might be additional packages that are outdated.');
-  logger.info('Or run ng update --all to try to update all at the same time.\n');
+  logger.info('Run "ng update --all" to try to update all at the same time.\n');
 
   return of<void>(undefined);
 }
@@ -758,9 +758,11 @@ export default function(options: UpdateSchema): Rule {
     // We cannot just return this because we need to fetch the packages from NPM still for the
     // help/guide to show.
     options.packages = [];
-  } else if (typeof options.packages == 'string') {
-    // If a string, then we should split it and make it an array.
-    options.packages = options.packages.split(/,/g);
+  } else {
+    // We split every packages by commas to allow people to pass in multiple and make it an array.
+    options.packages = options.packages.reduce((acc, curr) => {
+      return acc.concat(curr.split(','));
+    }, [] as string[]);
   }
 
   if (options.migrateOnly && options.from) {
@@ -776,11 +778,12 @@ export default function(options: UpdateSchema): Rule {
     const logger = context.logger;
     const allDependencies = _getAllDependencies(tree);
     const packages = _buildPackageList(options, allDependencies, logger);
+    const usingYarn = options.packageManager === 'yarn';
 
     return observableFrom([...allDependencies.keys()]).pipe(
       // Grab all package.json from the npm repository. This requires a lot of HTTP calls so we
       // try to parallelize as many as possible.
-      mergeMap(depName => getNpmPackageJson(depName, options.registry, logger)),
+      mergeMap(depName => getNpmPackageJson(depName, options.registry, logger, usingYarn)),
 
       // Build a map of all dependencies and their packageJson.
       reduce<NpmRepositoryPackageJson, Map<string, NpmRepositoryPackageJson>>(
@@ -852,9 +855,9 @@ export default function(options: UpdateSchema): Rule {
             logger.createChild(''),
             'warn',
           );
-          _validateUpdatePackages(infoMap, options.force, sublog);
+          _validateUpdatePackages(infoMap, !!options.force, sublog);
 
-          return _performUpdate(tree, context, infoMap, logger, options.migrateOnly);
+          return _performUpdate(tree, context, infoMap, logger, !!options.migrateOnly);
         } else {
           return _usageMessage(options, infoMap, logger);
         }
