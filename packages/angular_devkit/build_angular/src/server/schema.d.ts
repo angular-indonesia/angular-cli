@@ -6,17 +6,13 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import { FileReplacement } from '../browser/schema';
+import { BrowserBuilderSchema, FileReplacement, SourceMapOptions } from '../browser/schema';
 
 export interface BuildWebpackServerSchema {
   /**
    * The name of the TypeScript configuration file.
    */
   tsConfig: string;
-  /**
-   * Output sourcemaps.
-   */
-  sourceMap?: boolean;
   /**
    * Adds more details to output logging.
    */
@@ -38,11 +34,17 @@ export interface BuildWebpackServerSchema {
    */
   vendorChunk?: boolean;
   /**
+   * Output sourcemaps.
+   */
+  sourceMap: SourceMapOptions;
+  /**
    * Resolve vendor packages sourcemaps.
+   * @deprecated use sourceMap.vendor
    */
   vendorSourceMap?: boolean;
   /**
    * Output in-file eval sourcemaps.
+   * @deprecated
    */
   evalSourceMap?: boolean;
   /**
