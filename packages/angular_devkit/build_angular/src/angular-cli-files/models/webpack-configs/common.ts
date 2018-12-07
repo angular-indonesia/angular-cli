@@ -33,6 +33,12 @@ export const buildOptimizerLoader: string = g['_DevKitIsLocal']
 // tslint:disable-next-line:no-big-function
 export function getCommonConfig(wco: WebpackConfigOptions) {
   const { root, projectRoot, buildOptions } = wco;
+  const { styles: stylesOptimization, scripts: scriptsOptimization } = buildOptions.optimization;
+  const {
+    styles: stylesSouceMap,
+    scripts: scriptsSourceMap,
+    vendor: vendorSourceMap,
+  } = buildOptions.sourceMap;
 
   const nodeModules = findUp('node_modules', projectRoot);
   if (!nodeModules) {
@@ -102,7 +108,7 @@ export function getCommonConfig(wco: WebpackConfigOptions) {
 
       extraPlugins.push(new ScriptsWebpackPlugin({
         name: bundleName,
-        sourceMap: buildOptions.scriptsSourceMap,
+        sourceMap: scriptsSourceMap,
         filename: `${path.basename(bundleName)}${hash}.js`,
         scripts: script.paths,
         basePath: projectRoot,
@@ -158,7 +164,7 @@ export function getCommonConfig(wco: WebpackConfigOptions) {
   }
 
   let sourceMapUseRule;
-  if (buildOptions.sourceMap && buildOptions.vendorSourceMap) {
+  if ((scriptsSourceMap || stylesSouceMap) && vendorSourceMap) {
     sourceMapUseRule = {
       use: [
         {
@@ -174,7 +180,7 @@ export function getCommonConfig(wco: WebpackConfigOptions) {
       use: [
         {
           loader: buildOptimizerLoader,
-          options: { sourceMap: buildOptions.scriptsSourceMap },
+          options: { sourceMap: scriptsSourceMap },
         },
       ],
     };
@@ -204,37 +210,61 @@ export function getCommonConfig(wco: WebpackConfigOptions) {
     alias = rxPaths(nodeModules);
   } catch { }
 
-  const terserOptions = {
-    ecma: wco.supportES2015 ? 6 : 5,
-    warnings: !!buildOptions.verbose,
-    safari10: true,
-    output: {
-      ascii_only: true,
-      comments: false,
-      webkit: true,
-    },
+  const extraMinimizers = [];
+  if (stylesOptimization) {
+    extraMinimizers.push(
+      new CleanCssWebpackPlugin({
+        sourceMap: stylesSouceMap,
+        // component styles retain their original file name
+        test: (file) => /\.(?:css|scss|sass|less|styl)$/.test(file),
+      }),
+    );
+  }
 
-    // On server, we don't want to compress anything. We still set the ngDevMode = false for it
-    // to remove dev code.
-    compress: (buildOptions.platform == 'server' ? {
-      global_defs: {
-        ngDevMode: false,
+  if (scriptsOptimization) {
+    const terserOptions = {
+      ecma: wco.supportES2015 ? 6 : 5,
+      warnings: !!buildOptions.verbose,
+      safari10: true,
+      output: {
+        ascii_only: true,
+        comments: false,
+        webkit: true,
       },
-    } : {
-      pure_getters: buildOptions.buildOptimizer,
-      // PURE comments work best with 3 passes.
-      // See https://github.com/webpack/webpack/issues/2899#issuecomment-317425926.
-      passes: buildOptions.buildOptimizer ? 3 : 1,
-      global_defs: {
-        ngDevMode: false,
-      },
-    }),
-    // We also want to avoid mangling on server.
-    ...(buildOptions.platform == 'server' ? { mangle: false } : {}),
-  };
+
+      // On server, we don't want to compress anything. We still set the ngDevMode = false for it
+      // to remove dev code.
+      compress: (buildOptions.platform == 'server' ? {
+        global_defs: {
+          ngDevMode: false,
+        },
+      } : {
+          pure_getters: buildOptions.buildOptimizer,
+          // PURE comments work best with 3 passes.
+          // See https://github.com/webpack/webpack/issues/2899#issuecomment-317425926.
+          passes: buildOptions.buildOptimizer ? 3 : 1,
+          global_defs: {
+            ngDevMode: false,
+          },
+        }),
+      // We also want to avoid mangling on server.
+      ...(buildOptions.platform == 'server' ? { mangle: false } : {}),
+    };
+
+    extraMinimizers.push(
+      new TerserPlugin({
+        sourceMap: scriptsSourceMap,
+        parallel: true,
+        cache: true,
+        terserOptions,
+      }),
+    );
+  }
 
   return {
-    mode: buildOptions.optimization ? 'production' : 'development',
+    mode: scriptsOptimization || stylesOptimization
+      ? 'production'
+      : 'development',
     devtool: false,
     resolve: {
       extensions: ['.ts', '.tsx', '.mjs', '.js'],
@@ -296,17 +326,7 @@ export function getCommonConfig(wco: WebpackConfigOptions) {
         new HashedModuleIdsPlugin(),
         // TODO: check with Mike what this feature needs.
         new BundleBudgetPlugin({ budgets: buildOptions.budgets }),
-        new CleanCssWebpackPlugin({
-          sourceMap: buildOptions.stylesSourceMap,
-          // component styles retain their original file name
-          test: (file) => /\.(?:css|scss|sass|less|styl)$/.test(file),
-        }),
-        new TerserPlugin({
-          sourceMap: buildOptions.scriptsSourceMap,
-          parallel: true,
-          cache: true,
-          terserOptions,
-        }),
+        ...extraMinimizers,
       ],
     },
     plugins: extraPlugins,

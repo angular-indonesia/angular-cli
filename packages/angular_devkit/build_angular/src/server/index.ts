@@ -16,7 +16,7 @@ import { WebpackBuilder } from '@angular-devkit/build-webpack';
 import { Path, getSystemPath, normalize, resolve, virtualFs } from '@angular-devkit/core';
 import { Stats } from 'fs';
 import { Observable, concat, of } from 'rxjs';
-import { concatMap, last, tap } from 'rxjs/operators';
+import { concatMap, last } from 'rxjs/operators';
 import * as ts from 'typescript'; // tslint:disable-line:no-implicit-dependencies
 import { WebpackConfigOptions } from '../angular-cli-files/models/build-options';
 import {
@@ -30,8 +30,8 @@ import {
 import { readTsconfig } from '../angular-cli-files/utilities/read-tsconfig';
 import { requireProjectModule } from '../angular-cli-files/utilities/require-project-module';
 import { getBrowserLoggingCb } from '../browser';
-import { defaultProgress, normalizeFileReplacements, normalizeSourceMaps } from '../utils';
-import { BuildWebpackServerSchema } from './schema';
+import { defaultProgress, normalizeBuilderSchema } from '../utils';
+import { BuildWebpackServerSchema, NormalizedServerBuilderServerSchema } from './schema';
 const webpackMerge = require('webpack-merge');
 
 
@@ -40,30 +40,22 @@ export class ServerBuilder implements Builder<BuildWebpackServerSchema> {
   constructor(public context: BuilderContext) { }
 
   run(builderConfig: BuilderConfiguration<BuildWebpackServerSchema>): Observable<BuildEvent> {
-    let options = builderConfig.options;
     const root = this.context.workspace.root;
     const projectRoot = resolve(root, builderConfig.root);
     const host = new virtualFs.AliasHost(this.context.host as virtualFs.Host<Stats>);
     const webpackBuilder = new WebpackBuilder({ ...this.context, host });
+
+    const options = normalizeBuilderSchema(
+      host,
+      root,
+      builderConfig,
+    );
 
     // TODO: verify using of(null) to kickstart things is a pattern.
     return of(null).pipe(
       concatMap(() => options.deleteOutputPath
         ? this._deleteOutputDir(root, normalize(options.outputPath), this.context.host)
         : of(null)),
-      concatMap(() => normalizeFileReplacements(options.fileReplacements, host, root)),
-      tap(fileReplacements => options.fileReplacements = fileReplacements),
-      tap(() => {
-        const normalizedOptions = normalizeSourceMaps(options.sourceMap);
-        // todo: remove when removing the deprecations
-        normalizedOptions.vendorSourceMap
-          = normalizedOptions.vendorSourceMap || !!options.vendorSourceMap;
-
-        options = {
-          ...options,
-          ...normalizedOptions,
-        };
-      }),
       concatMap(() => {
         const webpackConfig = this.buildWebpackConfig(root, projectRoot, host, options);
 
@@ -74,7 +66,7 @@ export class ServerBuilder implements Builder<BuildWebpackServerSchema> {
 
   buildWebpackConfig(root: Path, projectRoot: Path,
                      host: virtualFs.Host<Stats>,
-                     options: BuildWebpackServerSchema) {
+                     options: NormalizedServerBuilderServerSchema) {
     let wco: WebpackConfigOptions;
 
     // TODO: make target defaults into configurations instead
