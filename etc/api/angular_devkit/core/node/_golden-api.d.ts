@@ -1,9 +1,8 @@
 export declare function createConsoleLogger(verbose?: boolean, stdout?: ProcessOutput, stderr?: ProcessOutput): logging.Logger;
 
-export declare namespace fs {
-    function isFile(filePath: string): boolean;
-    function isDirectory(filePath: string): boolean;
-}
+export declare function isDirectory(filePath: string): boolean;
+
+export declare function isFile(filePath: string): boolean;
 
 export declare class ModuleNotFoundException extends BaseException {
     readonly basePath: string;
@@ -38,6 +37,12 @@ export declare class NodeJsSyncHost implements virtualFs.Host<fs.Stats> {
     stat(path: Path): Observable<virtualFs.Stats<fs.Stats>>;
     watch(path: Path, _options?: virtualFs.HostWatchOptions): Observable<virtualFs.HostWatchEvent> | null;
     write(path: Path, content: virtualFs.FileBuffer): Observable<void>;
+}
+
+export declare class NodeModuleJobRegistry<MinimumArgumentValueT extends JsonValue = JsonValue, MinimumInputValueT extends JsonValue = JsonValue, MinimumOutputValueT extends JsonValue = JsonValue> implements core_experimental.jobs.Registry<MinimumArgumentValueT, MinimumInputValueT, MinimumOutputValueT> {
+    constructor(_resolveLocal?: boolean, _resolveGlobal?: boolean);
+    protected _resolve(name: string): string | null;
+    get<A extends MinimumArgumentValueT, I extends MinimumInputValueT, O extends MinimumOutputValueT>(name: core_experimental.jobs.JobName): Observable<core_experimental.jobs.JobHandler<A, I, O> | null>;
 }
 
 export interface ProcessOutput {

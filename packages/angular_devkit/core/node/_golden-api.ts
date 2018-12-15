@@ -5,13 +5,14 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import * as experimental from './experimental/job-registry';
-import * as fs from './fs';
+
+// Start experimental namespace
+// Start jobs namespace
+export * from './experimental/job-registry';
+// End jobs namespace
+// End experimental namespace
+
+export * from './fs';
 export * from './cli-logger';
 export * from './host';
 export { ModuleNotFoundException, ResolveOptions, resolve } from './resolve';
-
-export {
-  experimental,
-  fs,
-};

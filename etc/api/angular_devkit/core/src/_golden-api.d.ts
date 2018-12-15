@@ -165,7 +165,7 @@ export declare class CoreSchemaRegistry implements SchemaRegistry {
     addPostTransform(visitor: JsonVisitor, deps?: JsonVisitor[]): void;
     addPreTransform(visitor: JsonVisitor, deps?: JsonVisitor[]): void;
     addSmartDefaultProvider<T>(source: string, provider: SmartDefaultProvider<T>): void;
-    compile(schema: JsonObject): Observable<SchemaValidator>;
+    compile(schema: JsonSchema): Observable<SchemaValidator>;
     flatten(schema: JsonObject): Observable<JsonObject>;
     registerUriHandler(handler: UriHandler): void;
     usePromptProvider(provider: PromptProvider): void;
@@ -226,7 +226,7 @@ export declare function fragment(path: string): PathFragment;
 
 export declare function getSystemPath(path: Path): string;
 
-export declare function getTypesOfSchema(schema: JsonObject | true): Set<string>;
+export declare function getTypesOfSchema(schema: JsonSchema): Set<string>;
 
 export declare const gray: (x: string) => string;
 
@@ -472,6 +472,7 @@ export declare class Logger extends Observable<LogEntry> implements LoggerApi {
     info(message: string, metadata?: JsonObject): void;
     lift<R>(operator: Operator<LogEntry, R>): Observable<R>;
     log(level: LogLevel, message: string, metadata?: JsonObject): void;
+    next(entry: LogEntry): void;
     subscribe(): Subscription;
     subscribe(observer: PartialObserver<LogEntry>): Subscription;
     subscribe(next?: (value: LogEntry) => void, error?: (error: Error) => void, complete?: () => void): Subscription;
@@ -978,7 +979,7 @@ export declare class UnimplementedException extends BaseException {
     constructor();
 }
 
-export declare class UnknownException extends Error {
+export declare class UnknownException extends BaseException {
     constructor(message: string);
 }
 
@@ -990,7 +991,7 @@ export declare type UriHandler = (uri: string) => Observable<JsonObject> | Promi
 
 export declare function visitJson<ContextT>(json: JsonValue, visitor: JsonVisitor, schema?: JsonObject, refResolver?: ReferenceResolver<ContextT>, context?: ContextT): Observable<JsonValue>;
 
-export declare function visitJsonSchema(schema: JsonObject, visitor: JsonSchemaVisitor): void;
+export declare function visitJsonSchema(schema: JsonSchema, visitor: JsonSchemaVisitor): void;
 
 export declare const white: (x: string) => string;
 
