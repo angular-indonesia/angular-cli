@@ -112,28 +112,6 @@ describe('Browser Builder lazy modules', () => {
     ).toPromise().then(done, done.fail);
   });
 
-  it('should show error when lazy route is invalid on watch mode JIT', (done) => {
-    host.writeMultipleFiles(lazyModuleFiles);
-    host.writeMultipleFiles(lazyModuleImport);
-    host.replaceInFile(
-      'src/app/app.module.ts',
-      'lazy.module#LazyModule',
-      'invalid.module#LazyModule',
-    );
-
-    const logger = new TestLogger('rebuild-lazy-errors');
-    const overrides = { watch: true, aot: false };
-    runTargetSpec(host, browserTargetSpec, overrides, DefaultTimeout, logger).pipe(
-      tap((buildEvent) => expect(buildEvent.success).toBe(false)),
-      tap(() => {
-        expect(logger.includes('Could not resolve module')).toBe(true);
-        logger.clear();
-        host.appendToFile('src/main.ts', ' ');
-      }),
-      take(2),
-    ).toPromise().then(done, done.fail);
-  });
-
   it('supports lazy bundle for lazy routes with AOT', (done) => {
     host.writeMultipleFiles(lazyModuleFiles);
     host.writeMultipleFiles(lazyModuleImport);
