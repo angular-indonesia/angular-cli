@@ -15,8 +15,9 @@ import {
   Budget,
   CurrentFileReplacement,
   ExtraEntryPoint,
+  NormalizedOptimization,
+  NormalizedSourceMaps,
 } from '../../browser/schema';
-import { NormalizedOptimization, NormalizedSourceMaps } from '../../utils/index';
 
 export interface BuildOptions {
   optimization: NormalizedOptimization;
@@ -57,6 +58,7 @@ export interface BuildOptions {
   statsJson: boolean;
   forkTypeChecker: boolean;
   profile?: boolean;
+  es5BrowserSupport?: boolean;
 
   main: string;
   index: string;

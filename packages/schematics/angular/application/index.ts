@@ -207,6 +207,7 @@ function addAppToWorkspaceFile(options: ApplicationOptions, workspace: Workspace
             `${projectRoot}src/styles.${options.style}`,
           ],
           scripts: [],
+          es5BrowserSupport: true,
         },
         configurations: {
           production: {
@@ -367,6 +368,7 @@ export default function (options: ApplicationOptions): Rule {
             'dot': '.',
             relativePathToWorkspaceRoot,
             rootInSrc,
+            appName: options.name,
           }),
           move(appDir),
         ])),
