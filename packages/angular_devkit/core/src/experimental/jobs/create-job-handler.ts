@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  *
  */
-import { Observable, Observer, Subject, Subscription, from, isObservable } from 'rxjs';
+import { Observable, Observer, Subject, Subscription, from, isObservable, of } from 'rxjs';
 import { switchMap, tap } from 'rxjs/operators';
 import { BaseException } from '../../exception/index';
 import { JsonValue } from '../../json/index';
@@ -39,7 +39,7 @@ export interface SimpleJobHandlerContext<
 > extends JobHandlerContext<A, I, O> {
   logger: LoggerApi;
   createChannel: (name: string) => Observer<JsonValue>;
-  input: Observable<JsonValue>;
+  input: Observable<I>;
 }
 
 
@@ -68,12 +68,21 @@ export function createJobHandler<A extends JsonValue, I extends JsonValue, O ext
   const handler = (argument: A, context: JobHandlerContext<A, I, O>) => {
     const description = context.description;
     const inboundBus = context.inboundBus;
-    const inputChannel = new Subject<JsonValue>();
+    const inputChannel = new Subject<I>();
     let subscription: Subscription;
 
     return new Observable<JobOutboundMessage<O>>(subject => {
+      function complete() {
+        if (subscription) {
+          subscription.unsubscribe();
+        }
+        subject.next({ kind: JobOutboundMessageKind.End, description });
+        subject.complete();
+        inputChannel.complete();
+      }
+
       // Handle input.
-      inboundBus.subscribe(message => {
+      const inboundSub = inboundBus.subscribe(message => {
         switch (message.kind) {
           case JobInboundMessageKind.Ping:
             subject.next({ kind: JobOutboundMessageKind.Pong, description, id: message.id });
@@ -82,13 +91,7 @@ export function createJobHandler<A extends JsonValue, I extends JsonValue, O ext
           case JobInboundMessageKind.Stop:
             // There's no way to cancel a promise or a synchronous function, but we do cancel
             // observables where possible.
-            if (subscription) {
-              subscription.unsubscribe();
-            }
-            subject.next({ kind: JobOutboundMessageKind.End, description });
-            subject.complete();
-            // Close all channels.
-            channels.forEach(x => x.complete());
+            complete();
             break;
 
           case JobInboundMessageKind.Input:
@@ -99,7 +102,7 @@ export function createJobHandler<A extends JsonValue, I extends JsonValue, O ext
 
       // Configure a logger to pass in as additional context.
       const logger = new Logger('job');
-      logger.subscribe(entry => {
+      const logSub = logger.subscribe(entry => {
         subject.next({
           kind: JobOutboundMessageKind.Log,
           description,
@@ -108,11 +111,9 @@ export function createJobHandler<A extends JsonValue, I extends JsonValue, O ext
       });
 
       // Execute the function with the additional context.
-      subject.next({ kind: JobOutboundMessageKind.Start, description });
-
       const channels = new Map<string, Subject<JsonValue>>();
 
-      const newContext = {
+      const newContext: SimpleJobHandlerContext<A, I, O> = {
         ...context,
         input: inputChannel.asObservable(),
         logger,
@@ -121,7 +122,7 @@ export function createJobHandler<A extends JsonValue, I extends JsonValue, O ext
             throw new ChannelAlreadyExistException(name);
           }
           const channelSubject = new Subject<JsonValue>();
-          channelSubject.subscribe(
+          const channelSub = channelSubject.subscribe(
             message => {
               subject.next({
                 kind: JobOutboundMessageKind.ChannelMessage, description, name, message,
@@ -140,36 +141,32 @@ export function createJobHandler<A extends JsonValue, I extends JsonValue, O ext
           );
 
           channels.set(name, channelSubject);
+          if (subscription) {
+            subscription.add(channelSub);
+          }
 
           return channelSubject;
         },
       };
 
-      const result = fn(argument, newContext);
+      subject.next({ kind: JobOutboundMessageKind.Start, description });
+      let result = fn(argument, newContext);
       // If the result is a promise, simply wait for it to complete before reporting the result.
       if (isPromise(result)) {
-        result.then(result => {
-          subject.next({ kind: JobOutboundMessageKind.Output, description, value: result });
-          subject.next({ kind: JobOutboundMessageKind.End, description });
-          subject.complete();
-        }, err => subject.error(err));
-      } else if (isObservable(result)) {
-        subscription = (result as Observable<O>).subscribe(
-          (value: O) => subject.next({ kind: JobOutboundMessageKind.Output, description, value }),
-          error => subject.error(error),
-          () => {
-            subject.next({ kind: JobOutboundMessageKind.End, description });
-            subject.complete();
-          },
-        );
-
-        return subscription;
-      } else {
-        // If it's a scalar value, report it synchronously.
-        subject.next({ kind: JobOutboundMessageKind.Output, description, value: result as O });
-        subject.next({ kind: JobOutboundMessageKind.End, description });
-        subject.complete();
+        result = from(result);
+      } else if (!isObservable(result)) {
+        result = of(result as O);
       }
+
+      subscription = (result as Observable<O>).subscribe(
+        (value: O) => subject.next({ kind: JobOutboundMessageKind.Output, description, value }),
+        error => subject.error(error),
+        () => complete(),
+      );
+      subscription.add(inboundSub);
+      subscription.add(logSub);
+
+      return subscription;
     });
   };
 
@@ -184,7 +181,7 @@ export function createJobHandler<A extends JsonValue, I extends JsonValue, O ext
  */
 export function createJobFactory<A extends JsonValue, I extends JsonValue, O extends JsonValue>(
   loader: () => Promise<JobHandler<A, I, O>>,
-  options: Partial<JobDescription>,
+  options: Partial<JobDescription> = {},
 ): JobHandler<A, I, O> {
   const handler = (argument: A, context: JobHandlerContext<A, I, O>) => {
     return from(loader())
