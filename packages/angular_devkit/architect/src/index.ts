@@ -9,3 +9,8 @@
  * @deprecated
  */
 export * from './architect-legacy';
+
+import * as index2 from './index2';
+export {
+  index2,
+};
