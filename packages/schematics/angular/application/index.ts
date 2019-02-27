@@ -151,7 +151,7 @@ function addAppToWorkspaceFile(options: ApplicationOptions, workspace: Workspace
   // }
   let projectRoot = options.projectRoot !== undefined
     ? options.projectRoot
-    : `${workspace.newProjectRoot}/${options.name}`;
+    : `${workspace.newProjectRoot || ''}/${options.name}`;
   if (projectRoot !== '' && !projectRoot.endsWith('/')) {
     projectRoot += '/';
   }
@@ -326,7 +326,7 @@ export default function (options: ApplicationOptions): Rule {
       };
 
     const workspace = getWorkspace(host);
-    let newProjectRoot = workspace.newProjectRoot || 'projects';
+    let newProjectRoot = workspace.newProjectRoot || '';
     let appDir = `${newProjectRoot}/${options.name}`;
     let sourceRoot = `${appDir}/src`;
     let sourceDir = `${sourceRoot}/app`;
@@ -430,7 +430,7 @@ export default function (options: ApplicationOptions): Rule {
           move(sourceDir),
         ]), MergeStrategy.Overwrite),
       options.minimal ? noop() : schematic('e2e', e2eOptions),
-      options.experimentalIvy ? addPostInstallScript() : noop(),
+      options.enableIvy ? addPostInstallScript() : noop(),
       options.skipPackageJson ? noop() : addDependenciesToPackageJson(options),
       options.lintFix ? applyLintFix(sourceDir) : noop(),
     ]);
