@@ -250,20 +250,11 @@ describe('Component Schematic', () => {
   });
 
   it('should respect the style option', () => {
-    const options = { ...defaultOptions, style: Style.Scss };
-    const tree = schematicRunner.runSchematic('component', options, appTree);
-    const content = tree.readContent('/projects/bar/src/app/foo/foo.component.ts');
-    expect(content).toMatch(/styleUrls: \['.\/foo.component.scss/);
-    expect(tree.files).toContain('/projects/bar/src/app/foo/foo.component.scss');
-    expect(tree.files).not.toContain('/projects/bar/src/app/foo/foo.component.css');
-  });
-
-  it('should respect the style preprocessor option', () => {
     const options = { ...defaultOptions, style: Style.Sass };
     const tree = schematicRunner.runSchematic('component', options, appTree);
     const content = tree.readContent('/projects/bar/src/app/foo/foo.component.ts');
-    expect(content).toMatch(/styleUrls: \['.\/foo.component.scss/);
-    expect(tree.files).toContain('/projects/bar/src/app/foo/foo.component.scss');
+    expect(content).toMatch(/styleUrls: \['.\/foo.component.sass/);
+    expect(tree.files).toContain('/projects/bar/src/app/foo/foo.component.sass');
     expect(tree.files).not.toContain('/projects/bar/src/app/foo/foo.component.css');
   });
 
