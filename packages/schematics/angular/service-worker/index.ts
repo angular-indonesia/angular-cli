@@ -18,7 +18,7 @@ import {
   url,
 } from '@angular-devkit/schematics';
 import { NodePackageInstallTask } from '@angular-devkit/schematics/tasks';
-import * as ts from 'typescript';
+import * as ts from '../third_party/github.com/Microsoft/TypeScript/lib/typescript';
 import { addSymbolToNgModuleMetadata, insertImport, isImported } from '../utility/ast-utils';
 import { InsertChange } from '../utility/change';
 import { getWorkspace, updateWorkspace } from '../utility/config';
@@ -60,7 +60,7 @@ function updateConfigFile(options: ServiceWorkerOptions, root: string): Rule {
 
     const config = getProjectConfiguration(workspace, options);
     config.serviceWorker = true;
-    config.ngswConfigPath = `${root.endsWith('/') ? root : root + '/'}ngsw-config.json`;
+    config.ngswConfigPath = `${root && !root.endsWith('/') ? root + '/' : root}ngsw-config.json`;
 
     return updateWorkspace(workspace);
   };
@@ -174,17 +174,16 @@ export default function (options: ServiceWorkerOptions): Rule {
       resourcesOutputPath = '/' + resourcesOutputPath.split('/').filter(x => !!x).join('/');
     }
 
-    const root = project.root || project.sourceRoot || '';
     const templateSource = apply(url('./files'), [
       applyTemplates({ ...options, resourcesOutputPath }),
-      move(root),
+      move(project.root),
     ]);
 
     context.addTask(new NodePackageInstallTask());
 
     return chain([
       mergeWith(templateSource),
-      updateConfigFile(options, root),
+      updateConfigFile(options, project.root),
       addDependencies(),
       updateAppModule(options),
     ]);
