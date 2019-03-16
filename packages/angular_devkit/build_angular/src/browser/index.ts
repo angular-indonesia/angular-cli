@@ -149,14 +149,14 @@ export class BrowserBuilder implements Builder<BrowserBuilderSchema> {
 
     if (wco.buildOptions.main || wco.buildOptions.polyfills) {
       const typescriptConfigPartial = wco.buildOptions.aot
-        ? getAotConfig(wco, host)
-        : getNonAotConfig(wco, host);
+        ? getAotConfig(wco)
+        : getNonAotConfig(wco);
       webpackConfigs.push(typescriptConfigPartial);
     }
 
     const webpackConfig = webpackMerge(webpackConfigs);
 
-    if (options.profile) {
+    if (options.profile || process.env['NG_BUILD_PROFILING']) {
       const smp = new SpeedMeasurePlugin({
         outputFormat: 'json',
         outputTarget: getSystemPath(join(root, 'speed-measure-plugin.json')),

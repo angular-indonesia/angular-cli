@@ -95,7 +95,6 @@ export function createBrowserLoggingCallback(
 export function buildWebpackConfig(
   root: Path,
   projectRoot: Path,
-  host: virtualFs.Host<fs.Stats>,
   options: NormalizedBrowserBuilderSchema,
   logger: logging.LoggerApi,
 ): webpack.Configuration {
@@ -135,14 +134,14 @@ export function buildWebpackConfig(
 
   if (wco.buildOptions.main || wco.buildOptions.polyfills) {
     const typescriptConfigPartial = wco.buildOptions.aot
-      ? getAotConfig(wco, host)
-      : getNonAotConfig(wco, host);
+      ? getAotConfig(wco)
+      : getNonAotConfig(wco);
     webpackConfigs.push(typescriptConfigPartial);
   }
 
   const webpackConfig = webpackMerge(webpackConfigs);
 
-  if (options.profile) {
+  if (options.profile || process.env['NG_BUILD_PROFILING']) {
     const smp = new SpeedMeasurePlugin({
       outputFormat: 'json',
       outputTarget: getSystemPath(join(root, 'speed-measure-plugin.json')),
@@ -174,7 +173,7 @@ export async function buildBrowserWebpackConfigFromWorkspace(
     options,
   );
 
-  return buildWebpackConfig(workspace.root, projectRoot, host, normalizedOptions, logger);
+  return buildWebpackConfig(workspace.root, projectRoot, normalizedOptions, logger);
 }
 
 

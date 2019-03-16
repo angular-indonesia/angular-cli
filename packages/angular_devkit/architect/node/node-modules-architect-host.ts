@@ -61,12 +61,12 @@ export class WorkspaceNodeModulesArchitectHost implements ArchitectHost<NodeModu
     const builder = builderJson.builders && builderJson.builders[builderName];
 
     if (!builder) {
-      throw new Error(`Cannot find builder ${JSON.stringify(builderName)}.`);
+      throw new Error(`Cannot find builder ${JSON.stringify(builderStr)}.`);
     }
 
     const importPath = builder.implementation;
     if (!importPath) {
-      throw new Error('Invalid builder JSON');
+      throw new Error('Could not find the implementation for builder ' + builderStr);
     }
 
     return Promise.resolve({
@@ -86,8 +86,11 @@ export class WorkspaceNodeModulesArchitectHost implements ArchitectHost<NodeModu
     return this._root;
   }
 
-  async getOptionsForTarget(target: Target): Promise<json.JsonObject> {
+  async getOptionsForTarget(target: Target): Promise<json.JsonObject | null> {
     const targetSpec = this._workspace.getProjectTargets(target.project)[target.target];
+    if (targetSpec === undefined) {
+      return null;
+    }
     if (target.configuration && !targetSpec['configurations']) {
       throw new Error('Configuration not set in the workspace.');
     }
