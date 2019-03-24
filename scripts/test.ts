@@ -13,7 +13,7 @@ import * as Istanbul from 'istanbul';
 import 'jasmine';
 import { SpecReporter as JasmineSpecReporter } from 'jasmine-spec-reporter';
 import { ParsedArgs } from 'minimist';
-import { join, relative } from 'path';
+import { join, normalize, relative } from 'path';
 import { Position, SourceMapConsumer } from 'source-map';
 import * as ts from 'typescript';
 import { packages } from '../lib/packages';
@@ -225,12 +225,17 @@ export default function (args: ParsedArgs, logger: logging.Logger) {
     const sha = branchRevList.find(s => masterRevList.includes(s));
 
     if (sha) {
-      const diffFiles = _exec(
-        'git',
-        ['diff', sha, 'HEAD', '--name-only'],
-        {},
-        logger,
-      ).trim().split('\n');
+      const diffFiles = [
+        // Get diff between $SHA and HEAD.
+        ..._exec('git', ['diff', sha, 'HEAD', '--name-only'], {}, logger)
+          .trim().split('\n'),
+        // And add the current status to it (so it takes the non-committed changes).
+        ..._exec('git', ['status', '--short', '--show-stash'], {}, logger)
+          .split('\n').map(x => x.slice(2).trim()),
+      ]
+        .map(x => normalize(x))
+        .filter(x => x !== '.' && x !== '');  // Empty paths will be normalized to dot.
+
       const diffPackages = new Set();
       for (const pkgName of Object.keys(packages)) {
         const relativeRoot = relative(projectBaseDir, packages[pkgName].root);
@@ -240,6 +245,10 @@ export default function (args: ParsedArgs, logger: logging.Logger) {
           packages[pkgName].reverseDependencies.forEach(d => diffPackages.add(d));
         }
       }
+
+      // Show the packages that we will test.
+      logger.info(`Found ${diffPackages.size} packages:`);
+      logger.info(JSON.stringify([...diffPackages], null, 2));
 
       // Remove the tests from packages that haven't changed.
       tests = tests
@@ -267,6 +276,10 @@ export default function (args: ParsedArgs, logger: logging.Logger) {
 
   return new Promise(resolve => {
     runner.onComplete((passed: boolean) => resolve(passed ? 0 : 1));
-    runner.execute(tests);
+    if (args.seed != undefined) {
+      runner.seed(args.seed);
+    }
+
+    runner.execute(tests, args.filter);
   });
 }
