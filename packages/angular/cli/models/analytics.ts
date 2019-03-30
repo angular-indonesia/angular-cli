@@ -42,15 +42,6 @@ export function isPackageNameSafeForAnalytics(name: string) {
   });
 }
 
-  /**
- * MAKE SURE TO KEEP THIS IN SYNC WITH THE TABLE AND CONTENT IN `/docs/design/analytics.md`.
- * WE LIST THOSE DIMENSIONS (AND MORE).
- */
-export enum AnalyticsDimensions {
-  NgAddCollection = 6,
-  NgBuildBuildEventLog = 7,
-}
-
 
 /**
  * Attempt to get the Windows Language Code string.
@@ -241,6 +232,8 @@ function _buildUserAgentString() {
 export class UniversalAnalytics implements analytics.Analytics {
   private _ua: ua.Visitor;
   private _dirty = false;
+  private _metrics: (string | number)[] = [];
+  private _dimensions: (string | number)[] = [];
 
   /**
    * @param trackingId The Google Analytics ID.
@@ -266,10 +259,10 @@ export class UniversalAnalytics implements analytics.Analytics {
     this._ua.set('aid', _getNodeVersion());
 
     // We set custom metrics for values we care about.
-    this._ua.set('cm1', _getCpuCount());
-    this._ua.set('cm2', _getCpuSpeed());
-    this._ua.set('cm3', _getRamSize());
-    this._ua.set('cm4', _getNumericNodeVersion());
+    this._dimensions[analytics.NgCliAnalyticsDimensions.CpuCount] = _getCpuCount();
+    this._dimensions[analytics.NgCliAnalyticsDimensions.CpuSpeed] = _getCpuSpeed();
+    this._dimensions[analytics.NgCliAnalyticsDimensions.RamInMegabytes] = _getRamSize();
+    this._dimensions[analytics.NgCliAnalyticsDimensions.NodeVersion] = _getNumericNodeVersion();
   }
 
   /**
@@ -278,7 +271,9 @@ export class UniversalAnalytics implements analytics.Analytics {
    */
   private _customVariables(options: analytics.CustomDimensionsAndMetricsOptions) {
     const additionals: { [key: string]: boolean | number | string } = {};
+    this._dimensions.forEach((v, i) => additionals['cd' + i] = v);
     (options.dimensions || []).forEach((v, i) => additionals['cd' + i] = v);
+    this._metrics.forEach((v, i) => additionals['cm' + i] = v);
     (options.metrics || []).forEach((v, i) => additionals['cm' + i] = v);
 
     return additionals;

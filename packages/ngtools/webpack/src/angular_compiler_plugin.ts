@@ -46,6 +46,7 @@ import {
   exportLazyModuleMap,
   exportNgFactory,
   findResources,
+  importFactory,
   registerLocaleData,
   removeDecorators,
   replaceBootstrap,
@@ -103,6 +104,12 @@ export interface AngularCompilerPluginOptions {
   nameLazyFiles?: boolean;
   logger?: logging.Logger;
   directTemplateLoading?: boolean;
+  // When using the loadChildren string syntax, @ngtools/webpack must query @angular/compiler-cli
+  // via a private API to know which lazy routes exist. This increases build and rebuild time.
+  // When using Ivy, the string syntax is not supported at all. Thus we shouldn't attempt that.
+  // This option is also used for when the compilation doesn't need this sort of processing at all.
+  discoverLazyRoutes?: boolean;
+  importFactories?: boolean;
 
   // added to the list of lazy routes
   additionalLazyModules?: { [module: string]: string };
@@ -134,6 +141,8 @@ export class AngularCompilerPlugin {
   private _compilerHost: WebpackCompilerHost & CompilerHost;
   private _moduleResolutionCache: ts.ModuleResolutionCache;
   private _resourceLoader?: WebpackResourceLoader;
+  private _discoverLazyRoutes = true;
+  private _importFactories = false;
   // Contains `moduleImportPath#exportName` => `fullModulePath`.
   private _lazyRoutes: LazyRouteMap = {};
   private _tsConfigPath: string;
@@ -292,6 +301,36 @@ export class AngularCompilerPlugin {
       this._platformTransformers = options.platformTransformers;
     }
 
+    // Determine if lazy route discovery via Compiler CLI private API should be attempted.
+    if (this._compilerOptions.enableIvy) {
+      // Never try to discover lazy routes with Ivy.
+      this._discoverLazyRoutes = false;
+    } else if (options.discoverLazyRoutes !== undefined) {
+      // The default is to discover routes, but it can be overriden.
+      this._discoverLazyRoutes = options.discoverLazyRoutes;
+    }
+
+    if (this._discoverLazyRoutes === false && this.options.additionalLazyModuleResources
+      && this.options.additionalLazyModuleResources.length > 0) {
+      this._warnings.push(
+        new Error(`Lazy route discovery is disabled but additional Lazy Module Resources were`
+          + ` provided. These will be ignored.`),
+      );
+    }
+
+    if (this._discoverLazyRoutes === false && this.options.additionalLazyModules
+      && Object.keys(this.options.additionalLazyModules).length > 0) {
+      this._warnings.push(
+        new Error(`Lazy route discovery is disabled but additional lazy modules were provided.`
+          + `These will be ignored.`),
+      );
+    }
+
+    if (!this._compilerOptions.enableIvy && options.importFactories === true) {
+      // Only transform imports to use factories with View Engine.
+      this._importFactories = true;
+    }
+
     // Default ContextElementDependency to the one we can import from here.
     // Failing to use the right ContextElementDependency will throw the error below:
     // "No module factory available for dependency type: ContextElementDependency"
@@ -361,12 +400,7 @@ export class AngularCompilerPlugin {
 
     // Use an identity function as all our paths are absolute already.
     this._moduleResolutionCache = ts.createModuleResolutionCache(this._basePath, x => x);
-
-    const tsProgram = this._getTsProgram();
-    const oldFiles = new Set(tsProgram ?
-      tsProgram.getSourceFiles().map(sf => sf.fileName)
-      : [],
-    );
+    const oldTsProgram = this._getTsProgram();
 
     if (this._JitMode) {
       // Create the TypeScript program.
@@ -375,14 +409,9 @@ export class AngularCompilerPlugin {
         this._rootNames,
         this._compilerOptions,
         this._compilerHost,
-        tsProgram,
+        oldTsProgram,
       );
       timeEnd('AngularCompilerPlugin._createOrUpdateProgram.ts.createProgram');
-
-      const newFiles = this._program.getSourceFiles().filter(sf => !oldFiles.has(sf.fileName));
-      for (const newFile of newFiles) {
-        this._compilerHost.invalidate(newFile.fileName);
-      }
     } else {
       time('AngularCompilerPlugin._createOrUpdateProgram.ng.createProgram');
       // Create the Angular program.
@@ -397,9 +426,14 @@ export class AngularCompilerPlugin {
       time('AngularCompilerPlugin._createOrUpdateProgram.ng.loadNgStructureAsync');
       await this._program.loadNgStructureAsync();
       timeEnd('AngularCompilerPlugin._createOrUpdateProgram.ng.loadNgStructureAsync');
+    }
 
-      const newFiles = this._program.getTsProgram()
-        .getSourceFiles().filter(sf => !oldFiles.has(sf.fileName));
+    const newTsProgram = this._getTsProgram();
+    if (oldTsProgram && newTsProgram) {
+      // The invalidation should only happen if we have an old program
+      // as otherwise we will invalidate all the sourcefiles.
+      const oldFiles = new Set(oldTsProgram.getSourceFiles().map(sf => sf.fileName));
+      const newFiles = newTsProgram.getSourceFiles().filter(sf => !oldFiles.has(sf.fileName));
       for (const newFile of newFiles) {
         this._compilerHost.invalidate(newFile.fileName);
       }
@@ -411,7 +445,7 @@ export class AngularCompilerPlugin {
       this._entryModule = resolveEntryModuleFromMain(
         this._mainPath, this._compilerHost, this._getTsProgram() as ts.Program);
 
-      if (!this.entryModule && !this._compilerOptions.enableIvy) {
+      if (this._discoverLazyRoutes && !this.entryModule && !this._compilerOptions.enableIvy) {
         this._warnings.push('Lazy routes discovery is not enabled. '
           + 'Because there is neither an entryModule nor a '
           + 'statically analyzable bootstrap code in the main file.',
@@ -697,64 +731,63 @@ export class AngularCompilerPlugin {
       );
     });
 
-    // Add lazy modules to the context module for @angular/core
-    compiler.hooks.contextModuleFactory.tap('angular-compiler', cmf => {
-      const angularCorePackagePath = require.resolve('@angular/core/package.json');
+    if (this._discoverLazyRoutes) {
+      // Add lazy modules to the context module for @angular/core
+      compiler.hooks.contextModuleFactory.tap('angular-compiler', cmf => {
+        const angularCorePackagePath = require.resolve('@angular/core/package.json');
 
-      // APFv6 does not have single FESM anymore. Instead of verifying if we're pointing to
-      // FESMs, we resolve the `@angular/core` path and verify that the path for the
-      // module starts with it.
-      // This may be slower but it will be compatible with both APF5, 6 and potential future
-      // versions (until the dynamic import appears outside of core I suppose).
-      // We resolve any symbolic links in order to get the real path that would be used in webpack.
-      const angularCoreResourceRoot = fs.realpathSync(path.dirname(angularCorePackagePath));
+        // APFv6 does not have single FESM anymore. Instead of verifying if we're pointing to
+        // FESMs, we resolve the `@angular/core` path and verify that the path for the
+        // module starts with it.
+        // This may be slower but it will be compatible with both APF5, 6 and potential future
+        // versions (until the dynamic import appears outside of core I suppose).
+        // We resolve symbolic links in order to get the real path that would be used in webpack.
+        const angularCoreResourceRoot = fs.realpathSync(path.dirname(angularCorePackagePath));
 
-      cmf.hooks.afterResolve.tapPromise('angular-compiler', async result => {
-        // Alter only existing request from Angular or one of the additional lazy module resources.
-        const isLazyModuleResource = (resource: string) =>
-          resource.startsWith(angularCoreResourceRoot) ||
-          ( this.options.additionalLazyModuleResources &&
-            this.options.additionalLazyModuleResources.includes(resource));
+        cmf.hooks.afterResolve.tapPromise('angular-compiler', async result => {
+          // Alter only existing request from Angular or the additional lazy module resources.
+          const isLazyModuleResource = (resource: string) =>
+            resource.startsWith(angularCoreResourceRoot) ||
+            (this.options.additionalLazyModuleResources &&
+              this.options.additionalLazyModuleResources.includes(resource));
 
-        if (!result || !this.done || !isLazyModuleResource(result.resource)) {
-          return result;
-        }
-
-        return this.done.then(
-          () => {
-            // This folder does not exist, but we need to give webpack a resource.
-            // TODO: check if we can't just leave it as is (angularCoreModuleDir).
-            result.resource = path.join(this._basePath, '$$_lazy_route_resource');
-            // tslint:disable-next-line:no-any
-            result.dependencies.forEach((d: any) => d.critical = false);
-            // tslint:disable-next-line:no-any
-            result.resolveDependencies = (_fs: any, options: any, callback: Callback) => {
-              const dependencies = Object.keys(this._lazyRoutes)
-                .map((key) => {
-                  const modulePath = this._lazyRoutes[key];
-                  if (modulePath !== null) {
-                    const name = key.split('#')[0];
-
-                    return new this._contextElementDependencyConstructor(modulePath, name);
-                  } else {
-                    return null;
-                  }
-                })
-                .filter(x => !!x);
-
-              if (this._options.nameLazyFiles) {
-                options.chunkName = '[request]';
-              }
-
-              callback(null, dependencies);
-            };
-
+          if (!result || !this.done || !isLazyModuleResource(result.resource)) {
             return result;
-          },
-          () => undefined,
-        );
+          }
+
+          await this.done;
+
+          // This folder does not exist, but we need to give webpack a resource.
+          // TODO: check if we can't just leave it as is (angularCoreModuleDir).
+          result.resource = path.join(this._basePath, '$$_lazy_route_resource');
+          // tslint:disable-next-line:no-any
+          result.dependencies.forEach((d: any) => d.critical = false);
+          // tslint:disable-next-line:no-any
+          result.resolveDependencies = (_fs: any, options: any, callback: Callback) => {
+            const dependencies = Object.keys(this._lazyRoutes)
+              .map((key) => {
+                const modulePath = this._lazyRoutes[key];
+                if (modulePath !== null) {
+                  const name = key.split('#')[0];
+
+                  return new this._contextElementDependencyConstructor(modulePath, name);
+                } else {
+                  return null;
+                }
+              })
+              .filter(x => !!x);
+
+            if (this._options.nameLazyFiles) {
+              options.chunkName = '[request]';
+            }
+
+            callback(null, dependencies);
+          };
+
+          return result;
+        });
       });
-    });
+    }
 
     // Create and destroy forked type checker on watch mode.
     compiler.hooks.watchRun.tap('angular-compiler', () => {
@@ -868,6 +901,10 @@ export class AngularCompilerPlugin {
     } else {
       // Remove unneeded angular decorators.
       this._transformers.push(removeDecorators(isAppPath, getTypeChecker));
+      // Import ngfactory in loadChildren import syntax
+      if (this._importFactories) {
+        this._transformers.push(importFactory(msg => this._warnings.push(msg)));
+      }
     }
 
     if (this._platformTransformers !== null) {
@@ -922,27 +959,29 @@ export class AngularCompilerPlugin {
     // Make a new program and load the Angular structure.
     await this._createOrUpdateProgram();
 
-    // Try to find lazy routes if we have an entry module.
-    // We need to run the `listLazyRoutes` the first time because it also navigates libraries
-    // and other things that we might miss using the (faster) findLazyRoutesInAst.
-    // Lazy routes modules will be read with compilerHost and added to the changed files.
-    let lazyRouteMap: LazyRouteMap = {};
-    if (!this._JitMode || this._firstRun) {
-      lazyRouteMap = this._listLazyRoutesFromProgram();
-    } else {
-      const changedTsFiles = this._getChangedTsFiles();
-      if (changedTsFiles.length > 0) {
-        lazyRouteMap = this._findLazyRoutesInAst(changedTsFiles);
+    if (this._discoverLazyRoutes) {
+      // Try to find lazy routes if we have an entry module.
+      // We need to run the `listLazyRoutes` the first time because it also navigates libraries
+      // and other things that we might miss using the (faster) findLazyRoutesInAst.
+      // Lazy routes modules will be read with compilerHost and added to the changed files.
+      let lazyRouteMap: LazyRouteMap = {};
+      if (!this._JitMode || this._firstRun) {
+        lazyRouteMap = this._listLazyRoutesFromProgram();
+      } else {
+        const changedTsFiles = this._getChangedTsFiles();
+        if (changedTsFiles.length > 0) {
+          lazyRouteMap = this._findLazyRoutesInAst(changedTsFiles);
+        }
       }
+
+      // Find lazy routes
+      lazyRouteMap = {
+        ...lazyRouteMap,
+        ...this._options.additionalLazyModules,
+      };
+
+      this._processLazyRoutes(lazyRouteMap);
     }
-
-    // Find lazy routes
-    lazyRouteMap = {
-      ...lazyRouteMap,
-      ...this._options.additionalLazyModules,
-    };
-
-    this._processLazyRoutes(lazyRouteMap);
 
     // Emit files.
     time('AngularCompilerPlugin._update._emit');
@@ -1012,7 +1051,8 @@ export class AngularCompilerPlugin {
         // We also need to all changed files as dependencies of this file, so that all of them
         // will be watched and trigger a rebuild next time.
         outputText = '';
-        errorDependencies = this._getChangedCompilationFiles()
+        const program = this._getTsProgram();
+        errorDependencies = (program ? program.getSourceFiles().map(x => x.fileName) : [])
           // These paths are used by the loader so we must denormalize them.
           .map((p) => this._compilerHost.denormalizePath(p));
       }
@@ -1052,9 +1092,18 @@ export class AngularCompilerPlugin {
     const host = this._compilerHost;
     const cache = this._moduleResolutionCache;
 
-    const esImports = collectDeepNodes<ts.ImportDeclaration>(sourceFile,
-      ts.SyntaxKind.ImportDeclaration)
+    const esImports = collectDeepNodes<ts.ImportDeclaration | ts.ExportDeclaration>(
+      sourceFile,
+      [
+        ts.SyntaxKind.ImportDeclaration,
+        ts.SyntaxKind.ExportDeclaration,
+      ],
+    )
       .map(decl => {
+        if (!decl.moduleSpecifier) {
+          return null;
+        }
+
         const moduleName = (decl.moduleSpecifier as ts.StringLiteral).text;
         const resolved = ts.resolveModuleName(moduleName, resolvedFileName, options, host, cache);
 
