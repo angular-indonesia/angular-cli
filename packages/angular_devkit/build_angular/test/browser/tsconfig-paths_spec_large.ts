@@ -6,10 +6,8 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import { Architect } from '@angular-devkit/architect/src/index2';
-import { runTargetSpec } from '@angular-devkit/architect/testing';
-import { tap } from 'rxjs/operators';
-import { browserBuild, browserTargetSpec, createArchitect, host } from '../utils';
+import { Architect } from '@angular-devkit/architect';
+import { browserBuild, createArchitect, host } from '../utils';
 
 
 describe('Browser Builder tsconfig paths', () => {

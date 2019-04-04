@@ -6,12 +6,10 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import { Architect } from '@angular-devkit/architect/src/index2';
-import { runTargetSpec } from '@angular-devkit/architect/testing';
+import { Architect } from '@angular-devkit/architect';
 import { join, normalize, tags, virtualFs } from '@angular-devkit/core';
-import { tap } from 'rxjs/operators';
 import { BrowserBuilderOutput } from '../../src/browser';
-import { browserTargetSpec, createArchitect, host } from '../utils';
+import { createArchitect, host } from '../utils';
 
 
 describe('Browser Builder base href', () => {

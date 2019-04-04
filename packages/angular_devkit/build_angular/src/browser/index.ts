@@ -10,11 +10,11 @@ import {
   BuilderInfo,
   BuilderOutput,
   createBuilder,
-} from '@angular-devkit/architect/src/index2';
+} from '@angular-devkit/architect';
 import {
   WebpackLoggingCallback,
   runWebpack,
-} from '@angular-devkit/build-webpack/src/webpack/index2';
+} from '@angular-devkit/build-webpack';
 import {
   Path,
   analytics,
@@ -42,6 +42,7 @@ import {
   getNonAotConfig,
   getStatsConfig,
   getStylesConfig,
+  getWorkerConfig,
 } from '../angular-cli-files/models/webpack-configs';
 import { readTsconfig } from '../angular-cli-files/utilities/read-tsconfig';
 import { requireProjectModule } from '../angular-cli-files/utilities/require-project-module';
@@ -159,6 +160,10 @@ export function buildWebpackConfig(
       ? getAotConfig(wco)
       : getNonAotConfig(wco);
     webpackConfigs.push(typescriptConfigPartial);
+  }
+
+  if (wco.buildOptions.webWorkerTsConfig) {
+    webpackConfigs.push(getWorkerConfig(wco));
   }
 
   const webpackConfig = webpackMerge(webpackConfigs);
