@@ -6,7 +6,6 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import { BuilderContext, BuilderOutput, createBuilder } from '@angular-devkit/architect';
-import { NodeJsSyncHost } from '@angular-devkit/core/node';
 import { resolve } from 'path';
 import { Observable, from } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
@@ -16,6 +15,7 @@ import {
   getNonAotConfig,
   getStylesConfig,
   getTestConfig,
+  getWorkerConfig,
 } from '../angular-cli-files/models/webpack-configs';
 import { Schema as BrowserBuilderOptions } from '../browser/schema';
 import { generateBrowserWebpackConfigFromContext } from '../utils/webpack-browser-config';
@@ -27,15 +27,16 @@ type KarmaConfigOptions = import ('karma').ConfigOptions & {
   configFile?: string;
 };
 
+type WebpackConfigurationTransformer =
+  (configuration: webpack.Configuration) => webpack.Configuration;
+
 async function initialize(
   options: KarmaBuilderOptions,
   context: BuilderContext,
   // tslint:disable-next-line:no-implicit-dependencies
 ): Promise<[typeof import ('karma'), webpack.Configuration]> {
-  const host = new NodeJsSyncHost();
   const { config } = await generateBrowserWebpackConfigFromContext(
-    // only two properties are missing:
-    // * `outputPath` which is fixed for tests
+    // only one property is missing:
     // * `index` which is not used for tests
     { ...options as unknown as BrowserBuilderOptions, outputPath: '' },
     context,
@@ -44,8 +45,8 @@ async function initialize(
       getStylesConfig(wco),
       getNonAotConfig(wco),
       getTestConfig(wco),
+      getWorkerConfig(wco),
     ],
-    host,
   );
 
   // tslint:disable-next-line:no-implicit-dependencies
@@ -54,12 +55,14 @@ async function initialize(
   return [karma, config];
 }
 
-export function runKarma(
+export function execute(
   options: KarmaBuilderOptions,
   context: BuilderContext,
+  transforms: {
+    webpackConfiguration?: WebpackConfigurationTransformer,
+    karmaOptions?: (options: KarmaConfigOptions) => KarmaConfigOptions,
+  } = {},
 ): Observable<BuilderOutput> {
-  const root = context.workspaceRoot;
-
   return from(initialize(options, context)).pipe(
     switchMap(([karma, webpackConfig]) => new Observable<BuilderOutput>(subscriber => {
       const karmaOptions: KarmaConfigOptions = {};
@@ -76,7 +79,7 @@ export function runKarma(
       if (options.reporters) {
         // Split along commas to make it more natural, and remove empty strings.
         const reporters = options.reporters
-          .reduce<string[]>((acc, curr) => acc.concat(curr.split(/,/)), [])
+          .reduce<string[]>((acc, curr) => acc.concat(curr.split(',')), [])
           .filter(x => !!x);
 
         if (reporters.length > 0) {
@@ -85,11 +88,13 @@ export function runKarma(
       }
 
       // Assign additional karmaConfig options to the local ngapp config
-      karmaOptions.configFile = resolve(root, options.karmaConfig);
+      karmaOptions.configFile = resolve(context.workspaceRoot, options.karmaConfig);
 
       karmaOptions.buildWebpack = {
         options,
-        webpackConfig,
+        webpackConfig: transforms.webpackConfiguration
+          ? transforms.webpackConfiguration(webpackConfig)
+          : webpackConfig,
         // Pass onto Karma to emit BuildEvents.
         successCb: () => subscriber.next({ success: true }),
         failureCb: () => subscriber.next({ success: false }),
@@ -101,7 +106,9 @@ export function runKarma(
       };
 
       // Complete the observable once the Karma server returns.
-      const karmaServer = new karma.Server(karmaOptions, () => subscriber.complete());
+      const karmaServer = new karma.Server(
+        transforms.karmaOptions ? transforms.karmaOptions(karmaOptions) : karmaOptions,
+        () => subscriber.complete());
       // karma typings incorrectly define start's return value as void
       // tslint:disable-next-line:no-use-of-empty-return-value
       const karmaStart = karmaServer.start() as unknown as Promise<void>;
@@ -118,4 +125,5 @@ export function runKarma(
   );
 }
 
-export default createBuilder<Record<string, string> & KarmaBuilderOptions>(runKarma);
+export { KarmaBuilderOptions };
+export default createBuilder<Record<string, string> & KarmaBuilderOptions>(execute);
