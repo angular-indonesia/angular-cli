@@ -23,7 +23,7 @@ import {
 } from '../definitions';
 import { WorkspaceHost } from '../host';
 import { JsonWorkspaceMetadata, JsonWorkspaceSymbol } from './metadata';
-import { createVirtualAstObject } from './utilities';
+import { createVirtualAstObject, escapeKey } from './utilities';
 
 interface ParserContext {
   readonly host: WorkspaceHost;
@@ -78,7 +78,7 @@ export async function readJsonWorkspace(
 
 const specialWorkspaceExtensions = ['cli', 'defaultProject', 'newProjectRoot', 'schematics'];
 
-const specialProjectExtensions = ['cli', 'schematics'];
+const specialProjectExtensions = ['cli', 'schematics', 'projectType'];
 
 function parseWorkspace(workspaceNode: JsonAstObject, context: ParserContext): WorkspaceDefinition {
   const jsonMetadata = context.metadata;
@@ -116,7 +116,13 @@ function parseWorkspace(workspaceNode: JsonAstObject, context: ParserContext): W
   if (context.trackChanges && projectsNode) {
     const parentNode = projectsNode;
     collectionListener = (name, action, newValue) => {
-      jsonMetadata.addChange(action, `/projects/${name}`, parentNode, newValue, 'project');
+      jsonMetadata.addChange(
+        action,
+        `/projects/${escapeKey(name)}`,
+        parentNode,
+        newValue,
+        'project',
+      );
     };
   }
 
@@ -212,7 +218,7 @@ function parseProject(
     collectionListener = (name, action, newValue) => {
       jsonMetadata.addChange(
         action,
-        `/projects/${projectName}/targets/${name}`,
+        `/projects/${projectName}/targets/${escapeKey(name)}`,
         parentNode,
         newValue,
         'target',
