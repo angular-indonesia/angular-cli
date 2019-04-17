@@ -41,9 +41,10 @@ describe('Service Worker Schematic', () => {
     skipPackageJson: false,
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     appTree = schematicRunner.runSchematic('workspace', workspaceOptions);
-    appTree = schematicRunner.runSchematic('application', appOptions, appTree);
+    appTree = await schematicRunner.runSchematicAsync('application', appOptions, appTree)
+      .toPromise();
   });
 
   it('should put the worker file in the project root', async () => {
@@ -88,5 +89,18 @@ describe('Service Worker Schematic', () => {
     const appComponent = tree.readContent('/projects/bar/src/app/app.component.ts');
     expect(appComponent).toContain(`new Worker('./${defaultOptions.name}.worker`);
     expect(appComponent).toContain('console.log(`page got message: ${data}`)');
+  });
+
+  it('should add worker tsconfig to lint options', async () => {
+    const tree = await schematicRunner.runSchematicAsync('web-worker', defaultOptions, appTree)
+      .toPromise();
+    const workspace = JSON.parse(tree.readContent('/angular.json'));
+    const lintOptions = workspace.projects.bar.architect.lint.options;
+    expect(lintOptions.tsConfig).toEqual([
+      'projects/bar/tsconfig.app.json',
+      'projects/bar/tsconfig.spec.json',
+      'projects/bar/e2e/tsconfig.json',
+      'projects/bar/tsconfig.worker.json',
+    ]);
   });
 });
