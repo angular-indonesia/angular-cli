@@ -13,6 +13,7 @@ import {
 import { BuildResult, WebpackLoggingCallback, runWebpack } from '@angular-devkit/build-webpack';
 import {
   experimental,
+  getSystemPath,
   join,
   json,
   logging,
@@ -49,6 +50,7 @@ import {
 } from '../angular-cli-files/utilities/stats';
 import { ExecutionTransformer } from '../transforms';
 import { deleteOutputDir, isEs5SupportNeeded } from '../utils';
+import { Version } from '../utils/version';
 import { generateBrowserWebpackConfigFromContext } from '../utils/webpack-browser-config';
 import { Schema as BrowserBuilderSchema } from './schema';
 
@@ -168,6 +170,9 @@ export function buildWebpackBrowser(
   const host = new NodeJsSyncHost();
   const root = normalize(context.workspaceRoot);
 
+  // Check Angular version.
+  Version.assertCompatibleAngularVersion(context.workspaceRoot);
+
   const loggingFn = transforms.logging
     || createBrowserLoggingCallback(!!options.verbose, context.logger);
 
@@ -185,7 +190,7 @@ export function buildWebpackBrowser(
         normalize(workspace.getProject(projectName).root),
       );
 
-      const tsConfigPath = path.resolve(workspace.root, options.tsConfig);
+      const tsConfigPath = path.resolve(getSystemPath(workspace.root), options.tsConfig);
       const tsConfig = readTsconfig(tsConfigPath);
 
       if (isEs5SupportNeeded(projectRoot) &&
