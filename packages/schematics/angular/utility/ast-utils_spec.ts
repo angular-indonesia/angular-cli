@@ -16,6 +16,8 @@ import {
   addExportToModule,
   addProviderToModule,
   addSymbolToNgModuleMetadata,
+  findNodes,
+  insertAfterLastOccurrence,
 } from './ast-utils';
 
 
@@ -37,6 +39,7 @@ function applyChanges(path: string, content: string, changes: Change[]): string 
   return getFileContent(tree, path);
 }
 
+// tslint:disable-next-line:no-big-function
 describe('ast utils', () => {
   let modulePath: string;
   let moduleContent: string;
@@ -204,5 +207,52 @@ describe('ast utils', () => {
     const output = applyChanges(modulePath, moduleContent, changes);
     expect(output).toMatch(/import { LogService } from '.\/log.service';/);
     expect(output).toMatch(/\},\r?\n\s*LogService\r?\n\s*\]/);
+  });
+
+  describe('insertAfterLastOccurrence', () => {
+    const filePath = './src/foo.ts';
+
+    it('should work for the default scenario', () => {
+      const fileContent = `const arr = ['foo'];`;
+      const source = getTsSource(filePath, fileContent);
+      const arrayNode = findNodes(
+        source.getChildren().shift() as ts.Node,
+        ts.SyntaxKind.ArrayLiteralExpression,
+      );
+      const elements = (arrayNode.pop() as ts.ArrayLiteralExpression).elements;
+
+      const change = insertAfterLastOccurrence(
+        elements as unknown as ts.Node[],
+        `, 'bar'`,
+        filePath,
+        elements.pos,
+        ts.SyntaxKind.StringLiteral,
+      );
+      const output = applyChanges(filePath, fileContent, [change]);
+
+      expect(output).toMatch(/const arr = \['foo', 'bar'\];/);
+    });
+
+
+    it('should work without occurrences', () => {
+      const fileContent = `const arr = [];`;
+      const source = getTsSource(filePath, fileContent);
+      const arrayNode = findNodes(
+        source.getChildren().shift() as ts.Node,
+        ts.SyntaxKind.ArrayLiteralExpression,
+      );
+      const elements = (arrayNode.pop() as ts.ArrayLiteralExpression).elements;
+
+      const change = insertAfterLastOccurrence(
+        elements as unknown as ts.Node[],
+        `'bar'`,
+        filePath,
+        elements.pos,
+        ts.SyntaxKind.StringLiteral,
+      );
+      const output = applyChanges(filePath, fileContent, [change]);
+
+      expect(output).toMatch(/const arr = \['bar'\];/);
+    });
   });
 });
