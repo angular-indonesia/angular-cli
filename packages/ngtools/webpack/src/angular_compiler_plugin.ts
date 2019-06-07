@@ -151,6 +151,7 @@ export class AngularCompilerPlugin {
     return tsProgram ? tsProgram.getTypeChecker() : null;
   }
 
+  /** @deprecated  From 8.0.2 */
   static isSupported() {
     return VERSION && parseInt(VERSION.major) >= 8;
   }
@@ -1195,7 +1196,7 @@ export class AngularCompilerPlugin {
           'AngularCompilerPlugin._emit.ts', diagMode));
 
         if (!hasErrors(allDiagnostics)) {
-          if (this._firstRun || changedTsFiles.size > 20) {
+          if (this._firstRun || changedTsFiles.size > 20 || this._emitSkipped) {
             emitResult = tsProgram.emit(
               undefined,
               undefined,

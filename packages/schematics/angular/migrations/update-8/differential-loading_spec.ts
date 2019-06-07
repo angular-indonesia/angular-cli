@@ -80,6 +80,29 @@ describe('Migration to version 8', () => {
       expect(module).toBe('esnext');
     });
 
+    it(`should create 'downlevelIteration' property when doesn't exists`, () => {
+      const tree2 = schematicRunner.runSchematic('migration-07', {}, tree.branch());
+      const compilerOptions = {
+        ...oldTsConfig.compilerOptions,
+      };
+
+      tree.overwrite(tsConfigPath, JSON.stringify({ compilerOptions }, null, 2));
+      const { downlevelIteration } = JSON.parse(tree2.readContent(tsConfigPath)).compilerOptions;
+      expect(downlevelIteration).toBe(true);
+    });
+
+    it(`should update 'downlevelIteration' to true when it's false`, () => {
+      const tree2 = schematicRunner.runSchematic('migration-07', {}, tree.branch());
+      const compilerOptions = {
+        ...oldTsConfig.compilerOptions,
+        downlevelIteration: false,
+      };
+
+      tree.overwrite(tsConfigPath, JSON.stringify({ compilerOptions }, null, 2));
+      const { downlevelIteration } = JSON.parse(tree2.readContent(tsConfigPath)).compilerOptions;
+      expect(downlevelIteration).toBe(true);
+    });
+
     it(`should create browserslist file if it doesn't exist`, () => {
       tree.delete('/browserslist');
       const tree2 = schematicRunner.runSchematic('migration-07', {}, tree.branch());
@@ -165,6 +188,19 @@ describe('Migration to version 8', () => {
       tree.overwrite('angular.json', JSON.stringify(config));
       const tree2 = schematicRunner.runSchematic('migration-07', {}, tree.branch());
       expect(tree2.exists('/browserslist')).toBe(false);
+    });
+
+    it(`should move 'browserslist' to root when 'sourceRoot' is not defined`, () => {
+      tree.rename('/browserslist', '/src/browserslist');
+      expect(tree.exists('/src/browserslist')).toBe(true);
+
+      const config = JSON.parse(tree.readContent('angular.json'));
+      config.projects['migration-test'].sourceRoot = undefined;
+
+      tree.overwrite('angular.json', JSON.stringify(config));
+      const tree2 = schematicRunner.runSchematic('migration-07', {}, tree.branch());
+      expect(tree2.exists('/src/browserslist')).toBe(false);
+      expect(tree2.exists('/browserslist')).toBe(true);
     });
   });
 });
