@@ -58,7 +58,7 @@ import {
 } from '../angular-cli-files/utilities/stats';
 import { ExecutionTransformer } from '../transforms';
 import { BuildBrowserFeatures, deleteOutputDir } from '../utils';
-import { Version } from '../utils/version';
+import { assertCompatibleAngularVersion } from '../utils/version';
 import { generateBrowserWebpackConfigFromContext } from '../utils/webpack-browser-config';
 import { Schema as BrowserBuilderSchema } from './schema';
 
@@ -180,7 +180,7 @@ export function buildWebpackBrowser(
   const root = normalize(context.workspaceRoot);
 
   // Check Angular version.
-  Version.assertCompatibleAngularVersion(context.workspaceRoot);
+  assertCompatibleAngularVersion(context.workspaceRoot, context.logger);
 
   const loggingFn = transforms.logging
     || createBrowserLoggingCallback(!!options.verbose, context.logger);
@@ -261,7 +261,7 @@ export function buildWebpackBrowser(
             })
             .pipe(
               map(() => ({ success: true })),
-              catchError(() => of({ success: false })),
+              catchError(error => of({ success: false, error: mapErrorToMessage(error) })),
             );
           } else {
             return of({ success });
@@ -276,7 +276,10 @@ export function buildWebpackBrowser(
               resolve(root, normalize(options.outputPath)),
               options.baseHref || '/',
               options.ngswConfigPath,
-            ).then(() => ({ success: true }), () => ({ success: false })));
+            ).then(
+              () => ({ success: true }),
+              error => ({ success: false, error: mapErrorToMessage(error) }),
+            ));
           } else {
             return of(buildEvent);
           }
@@ -289,6 +292,18 @@ export function buildWebpackBrowser(
       );
     }),
   );
+}
+
+function mapErrorToMessage(error: unknown): string | undefined {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  return undefined;
 }
 
 export default createBuilder<json.JsonObject & BrowserBuilderSchema>(buildWebpackBrowser);
