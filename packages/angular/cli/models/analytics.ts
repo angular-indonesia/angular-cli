@@ -22,6 +22,28 @@ const analyticsLogDebug = debug('ng:analytics:log'); // Actual logs of events.
 
 const BYTES_PER_MEGABYTES = 1024 * 1024;
 
+let _defaultAngularCliPropertyCache: string;
+export const AnalyticsProperties = {
+  AngularCliProd: 'UA-8594346-29',
+  AngularCliStaging: 'UA-8594346-32',
+  get AngularCliDefault(): string {
+    if (_defaultAngularCliPropertyCache) {
+      return _defaultAngularCliPropertyCache;
+    }
+
+    const v = require('../package.json').version;
+
+    // The logic is if it's a full version then we should use the prod GA property.
+    if (/^\d+\.\d+\.\d+$/.test(v) && v !== '0.0.0') {
+      _defaultAngularCliPropertyCache = AnalyticsProperties.AngularCliProd;
+    } else {
+      _defaultAngularCliPropertyCache = AnalyticsProperties.AngularCliStaging;
+    }
+
+    return _defaultAngularCliPropertyCache;
+  },
+};
+
 /**
  * This is the ultimate safelist for checking if a package name is safe to report to analytics.
  */
@@ -388,6 +410,11 @@ export async function promptGlobalAnalytics(force = false) {
             ${colors.yellow('ng analytics off')}
       `);
       console.log('');
+    } else {
+      // Send back a ping with the user `optout`. This is the only thing we send.
+      const ua = new UniversalAnalytics(AnalyticsProperties.AngularCliDefault, 'optout');
+      ua.pageview('/telemetry/optout');
+      await ua.flush();
     }
 
     return true;
@@ -437,6 +464,11 @@ export async function promptProjectAnalytics(force = false): Promise<boolean> {
             ${colors.yellow('ng analytics project off')}
       `);
       console.log('');
+    } else {
+      // Send back a ping with the user `optout`. This is the only thing we send.
+      const ua = new UniversalAnalytics(AnalyticsProperties.AngularCliDefault, 'optout');
+      ua.pageview('/telemetry/project/optout');
+      await ua.flush();
     }
 
     return true;
@@ -467,7 +499,7 @@ export function hasGlobalAnalyticsConfiguration(): boolean {
  */
 export function getGlobalAnalytics(): UniversalAnalytics | undefined {
   analyticsDebug('getGlobalAnalytics');
-  const propertyId = 'UA-8594346-29';
+  const propertyId = AnalyticsProperties.AngularCliDefault;
 
   if ('NG_CLI_ANALYTICS' in process.env) {
     if (process.env['NG_CLI_ANALYTICS'] == 'false' || process.env['NG_CLI_ANALYTICS'] == '') {
