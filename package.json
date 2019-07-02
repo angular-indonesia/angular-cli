@@ -87,7 +87,6 @@
     "@bazel/jasmine": "~0.26.0",
     "@bazel/karma": "~0.26.0",
     "@bazel/typescript": "~0.26.0",
-    "@ngtools/json-schema": "^1.1.0",
     "@types/browserslist": "^4.4.0",
     "@types/caniuse-lite": "^1.0.0",
     "@types/copy-webpack-plugin": "^4.4.1",
@@ -129,7 +128,7 @@
     "pidtree": "^0.3.0",
     "pidusage": "^2.0.17",
     "rxjs": "~6.4.0",
-    "semver": "6.1.2",
+    "semver": "6.2.0",
     "source-map": "^0.5.6",
     "source-map-support": "^0.5.0",
     "spdx-satisfies": "^4.0.0",
@@ -139,7 +138,8 @@
     "ts-api-guardian": "0.4.4",
     "ts-node": "^5.0.0",
     "tslint-no-circular-imports": "^0.7.0",
-    "tslint-sonarts": "1.9.0"
+    "tslint-sonarts": "1.9.0",
+    "verdaccio": "4.0.3"
   },
   "husky": {
     "hooks": {
