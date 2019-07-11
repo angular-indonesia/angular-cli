@@ -40,6 +40,7 @@ import { Schema as BrowserBuilderSchema } from '../browser/schema';
 import { ExecutionTransformer } from '../transforms';
 import { BuildBrowserFeatures, normalizeOptimization } from '../utils';
 import { assertCompatibleAngularVersion } from '../utils/version';
+import { getIndexInputFile, getIndexOutputFile } from '../utils/webpack-browser-config';
 import { Schema } from './schema';
 const open = require('open');
 
@@ -190,7 +191,7 @@ export function serveWebpackBrowser(
       }
 
       if (browserOptions.index) {
-        const { scripts = [], styles = [], index, baseHref, tsConfig } = browserOptions;
+        const { scripts = [], styles = [], baseHref, tsConfig } = browserOptions;
         const projectName = context.target
           ? context.target.project
           : workspace.getDefaultProjectName();
@@ -209,13 +210,13 @@ export function serveWebpackBrowser(
 
         const entrypoints = generateEntryPoints({ scripts, styles });
         const moduleEntrypoints = buildBrowserFeatures.isDifferentialLoadingNeeded()
-          ? entrypoints
+          ? generateEntryPoints({ scripts: [], styles })
           : [];
 
         webpackConfig.plugins.push(
           new IndexHtmlWebpackPlugin({
-            input: path.resolve(root, index),
-            output: path.basename(index),
+            input: path.resolve(root, getIndexInputFile(browserOptions)),
+            output: getIndexOutputFile(browserOptions),
             baseHref,
             moduleEntrypoints,
             entrypoints,
@@ -317,7 +318,7 @@ export function buildServerConfig(
     historyApiFallback:
       !!browserOptions.index &&
       ({
-        index: `${servePath}/${path.basename(browserOptions.index)}`,
+        index: `${servePath}/${getIndexOutputFile(browserOptions)}`,
         disableDotRule: true,
         htmlAcceptHeaders: ['text/html', 'application/xhtml+xml'],
         rewrites: [
@@ -417,11 +418,13 @@ function _addLiveReload(
 
   // If a custom path is provided the webpack dev server client drops the sockjs-node segment.
   // This adds it back so that behavior is consistent when using a custom URL path
+  let sockjsPath = '';
   if (clientAddress.pathname) {
-    clientAddress.pathname = path.posix.join(clientAddress.pathname, 'sockjs-node');
+      clientAddress.pathname = path.posix.join(clientAddress.pathname, 'sockjs-node');
+      sockjsPath = '&sockPath=' + clientAddress.pathname;
   }
 
-  const entryPoints = [`${webpackDevServerPath}?${url.format(clientAddress)}`];
+  const entryPoints = [`${webpackDevServerPath}?${url.format(clientAddress)}${sockjsPath}`];
   if (options.hmr) {
     const webpackHmrLink = 'https://webpack.js.org/guides/hot-module-replacement';
 

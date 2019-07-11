@@ -80,8 +80,8 @@
     "typescript": "3.4.5"
   },
   "devDependencies": {
-    "@angular/compiler": "~8.1.0-next.1",
-    "@angular/compiler-cli": "~8.1.0-next.1",
+    "@angular/compiler": "~8.1.0",
+    "@angular/compiler-cli": "~8.1.0",
     "@bazel/bazel": "0.24.1",
     "@bazel/buildifier": "^0.22.0",
     "@bazel/jasmine": "~0.26.0",
@@ -106,7 +106,7 @@
     "@types/webpack-dev-server": "^3.1.0",
     "@types/webpack-sources": "^0.1.5",
     "@yarnpkg/lockfile": "1.1.0",
-    "ajv": "6.10.0",
+    "ajv": "6.10.1",
     "ansi-colors": "3.2.4",
     "common-tags": "^1.8.0",
     "conventional-changelog": "^1.1.0",
@@ -139,7 +139,7 @@
     "ts-node": "^5.0.0",
     "tslint-no-circular-imports": "^0.7.0",
     "tslint-sonarts": "1.9.0",
-    "verdaccio": "4.0.3"
+    "verdaccio": "4.1.0"
   },
   "husky": {
     "hooks": {
