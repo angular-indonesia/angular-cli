@@ -54,12 +54,12 @@ describe('Browser Builder styles', () => {
     };
     const jsIndexMatches: { [path: string]: string } = {
       'index.html':
-        '<script src="runtime.js"></script>' +
-        '<script src="polyfills.js"></script>' +
-        '<script src="styles.js"></script>' +
-        '<script src="renamed-style.js"></script>' +
-        '<script src="vendor.js"></script>' +
-        '<script src="main.js"></script>',
+        '<script src="runtime.js" defer></script>' +
+        '<script src="polyfills.js" defer></script>' +
+        '<script src="styles.js" defer></script>' +
+        '<script src="renamed-style.js" defer></script>' +
+        '<script src="vendor.js" defer></script>' +
+        '<script src="main.js" defer></script>',
     };
 
     host.writeMultipleFiles({
@@ -201,18 +201,6 @@ describe('Browser Builder styles', () => {
       };
       await browserBuild(architect, host, target, overrides);
     });
-  });
-
-  it(`supports material icons`, async () => {
-    const overrides = {
-      extractCss: true,
-      optimization: true,
-      styles: [
-        { input: '../../../../node_modules/material-design-icons/iconfont/material-icons.css' },
-      ],
-    };
-
-    await browserBuild(architect, host, target, overrides);
   });
 
   extensionsWithVariableSupport.forEach(ext => {
