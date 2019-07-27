@@ -219,10 +219,16 @@ function addAppToWorkspaceFile(options: ApplicationOptions, appDir: string): Rul
             extractLicenses: true,
             vendorChunk: false,
             buildOptimizer: true,
-            budgets: [{
+            budgets: [
+            {
               type: 'initial',
               maximumWarning: '2mb',
               maximumError: '5mb',
+            },
+            {
+              type: 'anyComponentStyle',
+              maximumWarning: '6kb',
+              maximumError: '10kb',
             }],
           },
         },
