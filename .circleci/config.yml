@@ -350,7 +350,7 @@ workflows:
       - test-large:
           name: test-large-ivy
           ivy: true
-          glob: "packages/angular_devkit/build_angular/test/browser/*_spec_large.ts"
+          glob: "packages/angular_devkit/@(build_angular|build_ng_packagr)/@(src|test)/@(build|browser)/*_spec_large.ts"
           requires:
             - build
       - e2e-cli:
@@ -368,6 +368,20 @@ workflows:
       - e2e-cli:
           name: e2e-cli-ng-snapshots
           snapshots: true
+          requires:
+            - e2e-cli
+          pre-steps:
+            - run:
+                name: Don't run expensive e2e snapshots tests for forks other than renovate-bot and angular
+                command: >
+                  if [[ "$CIRCLE_PR_USERNAME" != "renovate-bot" ]] &&
+                    [[ "$CIRCLE_PROJECT_USERNAME" != "angular" || $CIRCLE_BRANCH != "master" ]]; then
+                    circleci step halt
+                  fi
+      - e2e-cli:
+          name: e2e-cli-ng-ivy-snapshots
+          snapshots: true
+          ivy: true
           requires:
             - e2e-cli
           pre-steps:
