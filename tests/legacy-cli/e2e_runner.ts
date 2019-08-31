@@ -99,16 +99,13 @@ if (!argv.ve) {
   // - The test itself is not applicable to Ivy
   // As we transition into using Ivy as the default this list should be reassessed.
   allTests = allTests
-    // The basic AOT check is different with Ivy and being checked in /experimental/ivy.ts.
-    .filter(name => !name.endsWith('tests/basic/aot.ts'))
     // Ivy doesn't support i18n externally at the moment.
     .filter(name => !name.includes('tests/i18n/'))
     .filter(name => !name.endsWith('tests/build/aot/aot-i18n.ts'))
-    // The additional lazy modules array does not work with Ivy because it's not needed.
-    .filter(name => !name.endsWith('tests/build/dynamic-import.ts'))
     // We don't have a platform-server usage story yet for Ivy.
     // It's contingent on lazy loading and factory shim considerations that are still being
     // discussed.
+    // Broken currently https://github.com/angular/angular-cli/issues/15383
     .filter(name => !name.endsWith('tests/build/platform-server.ts'))
     .filter(name => !name.endsWith('tests/build/build-app-shell.ts'))
     .filter(name => !name.endsWith('tests/build/build-app-shell-with-schematic.ts'));

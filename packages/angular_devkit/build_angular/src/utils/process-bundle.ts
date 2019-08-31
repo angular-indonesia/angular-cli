@@ -9,6 +9,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { SourceMapConsumer, SourceMapGenerator } from 'source-map';
 import { minify } from 'terser';
+import { manglingDisabled } from './mangle-options';
 
 const { transformAsync } = require('@babel/core');
 const cacache = require('cacache');
@@ -132,11 +133,10 @@ async function processWorker(options: ProcessBundleOptions): Promise<void> {
 
     // Mangle downlevel code
     const result = minify(code, {
-      compress: false,
+      compress: true,
       ecma: 5,
-      mangle: true,
+      mangle: !manglingDisabled,
       safari10: true,
-      toplevel: true,
       output: {
         ascii_only: true,
         webkit: true,
@@ -184,7 +184,7 @@ async function mangleOriginal(options: ProcessBundleOptions): Promise<void> {
   const resultOriginal = minify(options.code, {
     compress: false,
     ecma: 6,
-    mangle: true,
+    mangle: !manglingDisabled,
     safari10: true,
     output: {
       ascii_only: true,
