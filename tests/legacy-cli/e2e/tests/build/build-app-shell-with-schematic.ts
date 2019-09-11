@@ -6,11 +6,6 @@ import { readNgVersion } from '../../utils/version';
 
 
 export default async function () {
-  // Skip this test in Angular 2/4.
-  if (getGlobalVariable('argv').ng2 || getGlobalVariable('argv').ng4) {
-    return;
-  }
-
   await appendToFile('src/app/app.component.html', '<router-outlet></router-outlet>');
   await ng('generate', 'appShell', '--client-project', 'test-project');
   await updateJsonFile('package.json', packageJson => {
@@ -22,5 +17,8 @@ export default async function () {
 
   await silentNpm('install');
   await ng('run', 'test-project:app-shell');
+  await expectFileToMatch('dist/test-project/index.html', /app-shell works!/);
+
+  await ng('run', 'test-project:app-shell:production');
   await expectFileToMatch('dist/test-project/index.html', /app-shell works!/);
 }
