@@ -17,6 +17,8 @@ export function testScrubFile(content: string) {
     '__decorate',
     'propDecorators',
     'ctorParameters',
+    'ɵsetClassMetadata',
+    'ɵɵsetNgModuleScope',
   ];
 
   return markers.some((marker) => content.indexOf(marker) !== -1);
@@ -50,20 +52,19 @@ function scrubFileTransformer(checker: ts.TypeChecker, isAngularCoreFile: boolea
           return ts.forEachChild(node, checkNodeForDecorators);
         }
         const exprStmt = node as ts.ExpressionStatement;
-        if (isDecoratorAssignmentExpression(exprStmt)) {
+        // Do checks that don't need the typechecker first and bail early.
+        if (isIvyPrivateCallExpression(exprStmt)
+          || isCtorParamsAssignmentExpression(exprStmt)) {
+          nodes.push(node);
+        } else if (isDecoratorAssignmentExpression(exprStmt)) {
           nodes.push(...pickDecorationNodesToRemove(exprStmt, ngMetadata, checker));
-        }
-        if (isDecorateAssignmentExpression(exprStmt, tslibImports, checker)) {
+        } else if (isDecorateAssignmentExpression(exprStmt, tslibImports, checker)) {
           nodes.push(...pickDecorateNodesToRemove(exprStmt, tslibImports, ngMetadata, checker));
-        }
-        if (isAngularDecoratorMetadataExpression(exprStmt, ngMetadata, tslibImports, checker)) {
+        } else if (isAngularDecoratorMetadataExpression(exprStmt,
+          ngMetadata, tslibImports, checker)) {
           nodes.push(node);
-        }
-        if (isPropDecoratorAssignmentExpression(exprStmt)) {
+        } else if (isPropDecoratorAssignmentExpression(exprStmt)) {
           nodes.push(...pickPropDecorationNodesToRemove(exprStmt, ngMetadata, checker));
-        }
-        if (isCtorParamsAssignmentExpression(exprStmt)) {
-          nodes.push(node);
         }
       }
 
@@ -152,23 +153,10 @@ function isAngularCoreImport(node: ts.ImportDeclaration, isAngularCoreFile: bool
 
 // Check if assignment is `Clazz.decorators = [...];`.
 function isDecoratorAssignmentExpression(exprStmt: ts.ExpressionStatement): boolean {
-  if (exprStmt.expression.kind !== ts.SyntaxKind.BinaryExpression) {
+  if (!isAssignmentExpressionTo(exprStmt, 'decorators')) {
     return false;
   }
   const expr = exprStmt.expression as ts.BinaryExpression;
-  if (expr.left.kind !== ts.SyntaxKind.PropertyAccessExpression) {
-    return false;
-  }
-  const propAccess = expr.left as ts.PropertyAccessExpression;
-  if (propAccess.expression.kind !== ts.SyntaxKind.Identifier) {
-    return false;
-  }
-  if (propAccess.name.text !== 'decorators') {
-    return false;
-  }
-  if (expr.operatorToken.kind !== ts.SyntaxKind.FirstAssignment) {
-    return false;
-  }
   if (expr.right.kind !== ts.SyntaxKind.ArrayLiteralExpression) {
     return false;
   }
@@ -277,23 +265,10 @@ function isAngularDecoratorMetadataExpression(
 
 // Check if assignment is `Clazz.propDecorators = [...];`.
 function isPropDecoratorAssignmentExpression(exprStmt: ts.ExpressionStatement): boolean {
-  if (exprStmt.expression.kind !== ts.SyntaxKind.BinaryExpression) {
+  if (!isAssignmentExpressionTo(exprStmt, 'propDecorators')) {
     return false;
   }
   const expr = exprStmt.expression as ts.BinaryExpression;
-  if (expr.left.kind !== ts.SyntaxKind.PropertyAccessExpression) {
-    return false;
-  }
-  const propAccess = expr.left as ts.PropertyAccessExpression;
-  if (propAccess.expression.kind !== ts.SyntaxKind.Identifier) {
-    return false;
-  }
-  if (propAccess.name.text !== 'propDecorators') {
-    return false;
-  }
-  if (expr.operatorToken.kind !== ts.SyntaxKind.FirstAssignment) {
-    return false;
-  }
   if (expr.right.kind !== ts.SyntaxKind.ObjectLiteralExpression) {
     return false;
   }
@@ -303,6 +278,20 @@ function isPropDecoratorAssignmentExpression(exprStmt: ts.ExpressionStatement): 
 
 // Check if assignment is `Clazz.ctorParameters = [...];`.
 function isCtorParamsAssignmentExpression(exprStmt: ts.ExpressionStatement): boolean {
+  if (!isAssignmentExpressionTo(exprStmt, 'ctorParameters')) {
+    return false;
+  }
+  const expr = exprStmt.expression as ts.BinaryExpression;
+  if (expr.right.kind !== ts.SyntaxKind.FunctionExpression
+    && expr.right.kind !== ts.SyntaxKind.ArrowFunction
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function isAssignmentExpressionTo(exprStmt: ts.ExpressionStatement, name: string) {
   if (exprStmt.expression.kind !== ts.SyntaxKind.BinaryExpression) {
     return false;
   }
@@ -311,7 +300,7 @@ function isCtorParamsAssignmentExpression(exprStmt: ts.ExpressionStatement): boo
     return false;
   }
   const propAccess = expr.left as ts.PropertyAccessExpression;
-  if (propAccess.name.text !== 'ctorParameters') {
+  if (propAccess.name.text !== name) {
     return false;
   }
   if (propAccess.expression.kind !== ts.SyntaxKind.Identifier) {
@@ -320,9 +309,22 @@ function isCtorParamsAssignmentExpression(exprStmt: ts.ExpressionStatement): boo
   if (expr.operatorToken.kind !== ts.SyntaxKind.FirstAssignment) {
     return false;
   }
-  if (expr.right.kind !== ts.SyntaxKind.FunctionExpression
-    && expr.right.kind !== ts.SyntaxKind.ArrowFunction
-  ) {
+
+  return true;
+}
+
+function isIvyPrivateCallExpression(exprStmt: ts.ExpressionStatement) {
+  const callExpr = exprStmt.expression;
+  if (!ts.isCallExpression(callExpr)) {
+    return false;
+  }
+  const propAccExpr = callExpr.expression;
+  if (!ts.isPropertyAccessExpression(propAccExpr)) {
+    return false;
+  }
+
+  if (propAccExpr.name.text != 'ɵsetClassMetadata'
+    && propAccExpr.name.text != 'ɵɵsetNgModuleScope') {
     return false;
   }
 
