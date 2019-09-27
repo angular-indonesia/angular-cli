@@ -31,7 +31,6 @@ import { Observable, from, of } from 'rxjs';
 import { bufferCount, catchError, concatMap, map, mergeScan, switchMap } from 'rxjs/operators';
 import { ScriptTarget } from 'typescript';
 import * as webpack from 'webpack';
-import * as workerFarm from 'worker-farm';
 import { NgBuildAnalyticsPlugin } from '../../plugins/webpack/analytics';
 import { WebpackConfigOptions } from '../angular-cli-files/models/build-options';
 import {
@@ -51,6 +50,8 @@ import {
 import { readTsconfig } from '../angular-cli-files/utilities/read-tsconfig';
 import { augmentAppWithServiceWorker } from '../angular-cli-files/utilities/service-worker';
 import {
+  generateBuildStats,
+  generateBundleStats,
   statsErrorsToString,
   statsToString,
   statsWarningsToString,
@@ -63,13 +64,20 @@ import {
   normalizeOptimization,
   normalizeSourceMaps,
 } from '../utils';
-import { CacheKey, ProcessBundleOptions } from '../utils/process-bundle';
+import { manglingDisabled } from '../utils/mangle-options';
+import {
+  CacheKey,
+  ProcessBundleFile,
+  ProcessBundleOptions,
+  ProcessBundleResult,
+} from '../utils/process-bundle';
 import { assertCompatibleAngularVersion } from '../utils/version';
 import {
   generateBrowserWebpackConfigFromContext,
   getIndexInputFile,
   getIndexOutputFile,
 } from '../utils/webpack-browser-config';
+import { ActionExecutor } from './action-executor';
 import { Schema as BrowserBuilderSchema } from './schema';
 
 const cacache = require('cacache');
@@ -107,7 +115,7 @@ export async function buildBrowserWebpackConfigFromContext(
   options: BrowserBuilderSchema,
   context: BuilderContext,
   host: virtualFs.Host<fs.Stats> = new NodeJsSyncHost(),
-): Promise<{ config: webpack.Configuration[], projectRoot: string, projectSourceRoot?: string }> {
+): Promise<{ config: webpack.Configuration[]; projectRoot: string; projectSourceRoot?: string }> {
   return generateBrowserWebpackConfigFromContext(
     options,
     context,
@@ -201,9 +209,6 @@ export function buildWebpackBrowser(
   // Check Angular version.
   assertCompatibleAngularVersion(context.workspaceRoot, context.logger);
 
-  const loggingFn =
-    transforms.logging || createBrowserLoggingCallback(!!options.verbose, context.logger);
-
   return from(initialize(options, context, host, transforms.webpackConfiguration)).pipe(
     // tslint:disable-next-line: no-big-function
     switchMap(({ config: configs, projectRoot }) => {
@@ -221,6 +226,10 @@ export function buildWebpackBrowser(
         `);
       }
 
+      const useBundleDownleveling =
+        isDifferentialLoadingNeeded && !(fullDifferential || options.watch);
+      const startTime = Date.now();
+
       return from(configs).pipe(
         // the concurrency parameter (3rd parameter of mergeScan) is deliberately
         // set to 1 to make sure the build steps are executed in sequence.
@@ -228,7 +237,13 @@ export function buildWebpackBrowser(
           (lastResult, config) => {
             // Make sure to only run the 2nd build step, if 1st one succeeded
             if (lastResult.success) {
-              return runWebpack(config, context, { logging: loggingFn });
+              return runWebpack(config, context, {
+                logging:
+                  transforms.logging ||
+                  (useBundleDownleveling
+                    ? () => {}
+                    : createBrowserLoggingCallback(!!options.verbose, context.logger)),
+              });
             } else {
               return of();
             }
@@ -241,7 +256,19 @@ export function buildWebpackBrowser(
         switchMap(async buildEvents => {
           configs.length = 0;
           const success = buildEvents.every(r => r.success);
-          if (success) {
+          if (!success && useBundleDownleveling) {
+            // If using bundle downleveling then there is only one build
+            // If it fails show any diagnostic messages and bail
+            const webpackStats = buildEvents[0].webpackStats;
+            if (webpackStats && webpackStats.warnings.length > 0) {
+              context.logger.warn(statsWarningsToString(webpackStats, { colors: true }));
+            }
+            if (webpackStats && webpackStats.errors.length > 0) {
+              context.logger.error(statsErrorsToString(webpackStats, { colors: true }));
+            }
+
+            return { success };
+          } else if (success) {
             let noModuleFiles: EmittedFiles[] | undefined;
             let moduleFiles: EmittedFiles[] | undefined;
             let files: EmittedFiles[] | undefined;
@@ -262,17 +289,18 @@ export function buildWebpackBrowser(
                 noModuleFiles = secondBuild.emittedFiles;
               }
             } else if (isDifferentialLoadingNeeded && !fullDifferential) {
-              const { emittedFiles = [] } = firstBuild;
+              const { emittedFiles = [], webpackStats } = firstBuild;
               moduleFiles = [];
               noModuleFiles = [];
 
               // Common options for all bundle process actions
               const sourceMapOptions = normalizeSourceMaps(options.sourceMap || false);
-              const actionOptions = {
+              const actionOptions: Partial<ProcessBundleOptions> = {
                 optimize: normalizeOptimization(options.optimization).scripts,
                 sourceMaps: sourceMapOptions.scripts,
                 hiddenSourceMaps: sourceMapOptions.hidden,
                 vendorSourceMaps: sourceMapOptions.vendor,
+                integrityAlgorithm: options.subresourceIntegrity ? 'sha384' : undefined,
               };
 
               const actions: ProcessBundleOptions[] = [];
@@ -302,8 +330,10 @@ export function buildWebpackBrowser(
                 seen.add(file.file);
 
                 // All files at this point except ES5 polyfills are module scripts
-                const es5Polyfills = file.file.startsWith('polyfills-es5');
-                if (!es5Polyfills && !file.file.startsWith('polyfills-nomodule-es5')) {
+                const es5Polyfills =
+                  file.file.startsWith('polyfills-es5') ||
+                  file.file.startsWith('polyfills-nomodule-es5');
+                if (!es5Polyfills) {
                   moduleFiles.push(file);
                 }
                 // If not optimizing then ES2015 polyfills do not need processing
@@ -338,6 +368,9 @@ export function buildWebpackBrowser(
                     filename,
                     code,
                     map,
+                    // id is always present for non-assets
+                    // tslint:disable-next-line: no-non-null-assertion
+                    name: file.id!,
                     optimizeOnly: true,
                   });
 
@@ -351,6 +384,9 @@ export function buildWebpackBrowser(
                   filename,
                   code,
                   map,
+                  // id is always present for non-assets
+                  // tslint:disable-next-line: no-non-null-assertion
+                  name: file.id!,
                   runtime: file.file.startsWith('runtime'),
                   ignoreOriginal: es5Polyfills,
                 });
@@ -366,15 +402,21 @@ export function buildWebpackBrowser(
               context.logger.info('Generating ES5 bundles for differential loading...');
 
               const processActions: typeof actions = [];
+              let processRuntimeAction: ProcessBundleOptions | undefined;
               const cacheActions: { src: string; dest: string }[] = [];
+              const processResults: ProcessBundleResult[] = [];
               for (const action of actions) {
                 // Create base cache key with elements:
                 // * package version - different build-angular versions cause different final outputs
                 // * code length/hash - ensure cached version matches the same input code
-                const codeHash = createHash('sha1')
+                const algorithm = action.integrityAlgorithm || 'sha1';
+                const codeHash = createHash(algorithm)
                   .update(action.code)
-                  .digest('hex');
-                const baseCacheKey = `${packageVersion}|${action.code.length}|${codeHash}`;
+                  .digest('base64');
+                let baseCacheKey = `${packageVersion}|${action.code.length}|${algorithm}-${codeHash}`;
+                if (manglingDisabled) {
+                  baseCacheKey += '|MD';
+                }
 
                 // Postfix added to sourcemap cache keys when vendor sourcemaps are present
                 // Allows non-destructive caching of both variants
@@ -407,50 +449,102 @@ export function buildWebpackBrowser(
 
                 // Attempt to get required cache entries
                 const cacheEntries = [];
+                let cached = cacheKeys.length > 0;
                 for (const key of cacheKeys) {
                   if (key) {
-                    cacheEntries.push(await cacache.get.info(cacheDownlevelPath, key));
+                    const entry = await cacache.get.info(cacheDownlevelPath, key);
+                    if (!entry) {
+                      cached = false;
+                      break;
+                    }
+                    cacheEntries.push(entry);
                   } else {
                     cacheEntries.push(null);
                   }
                 }
 
-                // Check if required cache entries are present
-                let cached = cacheKeys.length > 0;
-                for (let i = 0; i < cacheKeys.length; ++i) {
-                  if (cacheKeys[i] && !cacheEntries[i]) {
-                    cached = false;
-                    break;
-                  }
-                }
-
                 // If all required cached entries are present, use the cached entries
                 // Otherwise process the files
-                if (cached) {
-                  if (cacheEntries[CacheKey.OriginalCode]) {
+                // If SRI is enabled always process the runtime bundle
+                // Lazy route integrity values are stored in the runtime bundle
+                if (action.integrityAlgorithm && action.runtime) {
+                  processRuntimeAction = action;
+                } else if (cached) {
+                  const result: ProcessBundleResult = { name: action.name };
+                  if (action.integrityAlgorithm) {
+                    result.integrity = `${action.integrityAlgorithm}-${codeHash}`;
+                  }
+
+                  let cacheEntry = cacheEntries[CacheKey.OriginalCode];
+                  if (cacheEntry) {
                     cacheActions.push({
-                      src: cacheEntries[CacheKey.OriginalCode].path,
+                      src: cacheEntry.path,
                       dest: action.filename,
                     });
+                    result.original = {
+                      filename: action.filename,
+                      size: cacheEntry.size,
+                      integrity: cacheEntry.metadata && cacheEntry.metadata.integrity,
+                    };
+
+                    cacheEntry = cacheEntries[CacheKey.OriginalMap];
+                    if (cacheEntry) {
+                      cacheActions.push({
+                        src: cacheEntry.path,
+                        dest: action.filename + '.map',
+                      });
+                      result.original.map = {
+                        filename: action.filename + '.map',
+                        size: cacheEntry.size,
+                      };
+                    }
+                  } else if (!action.ignoreOriginal) {
+                    // If the original wasn't processed (and therefore not cached), add info
+                    result.original = {
+                      filename: action.filename,
+                      size: Buffer.byteLength(action.code, 'utf8'),
+                      map:
+                        action.map === undefined
+                          ? undefined
+                          : {
+                              filename: action.filename + '.map',
+                              size: Buffer.byteLength(action.map, 'utf8'),
+                            },
+                    };
                   }
-                  if (cacheEntries[CacheKey.OriginalMap]) {
+
+                  cacheEntry = cacheEntries[CacheKey.DownlevelCode];
+                  if (cacheEntry) {
                     cacheActions.push({
-                      src: cacheEntries[CacheKey.OriginalMap].path,
-                      dest: action.filename + '.map',
-                    });
-                  }
-                  if (cacheEntries[CacheKey.DownlevelCode]) {
-                    cacheActions.push({
-                      src: cacheEntries[CacheKey.DownlevelCode].path,
+                      src: cacheEntry.path,
                       dest: action.filename.replace('es2015', 'es5'),
                     });
+                    result.downlevel = {
+                      filename: action.filename.replace('es2015', 'es5'),
+                      size: cacheEntry.size,
+                      integrity: cacheEntry.metadata && cacheEntry.metadata.integrity,
+                    };
+
+                    cacheEntry = cacheEntries[CacheKey.DownlevelMap];
+                    if (cacheEntry) {
+                      cacheActions.push({
+                        src: cacheEntry.path,
+                        dest: action.filename.replace('es2015', 'es5') + '.map',
+                      });
+                      result.downlevel.map = {
+                        filename: action.filename.replace('es2015', 'es5') + '.map',
+                        size: cacheEntry.size,
+                      };
+                    }
                   }
-                  if (cacheEntries[CacheKey.DownlevelMap]) {
-                    cacheActions.push({
-                      src: cacheEntries[CacheKey.DownlevelMap].path,
-                      dest: action.filename.replace('es2015', 'es5') + '.map',
-                    });
-                  }
+
+                  processResults.push(result);
+                } else if (action.runtime) {
+                  processRuntimeAction = {
+                    ...action,
+                    cacheKeys,
+                    cachePath: cacheDownlevelPath || undefined,
+                  };
                 } else {
                   processActions.push({
                     ...action,
@@ -490,33 +584,106 @@ export function buildWebpackBrowser(
               }
 
               if (processActions.length > 0) {
-                await new Promise<void>((resolve, reject) => {
-                  const workerFile = require.resolve('../utils/process-bundle');
-                  const workers = workerFarm(
-                    {
-                      maxRetries: 1,
-                    },
-                    path.extname(workerFile) !== '.ts'
-                      ? workerFile
-                      : require.resolve('../utils/process-bundle-bootstrap'),
-                    ['process'],
-                  );
-                  let completed = 0;
-                  const workCallback = (error: Error | null) => {
-                    if (error) {
-                      workerFarm.end(workers);
-                      reject(error);
-                    } else if (++completed === processActions.length) {
-                      workerFarm.end(workers);
-                      resolve();
-                    }
-                  };
+                const workerFile = require.resolve('../utils/process-bundle');
+                const executor = new ActionExecutor<
+                  ProcessBundleOptions & { size: number },
+                  ProcessBundleResult
+                >(
+                  path.extname(workerFile) !== '.ts'
+                    ? workerFile
+                    : require.resolve('../utils/process-bundle-bootstrap'),
+                  'process',
+                );
 
-                  processActions.forEach(action => workers['process'](action, workCallback));
-                });
+                try {
+                  const results = await executor.executeAll(
+                    processActions.map(a => ({ ...a, size: a.code.length })),
+                  );
+                  results.forEach(result => processResults.push(result));
+                } finally {
+                  executor.stop();
+                }
+              }
+
+              // Runtime must be processed after all other files
+              if (processRuntimeAction) {
+                const runtimeOptions = {
+                  ...processRuntimeAction,
+                  runtimeData: processResults,
+                };
+                processResults.push(
+                  await import('../utils/process-bundle').then(m => m.process(runtimeOptions)),
+                );
               }
 
               context.logger.info('ES5 bundle generation complete.');
+
+              type ArrayElement<A> = A extends ReadonlyArray<infer T> ? T : never;
+              function generateBundleInfoStats(
+                id: string | number,
+                bundle: ProcessBundleFile,
+                chunk: ArrayElement<webpack.Stats.ToJsonOutput['chunks']> | undefined,
+              ): string {
+                return generateBundleStats(
+                  {
+                    id,
+                    size: bundle.size,
+                    files: bundle.map ? [bundle.filename, bundle.map.filename] : [bundle.filename],
+                    names: chunk && chunk.names,
+                    entry: !!chunk && chunk.names.includes('runtime'),
+                    initial: !!chunk && chunk.initial,
+                    rendered: true,
+                  },
+                  true,
+                );
+              }
+
+              let bundleInfoText = '';
+              const processedNames = new Set<string>();
+              for (const result of processResults) {
+                processedNames.add(result.name);
+
+                const chunk =
+                  webpackStats &&
+                  webpackStats.chunks &&
+                  webpackStats.chunks.find(c => result.name === c.id.toString());
+                if (result.original) {
+                  bundleInfoText +=
+                    '\n' + generateBundleInfoStats(result.name, result.original, chunk);
+                }
+                if (result.downlevel) {
+                  bundleInfoText +=
+                    '\n' + generateBundleInfoStats(result.name, result.downlevel, chunk);
+                }
+              }
+
+              if (webpackStats && webpackStats.chunks) {
+                for (const chunk of webpackStats.chunks) {
+                  if (processedNames.has(chunk.id.toString())) {
+                    continue;
+                  }
+
+                  const asset =
+                    webpackStats.assets && webpackStats.assets.find(a => a.name === chunk.files[0]);
+                  bundleInfoText +=
+                    '\n' + generateBundleStats({ ...chunk, size: asset && asset.size }, true);
+                }
+              }
+
+              bundleInfoText +=
+                '\n' +
+                generateBuildStats(
+                  (webpackStats && webpackStats.hash) || '<unknown>',
+                  Date.now() - startTime,
+                  true,
+                );
+              context.logger.info(bundleInfoText);
+              if (webpackStats && webpackStats.warnings.length > 0) {
+                context.logger.warn(statsWarningsToString(webpackStats, { colors: true }));
+              }
+              if (webpackStats && webpackStats.errors.length > 0) {
+                context.logger.error(statsErrorsToString(webpackStats, { colors: true }));
+              }
             } else {
               const { emittedFiles = [] } = firstBuild;
               files = emittedFiles.filter(x => x.name !== 'polyfills-es5');
