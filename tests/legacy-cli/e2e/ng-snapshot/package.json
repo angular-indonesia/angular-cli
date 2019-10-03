@@ -2,15 +2,15 @@
   "description": "snapshot versions of Angular for e2e testing",
   "private": true,
   "dependencies": {
-    "@angular/animations": "github:angular/animations-builds#d9c95a98ab03d2a94f6cd14af4f0c61fb986e04b",
-    "@angular/common": "github:angular/common-builds#6f9d910df1604baa913119744e984165b7dd8786",
-    "@angular/compiler": "github:angular/compiler-builds#4307078b0da26ef562eead5733b077f755466cf7",
-    "@angular/compiler-cli": "github:angular/compiler-cli-builds#5482fc3f6ac792c7812657cacd6e4db7f6df1cab",
-    "@angular/core": "github:angular/core-builds#7dfaeca7a6ec2ca0949095df2ed072436e0fb02c",
-    "@angular/forms": "github:angular/forms-builds#7a0700bc804ffe113abe234c0b2d6c3af7a57062",
-    "@angular/language-service": "github:angular/language-service-builds#405471457b9ed0d93d60eb1b64a14066c55c472d",
-    "@angular/platform-browser": "github:angular/platform-browser-builds#272a149be8baa1892847085d5854ea99181124f6",
-    "@angular/platform-browser-dynamic": "github:angular/platform-browser-dynamic-builds#381dda6deffb18eca38f2b4e8fdeab0f3670b39a",
-    "@angular/router": "github:angular/router-builds#04b7f6c24f4252c55134599b8aa364a07c5483b4"
+    "@angular/animations": "github:angular/animations-builds#c6e16e8b41fc235ce8731f467cfe0f3600ba11fb",
+    "@angular/common": "github:angular/common-builds#c615a3e93c535b1028d5624a3917d24321f58953",
+    "@angular/compiler": "github:angular/compiler-builds#ab10983d98e1681e8d8bf89a1b4f9e4a34c4df5c",
+    "@angular/compiler-cli": "github:angular/compiler-cli-builds#9280ab8c5417b62889af22c46a367b75f2cbc966",
+    "@angular/core": "github:angular/core-builds#efd37c2d68e941979d4338bf1dc2bd28012a3ec8",
+    "@angular/forms": "github:angular/forms-builds#c3911a86ef060e1f5efd5b8f66fd56b9a4a439f0",
+    "@angular/language-service": "github:angular/language-service-builds#d9480d6e0592086261cfb9ddded3d6b51895ce4f",
+    "@angular/platform-browser": "github:angular/platform-browser-builds#061451efe4e6a634d853dfba49bece9e0a5bd6b8",
+    "@angular/platform-browser-dynamic": "github:angular/platform-browser-dynamic-builds#d2b43a4f1013219be458731963cfefec6187f2a7",
+    "@angular/router": "github:angular/router-builds#e88dbe9a35b9a9219142fabc8af046a17fc0de45"
   }
 }

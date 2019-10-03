@@ -30,13 +30,18 @@ ts_library(
     ],
     module_name = "@angular-devkit/core",
     module_root = "src/index.d.ts",
+    # The attribute below is needed in g3 to turn off strict typechecking
+    # strict_checks = False,
     deps = [
         "@npm//rxjs",
         "@npm//@types/node",
+        "@npm//@types/fast-json-stable-stringify",
         "@npm//ajv",
         "@npm//magic-string",
         "@npm//source-map",
         # @typings: es2015.core
+        # @typings: es2015.proxy
+        # @typings: es2015.reflect
         # @typings: es2015.symbol.wellknown
         # @typings: es2016.array.include
     ],
@@ -55,6 +60,8 @@ ts_library(
         "src/experimental/workspace/test/test-workspace.json",
         "src/experimental/workspace/workspace-schema.json",
     ],
+    # The attribute below is needed in g3 to turn off strict typechecking
+    # strict_checks = False,
     # @external_begin
     tsconfig = "//:tsconfig-test.json",
     # @external_end
@@ -93,6 +100,8 @@ ts_library(
     ),
     module_name = "@angular-devkit/core/node",
     module_root = "node/index.d.ts",
+    # The attribute below is needed in g3 to turn off strict typechecking
+    # strict_checks = False,
     deps = [
         ":core",
         "@npm//@types/node",
@@ -150,6 +159,8 @@ ts_library(
     ),
     module_name = "@angular-devkit/core/node/testing",
     module_root = "node/testing/index.d.ts",
+    # The attribute below is needed in g3 to turn off strict typechecking
+    # strict_checks = False,
     deps = [
         ":core",
         ":node",
