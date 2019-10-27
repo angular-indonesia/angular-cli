@@ -5,33 +5,32 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import { experimental, json, workspaces } from '@angular-devkit/core';
+import { json, workspaces } from '@angular-devkit/core';
 import * as path from 'path';
+import * as v8 from 'v8';
 import { BuilderInfo } from '../src';
 import { Schema as BuilderSchema } from '../src/builders-schema';
 import { Target } from '../src/input-schema';
 import { ArchitectHost, Builder, BuilderSymbol } from '../src/internal';
 
-
 export type NodeModulesBuilderInfo = BuilderInfo & {
   import: string;
 };
 
+function clone(obj: unknown): unknown {
+  const serialize = ((v8 as unknown) as { serialize(value: unknown): Buffer }).serialize;
+  const deserialize = ((v8 as unknown) as { deserialize(buffer: Buffer): unknown }).deserialize;
+
+  try {
+    return deserialize(serialize(obj));
+  } catch {
+    return JSON.parse(JSON.stringify(obj));
+  }
+}
 
 // TODO: create a base class for all workspace related hosts.
 export class WorkspaceNodeModulesArchitectHost implements ArchitectHost<NodeModulesBuilderInfo> {
-
-  /**
-   * @deprecated
-   */
-  constructor(_workspace: experimental.workspace.Workspace, _root: string)
-
-  constructor(_workspace: workspaces.WorkspaceDefinition, _root: string)
-
-  constructor(
-    protected _workspace: experimental.workspace.Workspace | workspaces.WorkspaceDefinition,
-    protected _root: string,
-  ) {}
+  constructor(protected _workspace: workspaces.WorkspaceDefinition, protected _root: string) {}
 
   async getBuilderNameForTarget(target: Target) {
     const targetDefinition = this.findProjectTarget(target);
@@ -117,33 +116,30 @@ export class WorkspaceNodeModulesArchitectHost implements ArchitectHost<NodeModu
       }
     }
 
-    return {
+    const options = {
       ...targetSpec['options'],
       ...additionalOptions,
     };
+
+    return clone(options) as json.JsonObject;
   }
 
   async getProjectMetadata(target: Target | string): Promise<json.JsonObject | null> {
     const projectName = typeof target === 'string' ? target : target.project;
 
-    // NOTE: Remove conditional when deprecated support for experimental workspace API is removed.
-    if ('getProject' in this._workspace) {
-      return this._workspace.getProject(projectName) as unknown as json.JsonObject;
-    } else {
-      const projectDefinition = this._workspace.projects.get(projectName);
-      if (!projectDefinition) {
-        throw new Error('Project does not exist.');
-      }
-
-      const metadata = {
-        root: projectDefinition.root,
-        sourceRoot: projectDefinition.sourceRoot,
-        prefix: projectDefinition.prefix,
-        ...projectDefinition.extensions,
-      } as unknown as json.JsonObject;
-
-      return metadata;
+    const projectDefinition = this._workspace.projects.get(projectName);
+    if (!projectDefinition) {
+      throw new Error('Project does not exist.');
     }
+
+    const metadata = ({
+      root: projectDefinition.root,
+      sourceRoot: projectDefinition.sourceRoot,
+      prefix: projectDefinition.prefix,
+      ...clone(projectDefinition.extensions),
+    } as unknown) as json.JsonObject;
+
+    return metadata;
   }
 
   async loadBuilder(info: NodeModulesBuilderInfo): Promise<Builder> {
@@ -156,16 +152,11 @@ export class WorkspaceNodeModulesArchitectHost implements ArchitectHost<NodeModu
   }
 
   private findProjectTarget(target: Target) {
-    // NOTE: Remove conditional when deprecated support for experimental workspace API is removed.
-    if ('getProjectTargets' in this._workspace) {
-      return this._workspace.getProjectTargets(target.project)[target.target];
-    } else {
-      const projectDefinition = this._workspace.projects.get(target.project);
-      if (!projectDefinition) {
-        throw new Error('Project does not exist.');
-      }
-
-      return projectDefinition.targets.get(target.target);
+    const projectDefinition = this._workspace.projects.get(target.project);
+    if (!projectDefinition) {
+      throw new Error('Project does not exist.');
     }
+
+    return projectDefinition.targets.get(target.target);
   }
 }

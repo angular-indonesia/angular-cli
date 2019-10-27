@@ -26,7 +26,8 @@ import {
 import { RawSource } from 'webpack-sources';
 import { AssetPatternClass, ExtraEntryPoint } from '../../../browser/schema';
 import { BuildBrowserFeatures } from '../../../utils';
-import { manglingDisabled } from '../../../utils/mangle-options';
+import { findCachePath } from '../../../utils/cache-path';
+import { cachingDisabled, manglingDisabled } from '../../../utils/environment-options';
 import { BundleBudgetPlugin } from '../../plugins/bundle-budget';
 import { CleanCssWebpackPlugin } from '../../plugins/cleancss-webpack-plugin';
 import { NamedLazyChunksPlugin } from '../../plugins/named-chunks-plugin';
@@ -379,7 +380,8 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
       safari10: true,
       output: {
         ecma: terserEcma,
-        comments: false,
+        // default behavior (undefined value) is to keep only important comments (licenses, etc.)
+        comments: !buildOptions.extractLicenses && undefined,
         webkit: true,
       },
       // On server, we don't want to compress anything. We still set the ngDevMode = false for it
@@ -411,7 +413,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
       new TerserPlugin({
         sourceMap: scriptsSourceMap,
         parallel: true,
-        cache: true,
+        cache: !cachingDisabled && findCachePath('terser-webpack'),
         extractComments: false,
         chunkFilter: (chunk: compilation.Chunk) =>
           !globalScriptsByBundleName.some(s => s.bundleName === chunk.name),
@@ -422,7 +424,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
       new TerserPlugin({
         sourceMap: scriptsSourceMap,
         parallel: true,
-        cache: true,
+        cache: !cachingDisabled && findCachePath('terser-webpack'),
         extractComments: false,
         chunkFilter: (chunk: compilation.Chunk) =>
           globalScriptsByBundleName.some(s => s.bundleName === chunk.name),

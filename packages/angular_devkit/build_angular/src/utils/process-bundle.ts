@@ -5,7 +5,7 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import { NodePath, parseSync, transformAsync, traverse, types } from '@babel/core';
+import { NodePath, ParseResult, parseSync, transformAsync, traverse, types } from '@babel/core';
 import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -13,8 +13,8 @@ import { RawSourceMap, SourceMapConsumer, SourceMapGenerator } from 'source-map'
 import { minify } from 'terser';
 import * as v8 from 'v8';
 import { SourceMapSource } from 'webpack-sources';
+import { manglingDisabled } from './environment-options';
 import { I18nOptions } from './i18n-options';
-import { manglingDisabled } from './mangle-options';
 
 const cacache = require('cacache');
 const deserialize = ((v8 as unknown) as { deserialize(buffer: Buffer): unknown }).deserialize;
@@ -454,7 +454,9 @@ async function processRuntime(
       (options.cacheKeys && options.cacheKeys[CacheKey.DownlevelMap]) || null,
     );
     fs.writeFileSync(downlevelFilePath + '.map', downlevelMap);
-    downlevelCode += `\n//# sourceMappingURL=${path.basename(downlevelFilePath)}.map`;
+    if (!options.hiddenSourceMaps) {
+      downlevelCode += `\n//# sourceMappingURL=${path.basename(downlevelFilePath)}.map`;
+    }
   }
   await cachePut(
     downlevelCode,
@@ -472,6 +474,7 @@ export interface InlineOptions {
   es5: boolean;
   outputPath: string;
   missingTranslation?: 'warning' | 'error' | 'ignore';
+  setLocale?: boolean;
 }
 
 interface LocalizePosition {
@@ -491,7 +494,8 @@ export async function inlineLocales(options: InlineOptions) {
     throw new Error('Flat output is only supported when inlining one locale.');
   }
 
-  if (!options.code.includes(localizeName)) {
+  const hasLocalizeName = options.code.includes(localizeName);
+  if (!hasLocalizeName && !options.setLocale) {
     return inlineCopyOnly(options);
   }
 
@@ -506,13 +510,13 @@ export async function inlineLocales(options: InlineOptions) {
   const diagnostics = new localizeDiag.Diagnostics();
 
   const positions = findLocalizePositions(options, utils);
-  if (positions.length === 0) {
+  if (positions.length === 0 && !options.setLocale) {
     return inlineCopyOnly(options);
   }
 
-  const content = new MagicString(options.code);
-  const inputMap = options.map && JSON.parse(options.map) as RawSourceMap;
-
+  let content = new MagicString(options.code);
+  const inputMap = options.map && (JSON.parse(options.map) as RawSourceMap);
+  let contentClone;
   for (const locale of i18n.inlineLocales) {
     const isSourceLocale = locale === i18n.sourceLocale;
     // tslint:disable-next-line: no-any
@@ -530,6 +534,12 @@ export async function inlineLocales(options: InlineOptions) {
       const { code } = generate(expression);
 
       content.overwrite(position.start, position.end, code);
+    }
+
+    if (options.setLocale) {
+      const setLocaleText = `var $localize=Object.assign(void 0===$localize?{}:$localize,{locale:"${locale}"});`;
+      contentClone = content.clone();
+      content.prepend(setLocaleText);
     }
 
     const output = content.toString();
@@ -552,6 +562,11 @@ export async function inlineLocales(options: InlineOptions) {
 
       fs.writeFileSync(outputPath + '.map', JSON.stringify(outputMap));
     }
+
+    if (contentClone) {
+      content = contentClone;
+      contentClone = undefined;
+    }
   }
 
   return { file: options.filename, diagnostics: diagnostics.messages, count: positions.length };
@@ -563,7 +578,11 @@ function inlineCopyOnly(options: InlineOptions) {
   }
 
   for (const locale of i18n.inlineLocales) {
-    const outputPath = path.join(options.outputPath, i18n.flatOutput ? '' : locale, options.filename);
+    const outputPath = path.join(
+      options.outputPath,
+      i18n.flatOutput ? '' : locale,
+      options.filename,
+    );
     fs.writeFileSync(outputPath, options.code);
     if (options.map) {
       fs.writeFileSync(outputPath + '.map', options.map);
@@ -577,18 +596,38 @@ function findLocalizePositions(
   options: InlineOptions,
   utils: typeof import('@angular/localize/src/tools/src/translate/source_files/source_file_utils'),
 ): LocalizePosition[] {
-  const ast = parseSync(options.code, { babelrc: false });
+  let ast: ParseResult | undefined | null;
+
+  try {
+    ast = parseSync(options.code, {
+      babelrc: false,
+      sourceType: 'script',
+    });
+  } catch (error) {
+    if (error.message) {
+      // Make the error more readable.
+      // Same errors will contain the full content of the file as the error message
+      // Which makes it hard to find the actual error message.
+      const index = error.message.indexOf(')\n');
+      const msg = index !== -1 ? error.message.substr(0, index + 1) : error.message;
+      throw new Error(`${msg}\nAn error occurred inlining file "${options.filename}"`);
+    }
+  }
+
   if (!ast) {
     throw new Error(`Unknown error occurred inlining file "${options.filename}"`);
   }
 
   const positions: LocalizePosition[] = [];
-
   if (options.es5) {
     traverse(ast, {
       CallExpression(path: NodePath<types.CallExpression>) {
         const callee = path.get('callee');
-        if (callee.isIdentifier() && callee.node.name === localizeName) {
+        if (
+          callee.isIdentifier() &&
+          callee.node.name === localizeName &&
+          utils.isGlobalIdentifier(callee)
+        ) {
           const messageParts = utils.unwrapMessagePartsFromLocalizeCall(path);
           const expressions = utils.unwrapSubstitutionsFromLocalizeCall(path.node);
           positions.push({

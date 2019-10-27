@@ -15,16 +15,11 @@ import { expectToFail } from '../../utils/utils';
 import { readNgVersion } from '../../utils/version';
 
 export default async function() {
-  if (getGlobalVariable('argv').ve) {
-    return;
-  }
-
   let localizeVersion = '@angular/localize@' + readNgVersion();
   if (getGlobalVariable('argv')['ng-snapshots']) {
     localizeVersion = require('../../ng-snapshot/package.json').dependencies['@angular/localize'];
   }
   await npm('install', `${localizeVersion}`);
-  await npm('run', 'webdriver-update');
 
   await updateJsonFile('tsconfig.json', config => {
     config.compilerOptions.target = 'es2015';
@@ -37,7 +32,6 @@ export default async function() {
   const langTranslations = [
     { lang: 'en-US', translation: 'Hello i18n!' },
     { lang: 'fr', translation: 'Bonjour i18n!' },
-    { lang: 'de', translation: 'Hallo i18n!' },
   ];
 
   await updateJsonFile('angular.json', workspaceJson => {
@@ -110,8 +104,10 @@ export default async function() {
   for (const { lang, translation } of langTranslations) {
     await expectFileToMatch(`${baseDir}/${lang}/main-es5.js`, translation);
     await expectFileToMatch(`${baseDir}/${lang}/main-es2015.js`, translation);
-    await expectToFail(() => expectFileToMatch(`${baseDir}/${lang}/main-es5.js`, '$localize'));
-    await expectToFail(() => expectFileToMatch(`${baseDir}/${lang}/main-es2015.js`, '$localize'));
+    await expectToFail(() => expectFileToMatch(`${baseDir}/${lang}/main-es5.js`, '$localize`'));
+    await expectToFail(() => expectFileToMatch(`${baseDir}/${lang}/main-es2015.js`, '$localize`'));
+    await expectFileToMatch(`${baseDir}/${lang}/main-es5.js`, lang);
+    await expectFileToMatch(`${baseDir}/${lang}/main-es2015.js`, lang);
 
     // Ivy i18n doesn't yet work with `ng serve` so we must use a separate server.
     const app = express();

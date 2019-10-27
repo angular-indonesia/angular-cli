@@ -82,10 +82,14 @@ export function installTempPackage(
   logger: logging.Logger,
   packageManager: PackageManager = PackageManager.Npm,
 ): string {
-  const tempPath = mkdtempSync(join(realpathSync(tmpdir()), '.ng-temp-packages-'));
+  const tempPath = mkdtempSync(join(realpathSync(tmpdir()), 'angular-cli-packages-'));
 
   // clean up temp directory on process exit
-  process.on('exit', () => rimraf.sync(tempPath));
+  process.on('exit', () => {
+    try {
+      rimraf.sync(tempPath);
+    } catch { }
+  });
 
   // setup prefix/global modules path
   const packageManagerArgs = getPackageManagerArguments(packageManager);
@@ -104,11 +108,6 @@ export function installTempPackage(
   } else {
     tempNodeModules = join(tempPath, 'node_modules');
   }
-
-  // Needed to resolve schematics from this location since we use a custom
-  // resolve strategy in '@angular/devkit-core/node'
-  // todo: this should be removed when we change the resolutions to use require.resolve
-  process.env.NG_TEMP_MODULES_DIR = tempNodeModules;
 
   return tempNodeModules;
 }
