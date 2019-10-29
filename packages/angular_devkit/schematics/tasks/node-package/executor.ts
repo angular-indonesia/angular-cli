@@ -7,9 +7,10 @@
  */
 import { BaseException } from '@angular-devkit/core';
 import { SpawnOptions, spawn } from 'child_process';
+import * as ora from 'ora';
 import * as path from 'path';
 import { Observable } from 'rxjs';
-import { TaskExecutor } from '../../src';
+import { TaskExecutor, UnsuccessfulWorkflowExecution } from '../../src';
 import { NodePackageTaskFactoryOptions, NodePackageTaskOptions } from './options';
 
 type PackageManagerProfile = {
@@ -77,10 +78,9 @@ export default function(
       taskPackageManagerName = options.packageManager;
     }
 
-    const outputStream = process.stdout;
-    const errorStream = process.stderr;
+    const bufferedOutput: {stream: NodeJS.WriteStream, data: Buffer}[] = [];
     const spawnOptions: SpawnOptions = {
-      stdio:  [ process.stdin, outputStream, errorStream ],
+      stdio: !!options.hideOutput ? 'pipe' : 'inherit',
       shell: true,
       cwd: path.join(rootDirectory, options.workingDirectory || ''),
     };
@@ -100,16 +100,32 @@ export default function(
     }
 
     return new Observable(obs => {
-      spawn(taskPackageManagerName, args, spawnOptions)
+      const spinner = ora({
+        text: 'Installing packages...',
+        // Workaround for https://github.com/sindresorhus/ora/issues/136.
+        discardStdin: process.platform != 'win32',
+      }).start();
+      const childProcess = spawn(taskPackageManagerName, args, spawnOptions)
         .on('close', (code: number) => {
           if (code === 0) {
+            spinner.succeed('Packages installed successfully.');
+            spinner.stop();
             obs.next();
             obs.complete();
           } else {
-            const message = 'Package install failed, see above.';
-            obs.error(new Error(message));
+            if (options.hideOutput) {
+              bufferedOutput.forEach(({ stream, data }) => stream.write(data));
+            }
+            spinner.fail('Package install failed, see above.');
+            obs.error(new UnsuccessfulWorkflowExecution());
           }
       });
+      if (options.hideOutput) {
+        childProcess.stdout.on('data', (data: Buffer) =>
+          bufferedOutput.push({ stream: process.stdout, data: data }));
+        childProcess.stderr.on('data', (data: Buffer) =>
+          bufferedOutput.push({ stream: process.stderr, data: data }));
+      }
     });
 
   };

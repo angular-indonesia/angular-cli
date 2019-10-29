@@ -50,6 +50,9 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
       {
         packageManager: this.packageManager,
         root: normalize(this.workspace.root),
+        // __dirname -> favor @schematics/update from this package
+        // Otherwise, use packages from the active workspace (migrations)
+        resolvePaths: [__dirname, this.workspace.root],
       },
     );
     this.workflow.engineHost.registerOptionsTransform(
@@ -136,7 +139,7 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
     collectionPath: string,
     range: semver.Range,
     commit = false,
-  ) {
+  ): Promise<boolean> {
     const collection = this.workflow.engine.createCollection(collectionPath);
 
     const migrations = [];
@@ -190,19 +193,21 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
         this.createCommit(message, []);
       }
     }
+
+    return true;
   }
 
   // tslint:disable-next-line:no-big-function
   async run(options: UpdateCommandSchema & Arguments) {
     // Check if the current installed CLI version is older than the latest version.
-    if (await this.checkCLILatestVersion(options.verbose)) {
+    if (await this.checkCLILatestVersion(options.verbose, options.next)) {
       this.logger.warn(
         'The installed Angular CLI version is older than the latest published version.\n' +
         'Installing a temporary version to perform the update.',
       );
 
       return runTempPackageBin(
-        '@angular/cli@latest',
+        `@angular/cli@${options.next ? 'next' : 'latest'}`,
         this.logger,
         this.packageManager,
         process.argv.slice(2),
@@ -419,14 +424,14 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
         '>' + from + ' <=' + (options.to || packageNode.package.version),
       );
 
-      const result = await this.executeMigrations(
+      const success = await this.executeMigrations(
         packageName,
         migrations,
         migrationRange,
         !options.skipCommits,
       );
 
-      return result ? 1 : 0;
+      return success ? 0 : 1;
     }
 
     const requests: {
@@ -613,11 +618,11 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
    * Checks if the current installed CLI version is older than the latest version.
    * @returns `true` when the installed version is older.
   */
-  private async checkCLILatestVersion(verbose = false): Promise<boolean> {
+  private async checkCLILatestVersion(verbose = false, next = false): Promise<boolean> {
     const { version: installedCLIVersion } = require('../package.json');
 
     const LatestCLIManifest = await fetchPackageManifest(
-      '@angular/cli@latest',
+      `@angular/cli@${next ? 'next' : 'latest'}`,
       this.logger,
       {
         verbose,

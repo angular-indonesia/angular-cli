@@ -82,8 +82,8 @@
     "typescript": "3.6.4"
   },
   "devDependencies": {
-    "@angular/compiler": "9.0.0-next.13",
-    "@angular/compiler-cli": "9.0.0-next.13",
+    "@angular/compiler": "9.0.0-next.14",
+    "@angular/compiler-cli": "9.0.0-next.14",
     "@bazel/bazel": "1.0.0",
     "@bazel/buildifier": "0.29.0",
     "@bazel/jasmine": "0.39.0",
@@ -129,6 +129,7 @@
     "minimatch": "^3.0.4",
     "minimist": "^1.2.0",
     "npm-registry-client": "8.6.0",
+    "ora": "^4.0.2",
     "pacote": "^9.2.3",
     "pidtree": "^0.3.0",
     "pidusage": "^2.0.17",
