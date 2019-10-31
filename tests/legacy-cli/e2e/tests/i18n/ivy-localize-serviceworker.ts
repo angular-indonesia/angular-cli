@@ -2,7 +2,6 @@ import * as express from 'express';
 import { resolve } from 'path';
 import { getGlobalVariable } from '../../utils/env';
 import {
-  appendToFile,
   copyFile,
   expectFileToExist,
   expectFileToMatch,
@@ -15,11 +14,22 @@ import { expectToFail } from '../../utils/utils';
 import { readNgVersion } from '../../utils/version';
 
 export default async function() {
+  // TEMP: disable pending i18n updates
+  return;
+
   let localizeVersion = '@angular/localize@' + readNgVersion();
   if (getGlobalVariable('argv')['ng-snapshots']) {
     localizeVersion = require('../../ng-snapshot/package.json').dependencies['@angular/localize'];
   }
   await npm('install', `${localizeVersion}`);
+
+  let serviceWorkerVersion = '@angular/service-worker@' + readNgVersion();
+  if (getGlobalVariable('argv')['ng-snapshots']) {
+    serviceWorkerVersion = require('../../ng-snapshot/package.json').dependencies[
+      '@angular/service-worker'
+    ];
+  }
+  await npm('install', `${serviceWorkerVersion}`);
 
   await updateJsonFile('tsconfig.json', config => {
     config.compilerOptions.target = 'es2015';
@@ -30,8 +40,7 @@ export default async function() {
 
   // Set configurations for each locale.
   const langTranslations = [
-    // TODO: re-enable all locales once localeData support is added.
-    // { lang: 'en-US', translation: 'Hello i18n!' },
+    { lang: 'en-US', translation: 'Hello i18n!' },
     { lang: 'fr', translation: 'Bonjour i18n!' },
   ];
 
@@ -40,7 +49,6 @@ export default async function() {
     const appArchitect = appProject.architect || appProject.targets;
     const serveConfigs = appArchitect['serve'].configurations;
     const e2eConfigs = appArchitect['e2e'].configurations;
-    const buildConfigs = appArchitect['build'].configurations;
 
     // Make default builds prod.
     appArchitect['build'].options.optimization = true;
@@ -53,12 +61,11 @@ export default async function() {
       },
     ];
 
+    // Enable service worker
+    appArchitect['build'].options.serviceWorker = true;
+
     // Enable localization for all locales
-    // TODO: re-enable all locales once localeData support is added.
     // appArchitect['build'].options.localize = true;
-    appArchitect['build'].options.localize = ['fr'];
-    // Always error on missing translations.
-    appArchitect['build'].options.i18nMissingTranslation = 'error';
 
     // Add locale definitions to the project
     // tslint:disable-next-line: no-any
@@ -69,8 +76,6 @@ export default async function() {
       } else {
         i18n.locales[lang] = `src/locale/messages.${lang}.xlf`;
       }
-
-      buildConfigs[lang] = { localize: [lang] };
       serveConfigs[lang] = { browserTarget: `test-project:build:${lang}` };
       e2eConfigs[lang] = {
         specs: [`./src/app.${lang}.e2e-spec.ts`],
@@ -78,6 +83,29 @@ export default async function() {
       };
     }
   });
+
+  // Add service worker source configuration
+  const manifest = {
+    index: '/index.html',
+    assetGroups: [
+      {
+        name: 'app',
+        installMode: 'prefetch',
+        resources: {
+          files: ['/favicon.ico', '/index.html', '/manifest.webmanifest', '/*.css', '/*.js'],
+        },
+      },
+      {
+        name: 'assets',
+        installMode: 'lazy',
+        updateMode: 'prefetch',
+        resources: {
+          files: ['/assets/**', '/*.(eot|svg|cur|jpg|png|webp|gif|otf|ttf|woff|woff2|ani)'],
+        },
+      },
+    ],
+  };
+  await writeFile('ngsw-config.json', JSON.stringify(manifest));
 
   // Add a translatable element.
   await writeFile(
@@ -108,10 +136,7 @@ export default async function() {
   }
 
   // Build each locale and verify the output.
-  // NOTE: this should not fail in general, but multi-locale translation is currently disabled.
-  // TODO: remove expectToFail once localeData support is added.
-  await expectToFail(() => ng('build', '--localize', 'true'));
-  await ng('build');
+  await ng('build', '--i18n-missing-translation', 'error');
   for (const { lang, translation } of langTranslations) {
     await expectFileToMatch(`${baseDir}/${lang}/main-es5.js`, translation);
     await expectFileToMatch(`${baseDir}/${lang}/main-es2015.js`, translation);
@@ -119,6 +144,9 @@ export default async function() {
     await expectToFail(() => expectFileToMatch(`${baseDir}/${lang}/main-es2015.js`, '$localize`'));
     await expectFileToMatch(`${baseDir}/${lang}/main-es5.js`, lang);
     await expectFileToMatch(`${baseDir}/${lang}/main-es2015.js`, lang);
+
+    // Expect service worker configuration to be present
+    await expectFileToExist(`${baseDir}/${lang}/ngsw.json`);
 
     // Ivy i18n doesn't yet work with `ng serve` so we must use a separate server.
     const app = express();
@@ -152,16 +180,4 @@ export default async function() {
       server.close();
     }
   }
-
-  // Verify locale data registration (currently only for single locale builds)
-  await ng('build', '--optimization', 'false', '-c', 'fr', '--i18n-missing-translation', 'error');
-  await expectFileToMatch(`${baseDir}/fr/main-es5.js`, 'registerLocaleData');
-  await expectFileToMatch(`${baseDir}/fr/main-es2015.js`, 'registerLocaleData');
-
-  // Verify missing translation behaviour.
-  await appendToFile('src/app/app.component.html', '<p i18n>Other content</p>');
-  await ng('build', '--i18n-missing-translation', 'ignore');
-  await expectFileToMatch(`${baseDir}/fr/main-es5.js`, /Other content/);
-  await expectFileToMatch(`${baseDir}/fr/main-es2015.js`, /Other content/);
-  await expectToFail(() => ng('build'));
 }

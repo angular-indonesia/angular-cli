@@ -80,7 +80,7 @@ export function createI18nOptions(
     Object.keys(i18n.locales).forEach(locale => i18n.inlineLocales.add(locale));
   } else if (inline) {
     for (const locale of inline) {
-      if (!i18n.locales[locale]) {
+      if (!i18n.locales[locale] && i18n.sourceLocale !== locale) {
         throw new Error(`Requested inline locale '${locale}' is not defined for the project.`);
       }
 
@@ -93,17 +93,23 @@ export function createI18nOptions(
 
 export async function configureI18nBuild<T extends BrowserBuilderSchema | ServerBuilderSchema>(
   context: BuilderContext,
-  host: virtualFs.Host<fs.Stats>,
   options: T,
 ): Promise<{
-  buildOptions: T,
-  i18n: I18nOptions,
+  buildOptions: T;
+  i18n: I18nOptions;
 }> {
   if (!context.target) {
     throw new Error('The builder requires a target.');
   }
 
-  const buildOptions = { ... options };
+  const buildOptions = { ...options };
+
+  if (
+    buildOptions.localize === true ||
+    (Array.isArray(buildOptions.localize) && buildOptions.localize.length > 1)
+  ) {
+    throw new Error('Using the localize option for multiple locales is temporarily disabled.');
+  }
 
   const tsConfig = readTsconfig(buildOptions.tsConfig, context.workspaceRoot);
   const usingIvy = tsConfig.options.enableIvy !== false;
@@ -146,6 +152,12 @@ export async function configureI18nBuild<T extends BrowserBuilderSchema | Server
     if (usedFormats.size > 0) {
       buildOptions.i18nFormat = [...usedFormats][0];
     }
+
+    // If only one locale is specified set the deprecated option to enable the webpack plugin
+    // transform to register the locale directly in the output bundle.
+    if (i18n.inlineLocales.size === 1) {
+      buildOptions.i18nLocale = [...i18n.inlineLocales][0];
+    }
   }
 
   // If inlining store the output in a temporary location to facilitate post-processing
@@ -157,14 +169,18 @@ export async function configureI18nBuild<T extends BrowserBuilderSchema | Server
     process.on('exit', () => {
       try {
         rimraf.sync(tempPath);
-      } catch { }
+      } catch {}
     });
   }
 
   return { buildOptions, i18n };
 }
 
-function mergeDeprecatedI18nOptions(i18n: I18nOptions, i18nLocale: string | undefined, i18nFile: string | undefined): I18nOptions {
+function mergeDeprecatedI18nOptions(
+  i18n: I18nOptions,
+  i18nLocale: string | undefined,
+  i18nFile: string | undefined,
+): I18nOptions {
   if (i18nFile !== undefined && i18nLocale === undefined) {
     throw new Error(`Option 'i18nFile' cannot be used without the 'i18nLocale' option.`);
   }

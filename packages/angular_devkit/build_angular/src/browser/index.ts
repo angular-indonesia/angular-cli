@@ -75,6 +75,11 @@ const cacheDownlevelPath = cachingDisabled ? undefined : findCachePath('angular-
 
 export type BrowserBuilderOutput = json.JsonObject &
   BuilderOutput & {
+    baseOutputPath: string;
+    outputPaths: string[];
+    /**
+     * @deprecated in version 9. Use 'outputPaths' instead.
+     */
     outputPath: string;
   };
 
@@ -143,12 +148,7 @@ export async function buildBrowserWebpackConfigFromContext(
     );
   }
 
-  return generateBrowserWebpackConfigFromContext(
-    options,
-    context,
-    webpackPartialGenerator,
-    host,
-  );
+  return generateBrowserWebpackConfigFromContext(options, context, webpackPartialGenerator, host);
 }
 
 function getAnalyticsConfig(
@@ -193,12 +193,12 @@ async function initialize(
   i18n: I18nOptions;
 }> {
   const originalOutputPath = options.outputPath;
-  const { config, projectRoot, projectSourceRoot, i18n } = await buildBrowserWebpackConfigFromContext(
-    options,
-    context,
-    host,
-    true,
-  );
+  const {
+    config,
+    projectRoot,
+    projectSourceRoot,
+    i18n,
+  } = await buildBrowserWebpackConfigFromContext(options, context, host, true);
 
   let transformedConfig;
   if (webpackConfigurationTransform) {
@@ -206,10 +206,7 @@ async function initialize(
   }
 
   if (options.deleteOutputPath) {
-    deleteOutputDir(
-      context.workspaceRoot,
-      originalOutputPath,
-    );
+    deleteOutputDir(context.workspaceRoot, originalOutputPath);
   }
 
   return { config: transformedConfig || config, projectRoot, projectSourceRoot, i18n };
@@ -228,6 +225,7 @@ export function buildWebpackBrowser(
   const host = new NodeJsSyncHost();
   const root = normalize(context.workspaceRoot);
   const baseOutputPath = path.resolve(context.workspaceRoot, options.outputPath);
+  let outputPaths: undefined | string[];
 
   // Check Angular version.
   assertCompatibleAngularVersion(context.workspaceRoot, context.logger);
@@ -278,7 +276,7 @@ export function buildWebpackBrowser(
 
             return { success };
           } else if (success) {
-            const outputPaths = ensureOutputPaths(baseOutputPath, i18n);
+            outputPaths = ensureOutputPaths(baseOutputPath, i18n);
 
             let noModuleFiles: EmittedFiles[] | undefined;
             let moduleFiles: EmittedFiles[] | undefined;
@@ -672,35 +670,34 @@ export function buildWebpackBrowser(
                 }
               }
             }
+
+            if (!options.watch && options.serviceWorker) {
+              for (const outputPath of outputPaths) {
+                try {
+                  await augmentAppWithServiceWorker(
+                    host,
+                    root,
+                    normalize(projectRoot),
+                    normalize(outputPath),
+                    options.baseHref || '/',
+                    options.ngswConfigPath,
+                  );
+                } catch (err) {
+                  return { success: false, error: mapErrorToMessage(err) };
+                }
+              }
+            }
           }
 
           return { success };
-        }),
-        concatMap(buildEvent => {
-          if (buildEvent.success && !options.watch && options.serviceWorker) {
-            return from(
-              augmentAppWithServiceWorker(
-                host,
-                root,
-                normalize(projectRoot),
-                normalize(baseOutputPath),
-                options.baseHref || '/',
-                options.ngswConfigPath,
-              ).then(
-                () => ({ success: true }),
-                error => ({ success: false, error: mapErrorToMessage(error) }),
-              ),
-            );
-          } else {
-            return of(buildEvent);
-          }
         }),
         map(
           event =>
             ({
               ...event,
-              // If we use differential loading, both configs have the same outputs
+              baseOutputPath,
               outputPath: baseOutputPath,
+              outputPaths: outputPaths || [baseOutputPath],
             } as BrowserBuilderOutput),
         ),
       );
