@@ -162,8 +162,6 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
       return true;
     }
 
-    const startingGitSha = this.findCurrentGitSha();
-
     migrations.sort((a, b) => semver.compare(a.version, b.version) || a.name.localeCompare(b.name));
 
     this.logger.info(
@@ -171,25 +169,18 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
     );
 
     for (const migration of migrations) {
-      this.logger.info(`${colors.symbols.pointer}  ${migration.description.replace(/\. /g, '.\n   ')}`);
+      this.logger.info(`${colors.symbols.pointer} ${migration.description.replace(/\. /g, '.\n  ')}`);
 
       const result = await this.executeSchematic(migration.collection.name, migration.name);
       if (!result.success) {
-        if (startingGitSha !== null) {
-          const currentGitSha = this.findCurrentGitSha();
-          if (currentGitSha !== startingGitSha) {
-            this.logger.warn(`git HEAD was at ${startingGitSha} before migrations.`);
-          }
-        }
-
-        this.logger.error(`${colors.symbols.cross}  Migration failed. See above for further details.\n`);
+        this.logger.error(`${colors.symbols.cross} Migration failed. See above for further details.\n`);
 
         return false;
       }
 
       // Commit migration
       if (commit) {
-        let message = `migrate workspace for ${packageName}@${migration.version}`;
+        let message = `${packageName} migration - ${migration.name}`;
         if (migration.description) {
           message += '\n' + migration.description;
         }
@@ -197,7 +188,7 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
         this.createCommit(message, []);
       }
 
-      this.logger.info(colors.green(`${colors.symbols.check}  Migration succeeded.\n`));
+      this.logger.info(colors.green(`${colors.symbols.check} Migration succeeded.\n`));
     }
 
     return true;
@@ -434,7 +425,7 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
         packageName,
         migrations,
         migrationRange,
-        !options.skipCommits,
+        options.createCommits,
       );
 
       return success ? 0 : 1;
@@ -542,12 +533,13 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
     const { success } = await this.executeSchematic('@schematics/update', 'update', {
       verbose: options.verbose || false,
       force: options.force || false,
+      next: !!options.next,
       packageManager: this.packageManager,
       packages: packagesToUpdate,
       migrateExternal: true,
     });
 
-    if (success && !options.skipCommits) {
+    if (success && options.createCommits) {
       this.createCommit('Angular CLI update\n' + packagesToUpdate.join('\n'), []);
     }
 
@@ -566,7 +558,7 @@ export class UpdateCommand extends Command<UpdateCommandSchema> {
           migration.package,
           migration.collection,
           new semver.Range('>' + migration.from + ' <=' + migration.to),
-          !options.skipCommits,
+          options.createCommits,
         );
 
         if (!result) {

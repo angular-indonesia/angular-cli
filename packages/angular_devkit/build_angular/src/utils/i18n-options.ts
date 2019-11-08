@@ -19,7 +19,10 @@ import { createTranslationLoader } from './load-translations';
 export interface I18nOptions {
   inlineLocales: Set<string>;
   sourceLocale: string;
-  locales: Record<string, { file: string; format?: string; translation?: unknown }>;
+  locales: Record<
+    string,
+    { file: string; format?: string; translation?: unknown; dataPath?: string }
+  >;
   flatOutput?: boolean;
   readonly shouldInline: boolean;
 }
@@ -81,7 +84,7 @@ export function createI18nOptions(
   } else if (inline) {
     for (const locale of inline) {
       if (!i18n.locales[locale] && i18n.sourceLocale !== locale) {
-        throw new Error(`Requested inline locale '${locale}' is not defined for the project.`);
+        throw new Error(`Requested locale '${locale}' is not defined for the project.`);
       }
 
       i18n.inlineLocales.add(locale);
@@ -127,12 +130,19 @@ export async function configureI18nBuild<T extends BrowserBuilderSchema | Server
   }
 
   if (i18n.inlineLocales.size > 0) {
+    const projectRoot = path.join(context.workspaceRoot, (metadata.root as string) || '');
+    const localeDataBasePath = findLocaleDataBasePath(projectRoot);
+    if (!localeDataBasePath) {
+      throw new Error(
+        `Unable to find locale data within '@angular/common'. Please ensure '@angular/common' is installed.`,
+      );
+    }
+
     // Load locales
     const loader = await createTranslationLoader();
-    const projectRoot = path.join(context.workspaceRoot, (metadata.root as string) || '');
     const usedFormats = new Set<string>();
     for (const [locale, desc] of Object.entries(i18n.locales)) {
-      if (i18n.inlineLocales.has(locale)) {
+      if (i18n.inlineLocales.has(locale) && desc.file) {
         const result = loader(path.join(projectRoot, desc.file));
 
         usedFormats.add(result.format);
@@ -145,6 +155,16 @@ export async function configureI18nBuild<T extends BrowserBuilderSchema | Server
 
         desc.format = result.format;
         desc.translation = result.translation;
+
+        const localeDataPath = findLocaleDataPath(locale, localeDataBasePath);
+        if (!localeDataPath) {
+          context.logger.warn(
+            `Locale data for '${locale}' cannot be found.  No locale data will be included for this locale.`,
+          );
+        } else {
+          // Temporarily disable pending FW locale data fix
+          // desc.dataPath = localeDataPath;
+        }
       }
     }
 
@@ -191,9 +211,41 @@ function mergeDeprecatedI18nOptions(
 
     if (i18nFile !== undefined) {
       i18n.locales[i18nLocale] = { file: i18nFile };
-      i18n.flatOutput = true;
+    } else {
+      // If no file, treat the locale as the source locale
+      // This mimics deprecated behavior
+      i18n.sourceLocale = i18nLocale;
     }
+
+    i18n.flatOutput = true;
   }
 
   return i18n;
+}
+
+function findLocaleDataBasePath(projectRoot: string): string | null {
+  try {
+    const commonPath = path.dirname(
+      require.resolve('@angular/common/package.json', { paths: [projectRoot] }),
+    );
+    const localesPath = path.join(commonPath, 'locales/global');
+
+    if (!fs.existsSync(localesPath)) {
+      return null;
+    }
+
+    return localesPath;
+  } catch {
+    return null;
+  }
+}
+
+function findLocaleDataPath(locale: string, basePath: string): string | null {
+  const localeDataPath = path.join(basePath, locale + '.js');
+
+  if (!fs.existsSync(localeDataPath)) {
+    return null;
+  }
+
+  return localeDataPath;
 }

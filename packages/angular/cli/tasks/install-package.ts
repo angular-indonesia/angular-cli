@@ -8,12 +8,7 @@
 
 import { logging } from '@angular-devkit/core';
 import { spawnSync } from 'child_process';
-import {
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-} from 'fs';
+import { existsSync, mkdtempSync, readFileSync, realpathSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, resolve } from 'path';
 import * as rimraf from 'rimraf';
@@ -26,6 +21,8 @@ interface PackageManagerOptions {
   saveDev: string;
   install: string;
   prefix: string;
+  noBinLinks: string;
+  noLockfile: string;
 }
 
 export function installPackage(
@@ -34,7 +31,7 @@ export function installPackage(
   packageManager: PackageManager = PackageManager.Npm,
   save: Exclude<NgAddSaveDepedency, false> = true,
   extraArgs: string[] = [],
-  global = false,
+  cwd = process.cwd(),
 ) {
   const packageManagerArgs = getPackageManagerArguments(packageManager);
 
@@ -42,6 +39,7 @@ export function installPackage(
     packageManagerArgs.install,
     packageName,
     packageManagerArgs.silent,
+    packageManagerArgs.noBinLinks,
   ];
 
   logger.info(colors.green(`Installing packages for tooling via ${packageManager}.`));
@@ -50,28 +48,19 @@ export function installPackage(
     installArgs.push(packageManagerArgs.saveDev);
   }
 
-  if (global) {
-    if (packageManager === PackageManager.Yarn) {
-      installArgs.unshift('global');
-    } else {
-      installArgs.push('--global');
-    }
-  }
-
-  const { status } = spawnSync(
-    packageManager,
-    [
-      ...installArgs,
-      ...extraArgs,
-    ],
-    {
-      stdio: 'inherit',
-      shell: true,
-    },
-  );
+  const { status, stderr, stdout, error } = spawnSync(packageManager, [...installArgs, ...extraArgs], {
+    stdio: 'pipe',
+    shell: true,
+    encoding: 'utf8',
+    cwd,
+  });
 
   if (status !== 0) {
-    throw new Error('Package install failed, see above.');
+    let errorMessage = ((error && error.message) || stderr || stdout || '').trim();
+    if (errorMessage) {
+      errorMessage += '\n';
+    }
+    throw new Error(errorMessage + `Package install failed${errorMessage ? ', see above' : ''}.`);
   }
 
   logger.info(colors.green(`Installed packages for tooling via ${packageManager}.`));
@@ -88,26 +77,20 @@ export function installTempPackage(
   process.on('exit', () => {
     try {
       rimraf.sync(tempPath);
-    } catch { }
+    } catch {}
   });
 
   // setup prefix/global modules path
   const packageManagerArgs = getPackageManagerArguments(packageManager);
+  const tempNodeModules = join(tempPath, 'node_modules');
   const installArgs: string[] = [
     packageManagerArgs.prefix,
-    tempPath,
+    // Yarn will no append 'node_modules' to the path
+    packageManager === PackageManager.Yarn ? tempNodeModules : tempPath,
+    packageManagerArgs.noLockfile,
   ];
 
-  installPackage(packageName, logger, packageManager, true, installArgs, true);
-
-  let tempNodeModules: string;
-  if (packageManager !== PackageManager.Yarn && process.platform !== 'win32') {
-    // Global installs on Unix systems go to {prefix}/lib/node_modules.
-    // Global installs on Windows go to {prefix}/node_modules (that is, no lib folder.)
-    tempNodeModules = join(tempPath, 'lib', 'node_modules');
-  } else {
-    tempNodeModules = join(tempPath, 'node_modules');
-  }
+  installPackage(packageName, logger, packageManager, true, installArgs, tempPath);
 
   return tempNodeModules;
 }
@@ -144,10 +127,7 @@ export function runTempPackageBin(
     throw new Error(`Cannot locate bin for temporary package: ${packageNameNoVersion}.`);
   }
 
-  const argv = [
-    binPath,
-    ...args,
-  ];
+  const argv = [binPath, ...args];
 
   const { status, error } = spawnSync('node', argv, {
     stdio: 'inherit',
@@ -169,15 +149,19 @@ export function runTempPackageBin(
 function getPackageManagerArguments(packageManager: PackageManager): PackageManagerOptions {
   return packageManager === PackageManager.Yarn
     ? {
-      silent: '--silent',
-      saveDev: '--dev',
-      install: 'add',
-      prefix: '--global-folder',
-    }
+        silent: '--silent',
+        saveDev: '--dev',
+        install: 'add',
+        prefix: '--modules-folder',
+        noBinLinks: '--no-bin-links',
+        noLockfile: '--no-lockfile',
+      }
     : {
-      silent: '--quiet',
-      saveDev: '--save-dev',
-      install: 'install',
-      prefix: '--prefix',
-    };
+        silent: '--quiet',
+        saveDev: '--save-dev',
+        install: 'install',
+        prefix: '--prefix',
+        noBinLinks: '--no-bin-links',
+        noLockfile: '--no-package-lock',
+      };
 }

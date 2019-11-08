@@ -502,9 +502,10 @@ export async function inlineLocales(options: InlineOptions) {
   const { default: MagicString } = await import('magic-string');
   const { default: generate } = await import('@babel/generator');
   const utils = await import(
-    // tslint:disable-next-line: trailing-comma
+    // tslint:disable-next-line: trailing-comma no-implicit-dependencies
     '@angular/localize/src/tools/src/translate/source_files/source_file_utils'
   );
+  // tslint:disable-next-line: no-implicit-dependencies
   const localizeDiag = await import('@angular/localize/src/tools/src/diagnostics');
 
   const diagnostics = new localizeDiag.Diagnostics();
@@ -540,6 +541,14 @@ export async function inlineLocales(options: InlineOptions) {
       const setLocaleText = `var $localize=Object.assign(void 0===$localize?{}:$localize,{locale:"${locale}"});`;
       contentClone = content.clone();
       content.prepend(setLocaleText);
+
+      // If locale data is provided, load it and prepend to file
+      const localeDataPath = i18n.locales[locale] && i18n.locales[locale].dataPath;
+      if (localeDataPath) {
+        const localDataContent = loadLocaleData(localeDataPath, true);
+        // The semicolon ensures that there is no syntax error between statements
+        content.prepend(localDataContent + ';');
+      }
     }
 
     const output = content.toString();
@@ -594,6 +603,7 @@ function inlineCopyOnly(options: InlineOptions) {
 
 function findLocalizePositions(
   options: InlineOptions,
+  // tslint:disable-next-line: no-implicit-dependencies
   utils: typeof import('@angular/localize/src/tools/src/translate/source_files/source_file_utils'),
 ): LocalizePosition[] {
   let ast: ParseResult | undefined | null;
@@ -666,4 +676,21 @@ function findLocalizePositions(
   }
 
   return positions;
+}
+
+function loadLocaleData(path: string, optimize: boolean): string {
+  // The path is validated during option processing before the build starts
+  const content = fs.readFileSync(path, 'utf8');
+
+  // NOTE: This can be removed once the locale data files are preprocessed in the framework
+  if (optimize) {
+    const result = terserMangle(content, {
+      compress: true,
+      ecma: 5,
+    });
+
+    return result.code;
+  }
+
+  return content;
 }
