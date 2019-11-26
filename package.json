@@ -99,7 +99,7 @@
     "@types/find-cache-dir": "^2.0.0",
     "@types/glob": "^7.0.0",
     "@types/inquirer": "^0.0.44",
-    "@types/jasmine": "~3.4.0",
+    "@types/jasmine": "~3.5.0",
     "@types/karma": "^3.0.2",
     "@types/loader-utils": "^1.1.3",
     "@types/minimist": "^1.2.0",
@@ -130,7 +130,7 @@
     "minimist": "^1.2.0",
     "npm-registry-client": "8.6.0",
     "ora": "^4.0.2",
-    "pacote": "10.1.3",
+    "pacote": "10.1.5",
     "pidtree": "^0.3.0",
     "pidusage": "^2.0.17",
     "rxjs": "6.5.3",
@@ -146,7 +146,7 @@
     "ts-node": "^5.0.0",
     "tslint-no-circular-imports": "^0.7.0",
     "tslint-sonarts": "1.9.0",
-    "verdaccio": "4.3.4"
+    "verdaccio": "4.3.5"
   },
   "husky": {
     "hooks": {
