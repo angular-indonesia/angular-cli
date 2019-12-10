@@ -27,6 +27,8 @@ import {
   getWorkerConfig,
   normalizeExtraEntryPoints,
 } from '../angular-cli-files/models/webpack-configs';
+import { markAsyncChunksNonInitial } from '../angular-cli-files/utilities/async-chunks';
+import { ThresholdSeverity, checkBudgets } from '../angular-cli-files/utilities/bundle-calculator';
 import {
   IndexHtmlTransform,
   writeIndexHtml,
@@ -265,10 +267,18 @@ export function buildWebpackBrowser(
       }).pipe(
         // tslint:disable-next-line: no-big-function
         concatMap(async buildEvent => {
-          const { webpackStats, success, emittedFiles = [] } = buildEvent;
-          if (!webpackStats) {
+          const { webpackStats: webpackRawStats, success, emittedFiles = [] } = buildEvent;
+          if (!webpackRawStats) {
             throw new Error('Webpack stats build result is required.');
           }
+
+          // Fix incorrectly set `initial` value on chunks.
+          const extraEntryPoints = normalizeExtraEntryPoints(options.styles || [], 'styles')
+              .concat(normalizeExtraEntryPoints(options.scripts || [], 'scripts'));
+          const webpackStats = {
+            ...webpackRawStats,
+            chunks: markAsyncChunksNonInitial(webpackRawStats, extraEntryPoints),
+          };
 
           if (!success && useBundleDownleveling) {
             // If using bundle downleveling then there is only one build
@@ -604,35 +614,30 @@ export function buildWebpackBrowser(
               }
 
               let bundleInfoText = '';
-              const processedNames = new Set<string>();
               for (const result of processResults) {
-                processedNames.add(result.name);
+                const chunk = webpackStats.chunks
+                    && webpackStats.chunks.find((chunk) => chunk.id.toString() === result.name);
 
-                const chunk =
-                  webpackStats &&
-                  webpackStats.chunks &&
-                  webpackStats.chunks.find(c => result.name === c.id.toString());
                 if (result.original) {
                   bundleInfoText +=
                     '\n' + generateBundleInfoStats(result.name, result.original, chunk);
                 }
+
                 if (result.downlevel) {
                   bundleInfoText +=
                     '\n' + generateBundleInfoStats(result.name, result.downlevel, chunk);
                 }
               }
 
-              if (webpackStats && webpackStats.chunks) {
-                for (const chunk of webpackStats.chunks) {
-                  if (processedNames.has(chunk.id.toString())) {
-                    continue;
-                  }
-
-                  const asset =
+              const unprocessedChunks = webpackStats.chunks && webpackStats.chunks
+                  .filter((chunk) => !processResults
+                      .find((result) => chunk.id.toString() === result.name),
+                  ) || [];
+              for (const chunk of unprocessedChunks) {
+                const asset =
                     webpackStats.assets && webpackStats.assets.find(a => a.name === chunk.files[0]);
-                  bundleInfoText +=
-                    '\n' + generateBundleStats({ ...chunk, size: asset && asset.size }, true);
-                }
+                bundleInfoText +=
+                  '\n' + generateBundleStats({ ...chunk, size: asset && asset.size }, true);
               }
 
               bundleInfoText +=
@@ -643,11 +648,32 @@ export function buildWebpackBrowser(
                   true,
                 );
               context.logger.info(bundleInfoText);
+
+              // Check for budget errors and display them to the user.
+              const budgets = options.budgets || [];
+              const budgetFailures = checkBudgets(budgets, webpackStats, processResults);
+              for (const {severity, message} of budgetFailures) {
+                const msg = `budgets: ${message}`;
+                switch (severity) {
+                  case ThresholdSeverity.Warning:
+                    webpackStats.warnings.push(msg);
+                    break;
+                  case ThresholdSeverity.Error:
+                    webpackStats.errors.push(msg);
+                    break;
+                  default:
+                    assertNever(severity);
+                    break;
+                }
+              }
+
               if (webpackStats && webpackStats.warnings.length > 0) {
                 context.logger.warn(statsWarningsToString(webpackStats, { colors: true }));
               }
               if (webpackStats && webpackStats.errors.length > 0) {
                 context.logger.error(statsErrorsToString(webpackStats, { colors: true }));
+
+                return { success: false };
               }
             } else {
               files = emittedFiles.filter(x => x.name !== 'polyfills-es5');
@@ -703,14 +729,24 @@ export function buildWebpackBrowser(
             }
 
             if (!options.watch && options.serviceWorker) {
-              for (const outputPath of outputPaths.values()) {
+              for (const [locale, outputPath] of outputPaths.entries()) {
+                let localeBaseHref;
+                if (i18n.locales[locale] && i18n.locales[locale].baseHref !== '') {
+                  localeBaseHref = path.posix.join(
+                    options.baseHref || '',
+                    i18n.locales[locale].baseHref === undefined
+                      ? `/${locale}/`
+                      : i18n.locales[locale].baseHref,
+                  );
+                }
+
                 try {
                   await augmentAppWithServiceWorker(
                     host,
                     root,
                     normalize(projectRoot),
                     normalize(outputPath),
-                    options.baseHref || '/',
+                    localeBaseHref || options.baseHref || '/',
                     options.ngswConfigPath,
                   );
                 } catch (err) {
@@ -777,6 +813,11 @@ function mapErrorToMessage(error: unknown): string | undefined {
   }
 
   return undefined;
+}
+
+function assertNever(input: never): never {
+  throw new Error(`Unexpected call to assertNever() with input: ${
+      JSON.stringify(input, null /* replacer */, 4 /* tabSize */)}`);
 }
 
 export default createBuilder<json.JsonObject & BrowserBuilderSchema>(buildWebpackBrowser);
