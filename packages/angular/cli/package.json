@@ -38,7 +38,7 @@
     "npm-package-arg": "8.0.0",
     "npm-pick-manifest": "5.0.0",
     "open": "7.0.0",
-    "pacote": "10.2.1",
+    "pacote": "10.3.0",
     "read-package-tree": "5.3.1",
     "rimraf": "3.0.0",
     "semver": "7.1.1",
@@ -52,7 +52,9 @@
       "@angular/cli": "0.0.0",
       "@angular-devkit/build-angular":  "0.0.0",
       "@angular-devkit/build-ng-packagr": "0.0.0",
-      "@angular-devkit/build-webpack": "0.0.0"
+      "@angular-devkit/build-webpack": "0.0.0",
+      "@angular-devkit/core": "0.0.0",
+      "@angular-devkit/schematics": "0.0.0"
     }
   }
 }
