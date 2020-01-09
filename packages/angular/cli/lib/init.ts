@@ -7,7 +7,6 @@
  */
 import 'symbol-observable';
 // symbol polyfill must go first
-// tslint:disable: no-console
 // tslint:disable-next-line:ordered-imports import-groups
 import { tags } from '@angular-devkit/core';
 import * as fs from 'fs';
@@ -76,6 +75,14 @@ if (process.env['NG_CLI_PROFILING']) {
 }
 
 (async () => {
+  /**
+   * Disable Browserslist old data warning as otherwise with every release we'd need to update this dependency
+   * which is cumbersome considering we pin versions and the warning is not user actionable.
+   * `Browserslist: caniuse-lite is outdated. Please run next command `npm update`
+   * See: https://github.com/browserslist/browserslist/blob/819c4337456996d19db6ba953014579329e9c6e1/node.js#L324
+   */
+  process.env.BROWSERSLIST_IGNORE_OLD_DATA = '1';
+
   const disableVersionCheckEnv = process.env['NG_DISABLE_VERSION_CHECK'];
   /**
    * Disable CLI version mismatch checks and forces usage of the invoked CLI
@@ -103,7 +110,7 @@ if (process.env['NG_CLI_PROFILING']) {
       localVersion = _fromPackageJson();
       shouldWarn = localVersion != null && globalVersion.compare(localVersion) > 0;
     } catch (e) {
-      // eslint-disable-next-line no-console
+      // tslint:disable-next-line no-console
       console.error(e);
       shouldWarn = true;
     }
@@ -117,10 +124,10 @@ if (process.env['NG_CLI_PROFILING']) {
       `);
       // Don't show warning colorised on `ng completion`
       if (process.argv[2] !== 'completion') {
-        // eslint-disable-next-line no-console
+        // tslint:disable-next-line no-console
         console.error(warning);
       } else {
-        // eslint-disable-next-line no-console
+        // tslint:disable-next-line no-console
         console.error(warning);
         process.exit(1);
       }
@@ -162,6 +169,7 @@ if (process.env['NG_CLI_PROFILING']) {
   process.exit(exitCode);
 })
 .catch((err: Error) => {
+  // tslint:disable-next-line no-console
   console.error('Unknown error: ' + err.toString());
   process.exit(127);
 });
