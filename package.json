@@ -79,11 +79,11 @@
     "quicktype-core": "^6.0.15",
     "temp": "^0.9.0",
     "tslint": "^5.15.0",
-    "typescript": "3.7.4"
+    "typescript": "3.7.5"
   },
   "devDependencies": {
-    "@angular/compiler": "9.0.0-rc.8",
-    "@angular/compiler-cli": "9.0.0-rc.8",
+    "@angular/compiler": "9.0.0-rc.9",
+    "@angular/compiler-cli": "9.0.0-rc.9",
     "@bazel/bazel": "1.2.0",
     "@bazel/buildifier": "0.29.0",
     "@bazel/jasmine": "0.42.3",
@@ -120,7 +120,7 @@
     "fast-json-stable-stringify": "2.1.0",
     "gh-got": "^8.0.1",
     "git-raw-commits": "^2.0.0",
-    "husky": "^4.0.0",
+    "husky": "^4.0.10",
     "jasmine": "^3.3.1",
     "jasmine-spec-reporter": "^4.2.1",
     "karma": "~4.4.1",
