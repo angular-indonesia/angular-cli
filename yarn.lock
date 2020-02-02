@@ -860,31 +860,31 @@
   resolved "https://registry.yarnpkg.com/@bazel/hide-bazel-files/-/hide-bazel-files-1.2.0.tgz#23480d00953d5ccdc1aa2721b121089e5a4d0808"
   integrity sha512-c1N1oy4+Rp84iy5HJTWKl13WTfLfMmELqrnx1C5rkW8fvDcu56u+aeqf7UKW6xvmbbsMl0r7re92cHW+ogcqHQ==
 
-"@bazel/jasmine@1.2.0":
-  version "1.2.0"
-  resolved "https://registry.yarnpkg.com/@bazel/jasmine/-/jasmine-1.2.0.tgz#0225cba4d678fabc9da4f70dc48ba22b7f523dd1"
-  integrity sha512-o6OjPHOfnNSRPWsEslGmN9k5PqqsyY6FS7zhn/xQMy/oOqveOPlva0tx/aAKJRLpLIw2Rpp7WoY/GaVDbfUqVA==
+"@bazel/jasmine@1.2.1":
+  version "1.2.1"
+  resolved "https://registry.yarnpkg.com/@bazel/jasmine/-/jasmine-1.2.1.tgz#1da301b68f74387fbf92f568018d74d6a6df12a5"
+  integrity sha512-5XFOwbzHeRJWLRgxmUDUYtoR9ro88hsRRMbR5+QyHUpEDz9JepJPf0YEtztqCMgWhdC+CxWb83KURHsunD/79w==
   dependencies:
     jasmine "~3.4.0"
     jasmine-core "~3.4.0"
     v8-coverage "1.0.9"
 
-"@bazel/karma@1.2.0":
-  version "1.2.0"
-  resolved "https://registry.yarnpkg.com/@bazel/karma/-/karma-1.2.0.tgz#ef06efa689494181040cc2c7af982675d02aad52"
-  integrity sha512-Afv2LGm5jgPWHAoPkZl5vSSN0hSQxahqk/jlL6KJ4JI5WNy47R2oRgxjQtsthjBGVzJKGGMgfy4CTBnc6UOS2w==
+"@bazel/karma@1.2.1":
+  version "1.2.1"
+  resolved "https://registry.yarnpkg.com/@bazel/karma/-/karma-1.2.1.tgz#e8327ed5810023cfab5adf436fe401b2ad1b8d0b"
+  integrity sha512-2PRvX0u3T+rZMYZmwyeNdSq1b6QAfNgbqzJZvm1brGRs1q1BgZLRhUjy7DD0+6+3HKrXuQVqa7JZVi8N2Ks5ew==
   dependencies:
     tmp "0.1.0"
 
-"@bazel/labs@1.2.0":
-  version "1.2.0"
-  resolved "https://registry.yarnpkg.com/@bazel/labs/-/labs-1.2.0.tgz#a9925d0cfbc8f66f232a8ae635948f33268448cf"
-  integrity sha512-n+Py86yjmIhUIn1duFsxRl/73l93GEtLLzHPdAuum8AFzm/RPRSGsIIizAQDDAnDXnmNF/gPL8LnbBTtdUi0PQ==
+"@bazel/labs@1.2.1":
+  version "1.2.1"
+  resolved "https://registry.yarnpkg.com/@bazel/labs/-/labs-1.2.1.tgz#7a9b66fb03fc9336c186ce16a406b216b5cbe03c"
+  integrity sha512-3+jCQdQvjBnqPiVogrSiAHsLnfj7q+aPpAggL8gfidI8/lmpLkHChlUs7KOKnLZqJglOld5IDAxbIysUUwWnfg==
 
-"@bazel/typescript@1.2.0":
-  version "1.2.0"
-  resolved "https://registry.yarnpkg.com/@bazel/typescript/-/typescript-1.2.0.tgz#ab2016e1d6eb7a86b44536e887f51eaf3d75f1a7"
-  integrity sha512-hPEG8K0psyEcs6HFRiqZNQwXL/dQ8sXKdrNFWv87+rh+YUNfd58uktoynhllympOPThcbUZcZicLWBEFQOc8nA==
+"@bazel/typescript@1.2.1":
+  version "1.2.1"
+  resolved "https://registry.yarnpkg.com/@bazel/typescript/-/typescript-1.2.1.tgz#a83ecebe48f32c2443879a85f0766dab386ff9d3"
+  integrity sha512-RKgOWos1Ya7XoSUZOV/A8+LS4ZmCvIXv363w4xNdObKjwKFqSdOfsS+uYaVr8g5e0T24jl52QnbdS7i0eUJBqA==
   dependencies:
     protobufjs "6.8.8"
     semver "5.6.0"
@@ -2462,7 +2462,16 @@ browserify-zlib@^0.2.0:
   dependencies:
     pako "~1.0.5"
 
-browserslist@4.8.5, browserslist@^4.0.0, browserslist@^4.7.0, browserslist@^4.8.2, browserslist@^4.8.3:
+browserslist@4.8.6:
+  version "4.8.6"
+  resolved "https://registry.yarnpkg.com/browserslist/-/browserslist-4.8.6.tgz#96406f3f5f0755d272e27a66f4163ca821590a7e"
+  integrity sha512-ZHao85gf0eZ0ESxLfCp73GG9O/VTytYDIkIiZDlURppLTI9wErSM/5yAKEq6rcUdxBLjMELmrYUJGg5sxGKMHg==
+  dependencies:
+    caniuse-lite "^1.0.30001023"
+    electron-to-chromium "^1.3.341"
+    node-releases "^1.1.47"
+
+browserslist@^4.0.0, browserslist@^4.7.0, browserslist@^4.8.2, browserslist@^4.8.3:
   version "4.8.5"
   resolved "https://registry.yarnpkg.com/browserslist/-/browserslist-4.8.5.tgz#691af4e327ac877b25e7a3f7ee869c4ef36cdea3"
   integrity sha512-4LMHuicxkabIB+n9874jZX/az1IaZ5a+EUuvD7KFOu9x/Bd5YHyO0DIz2ls/Kl8g0ItS4X/ilEgf4T1Br0lgSg==
@@ -2739,7 +2748,7 @@ caniuse-api@^3.0.0:
     lodash.memoize "^4.1.2"
     lodash.uniq "^4.5.0"
 
-caniuse-lite@1.0.30001023, caniuse-lite@^1.0.0, caniuse-lite@^1.0.30001020, caniuse-lite@^1.0.30001022:
+caniuse-lite@1.0.30001023, caniuse-lite@^1.0.0, caniuse-lite@^1.0.30001020, caniuse-lite@^1.0.30001022, caniuse-lite@^1.0.30001023:
   version "1.0.30001023"
   resolved "https://registry.yarnpkg.com/caniuse-lite/-/caniuse-lite-1.0.30001023.tgz#b82155827f3f5009077bdd2df3d8968bcbcc6fc4"
   integrity sha512-C5TDMiYG11EOhVOA62W1p3UsJ2z4DsHtMBQtjzp3ZsUglcQn62WOUgW0y795c7A5uZ+GCEIvzkMatLIlAsbNTA==
@@ -4186,6 +4195,11 @@ electron-to-chromium@^1.3.338:
   version "1.3.340"
   resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.3.340.tgz#5d4fe78e984d4211194cf5a52e08069543da146f"
   integrity sha512-hRFBAglhcj5iVYH+o8QU0+XId1WGoc0VGowJB1cuJAt3exHGrivZvWeAO5BRgBZqwZtwxjm8a5MQeGoT/Su3ww==
+
+electron-to-chromium@^1.3.341:
+  version "1.3.342"
+  resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.3.342.tgz#138317aa7399e268735b9269fe374a8566425090"
+  integrity sha512-An/MLhGLIG/g7lZ5vqs4lar96zv74agd3ZcADDHLpjAa16T7Y/pO/33Q31JOwpmHeyjithtHtUcn7XLuaz78lw==
 
 elliptic@^6.0.0:
   version "6.5.2"
@@ -5873,6 +5887,11 @@ is-directory@^0.3.1:
   resolved "https://registry.yarnpkg.com/is-directory/-/is-directory-0.3.1.tgz#61339b6f2475fc772fd9c9d83f5c8575dc154ae1"
   integrity sha1-YTObbyR1/Hcv2cnYP1yFddwVSuE=
 
+is-docker@^2.0.0:
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/is-docker/-/is-docker-2.0.0.tgz#2cb0df0e75e2d064fe1864c37cdeacb7b2dcf25b"
+  integrity sha512-pJEdRugimx4fBMra5z2/5iRdZ63OhYV0vr0Dwm5+xtW4D1FvRkB8hamMIhnWfyJeDdyr/aa7BDyNbtG38VxgoQ==
+
 is-extendable@^0.1.0, is-extendable@^0.1.1:
   version "0.1.1"
   resolved "https://registry.yarnpkg.com/is-extendable/-/is-extendable-0.1.1.tgz#62b110e289a471418e3ec36a617d472e301dfc89"
@@ -6103,7 +6122,7 @@ is-wsl@^1.1.0:
   resolved "https://registry.yarnpkg.com/is-wsl/-/is-wsl-1.1.0.tgz#1f16e4aa22b04d1336b66188a66af3c600c3a66d"
   integrity sha1-HxbkqiKwTRM2tmGIpmrzxgDDpm0=
 
-is-wsl@^2.1.0:
+is-wsl@^2.1.1:
   version "2.1.1"
   resolved "https://registry.yarnpkg.com/is-wsl/-/is-wsl-2.1.1.tgz#4a1c152d429df3d441669498e2486d3596ebaf1d"
   integrity sha512-umZHcSrwlDHo2TGMXv0DZ8dIUGunZ2Iv68YZnrmCiBPkZ4aaOhtv7pXJKeki9k3qJ3RJr0cDyitcl5wEH3AYog==
@@ -7713,7 +7732,7 @@ node-pre-gyp@*:
     semver "^5.3.0"
     tar "^4.4.2"
 
-node-releases@^1.1.46:
+node-releases@^1.1.46, node-releases@^1.1.47:
   version "1.1.47"
   resolved "https://registry.yarnpkg.com/node-releases/-/node-releases-1.1.47.tgz#c59ef739a1fd7ecbd9f0b7cf5b7871e8a8b591e4"
   integrity sha512-k4xjVPx5FpwBUj0Gw7uvFOTF4Ep8Hok1I6qjwL3pLfwe7Y0REQSAqOwwv9TWBCUtMHxcXfY4PgRLRozcChvTcA==
@@ -8039,12 +8058,13 @@ onetime@^5.1.0:
   dependencies:
     mimic-fn "^2.1.0"
 
-open@7.0.0:
-  version "7.0.0"
-  resolved "https://registry.yarnpkg.com/open/-/open-7.0.0.tgz#7e52999b14eb73f90f0f0807fe93897c4ae73ec9"
-  integrity sha512-K6EKzYqnwQzk+/dzJAQSBORub3xlBTxMz+ntpZpH/LyCa1o6KjXhuN+2npAaI9jaSmU3R1Q8NWf4KUWcyytGsQ==
+open@7.0.1:
+  version "7.0.1"
+  resolved "https://registry.yarnpkg.com/open/-/open-7.0.1.tgz#259a6c2097da6b95c596a2734f2ed05643c432b8"
+  integrity sha512-/fVm742AZt6bZ3NpbmBzGpZksDiGbo+xz8RylegKSAnTCgT5u5tvJe0cre3QxICphqHhJHc0OFtFyvU7rNx8+Q==
   dependencies:
-    is-wsl "^2.1.0"
+    is-docker "^2.0.0"
+    is-wsl "^2.1.1"
 
 opencollective-postinstall@^2.0.0, opencollective-postinstall@^2.0.2:
   version "2.0.2"
