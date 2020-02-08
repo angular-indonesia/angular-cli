@@ -7,11 +7,11 @@
  */
 // tslint:disable:no-big-function
 import { tags } from '@angular-devkit/core';  // tslint:disable-line:no-implicit-dependencies
-import { createTypescriptContext, transformTypescript } from './ast_helpers';
 import { removeDecorators } from './remove_decorators';
+import { createTypescriptContext, transformTypescript } from './spec_helpers';
 
 describe('@ngtools/webpack transformers', () => {
-  describe('decorator_remover', () => {
+  describe('remove_decorators', () => {
     it('should remove Angular decorators', () => {
       const input = tags.stripIndent`
         import { Component } from '@angular/core';
