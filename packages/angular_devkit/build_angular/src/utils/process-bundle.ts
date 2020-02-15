@@ -27,8 +27,8 @@ import { I18nOptions } from './i18n-options';
 const cacache = require('cacache');
 const deserialize = ((v8 as unknown) as { deserialize(buffer: Buffer): unknown }).deserialize;
 
-// If code size is larger than 500KB, consider lower fidelity but faster sourcemap merge
-const FAST_SOURCEMAP_THRESHOLD = 500 * 1024;
+// If code size is larger than 1MB, consider lower fidelity but faster sourcemap merge
+const FAST_SOURCEMAP_THRESHOLD = 1024 * 1024;
 
 export interface ProcessBundleOptions {
   filename: string;
@@ -110,7 +110,7 @@ export async function process(options: ProcessBundleOptions): Promise<ProcessBun
 
   const basePath = path.dirname(options.filename);
   const filename = path.basename(options.filename);
-  const downlevelFilename = filename.replace(/\-es20\d{2}/, '-es5');
+  const downlevelFilename = filename.replace(/\-(es20\d{2}|esnext)/, '-es5');
   const downlevel = !options.optimizeOnly;
   const sourceCode = options.code;
   const sourceMap = options.map ? JSON.parse(options.map) : undefined;
@@ -254,6 +254,25 @@ async function mergeSourceMapsFast(first: RawSourceMap, second: RawSourceMap) {
   const map = generator.toJSON();
   map.file = second.file;
   map.sourceRoot = sourceRoot;
+
+  // Add source content if present
+  if (first.sourcesContent) {
+    // Source content array is based on index of sources
+    const sourceContentMap = new Map<string, number>();
+    for (let i = 0; i < first.sources.length; i++) {
+      // make paths "absolute" so they can be compared (`./a.js` and `a.js` are equivalent)
+      sourceContentMap.set(path.resolve('/', first.sources[i]), i);
+    }
+    map.sourcesContent = [];
+    for (let i = 0; i < map.sources.length; i++) {
+      const contentIndex = sourceContentMap.get(path.resolve('/', map.sources[i]));
+      if (contentIndex === undefined) {
+        map.sourcesContent.push('');
+      } else {
+        map.sourcesContent.push(first.sourcesContent[contentIndex]);
+      }
+    }
+  }
 
   // Put the sourceRoot back
   if (sourceRoot) {
@@ -440,7 +459,7 @@ async function processRuntime(
 
   // Adjust lazy loaded scripts to point to the proper variant
   // Extra spacing is intentional to align source line positions
-  downlevelCode = downlevelCode.replace(/"\-es20\d{2}\./, '   "-es5.');
+  downlevelCode = downlevelCode.replace(/"\-(es20\d{2}|esnext)\./, '   "-es5.');
 
   return {
     original: await processBundle({
@@ -451,7 +470,7 @@ async function processRuntime(
     downlevel: await processBundle({
       ...options,
       code: downlevelCode,
-      filename: options.filename.replace(/\-es20\d{2}/, '-es5'),
+      filename: options.filename.replace(/\-(es20\d{2}|esnext)/, '-es5'),
       isOriginal: false,
     }),
   };
