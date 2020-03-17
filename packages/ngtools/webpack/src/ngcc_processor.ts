@@ -6,7 +6,8 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import { Logger, PathMappings, process as mainNgcc } from '@angular/compiler-cli/ngcc';
+import { LogLevel, Logger, PathMappings, process as mainNgcc } from '@angular/compiler-cli/ngcc';
+import { spawnSync } from 'child_process';
 import { accessSync, constants, existsSync } from 'fs';
 import * as path from 'path';
 import * as ts from 'typescript';
@@ -49,6 +50,53 @@ export class NgccProcessor {
     }
   }
 
+  /** Process the entire node modules tree. */
+  process() {
+    // Under Bazel when running in sandbox mode parts of the filesystem is read-only.
+    if (process.env.BAZEL_TARGET) {
+      return;
+    }
+
+    // Skip if node_modules are read-only
+    const corePackage = this.tryResolvePackage('@angular/core', this._nodeModulesDirectory);
+    if (corePackage && isReadOnlyFile(corePackage)) {
+      return;
+    }
+
+    const timeLabel = 'NgccProcessor.process';
+    time(timeLabel);
+
+    // We spawn instead of using the API because:
+    // - NGCC Async uses clustering which is problematic when used via the API which means
+    // that we cannot setup multiple cluster masters with different options.
+    // - We will not be able to have concurrent builds otherwise Ex: App-Shell,
+    // as NGCC will create a lock file for both builds and it will cause builds to fails.
+    const { status, error } = spawnSync(
+      process.execPath,
+      [
+        require.resolve('@angular/compiler-cli/ngcc/main-ngcc.js'),
+        '--source', /** basePath */
+        this._nodeModulesDirectory,
+        '--properties', /** propertiesToConsider */
+        ...this.propertiesToConsider,
+        '--first-only', /** compileAllFormats */
+        '--create-ivy-entry-points', /** createNewEntryPointFormats */
+        '--async',
+      ],
+      {
+        stdio: ['inherit', process.stderr, process.stderr],
+      },
+    );
+
+    if (status !== 0) {
+      const errorMessage = error?.message || '';
+      throw new Error(errorMessage + `NGCC failed${errorMessage ? ', see above' : ''}.`);
+    }
+
+    timeEnd(timeLabel);
+  }
+
+  /** Process a module and it's depedencies. */
   processModule(
     moduleName: string,
     resolvedModule: ts.ResolvedModule | ts.ResolvedTypeReferenceDirective,
@@ -61,18 +109,9 @@ export class NgccProcessor {
     }
 
     const packageJsonPath = this.tryResolvePackage(moduleName, resolvedFileName);
-    if (!packageJsonPath) {
-      // add it to processed so the second time round we skip this.
-      this._processedModules.add(resolvedFileName);
-
-      return;
-    }
-
     // If the package.json is read only we should skip calling NGCC.
     // With Bazel when running under sandbox the filesystem is read-only.
-    try {
-      accessSync(packageJsonPath, constants.W_OK);
-    } catch {
+    if (!packageJsonPath || isReadOnlyFile(packageJsonPath)) {
       // add it to processed so the second time round we skip this.
       this._processedModules.add(resolvedFileName);
 
@@ -142,12 +181,14 @@ export class NgccProcessor {
 }
 
 class NgccLogger implements Logger {
+  level = LogLevel.info;
+
   constructor(
     private readonly compilationWarnings: (Error | string)[],
     private readonly compilationErrors: (Error | string)[],
-  ) {}
+  ) { }
 
-  debug(..._args: string[]) {}
+  debug(..._args: string[]) { }
 
   info(...args: string[]) {
     // Log to stderr because it's a progress-like info message.
@@ -160,5 +201,15 @@ class NgccLogger implements Logger {
 
   error(...args: string[]) {
     this.compilationErrors.push(new Error(args.join(' ')));
+  }
+}
+
+function isReadOnlyFile(fileName: string): boolean {
+  try {
+    accessSync(fileName, constants.W_OK);
+
+    return false;
+  } catch {
+    return true;
   }
 }
