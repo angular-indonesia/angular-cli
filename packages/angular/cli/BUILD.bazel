@@ -6,6 +6,7 @@
 licenses(["notice"])  # MIT
 
 load("@npm_bazel_typescript//:index.bzl", "ts_library")
+load("@npm_bazel_jasmine//:index.bzl", "jasmine_node_test")
 load("//tools:ts_json_schema.bzl", "ts_json_schema")
 
 package(default_visibility = ["//visibility:public"])
@@ -18,7 +19,28 @@ ts_library(
             "**/*_spec.ts",
             "**/*_spec_large.ts",
         ],
-    ),
+    ) + [
+        "//packages/angular/cli:lib/config/schema.ts",
+        "//packages/angular/cli:commands/analytics.ts",
+        "//packages/angular/cli:commands/add.ts",
+        "//packages/angular/cli:commands/build.ts",
+        "//packages/angular/cli:commands/deploy.ts",
+        "//packages/angular/cli:commands/config.ts",
+        "//packages/angular/cli:commands/deprecated.ts",
+        "//packages/angular/cli:commands/doc.ts",
+        "//packages/angular/cli:commands/e2e.ts",
+        "//packages/angular/cli:commands/easter-egg.ts",
+        "//packages/angular/cli:commands/generate.ts",
+        "//packages/angular/cli:commands/help.ts",
+        "//packages/angular/cli:commands/lint.ts",
+        "//packages/angular/cli:commands/new.ts",
+        "//packages/angular/cli:commands/serve.ts",
+        "//packages/angular/cli:commands/test.ts",
+        "//packages/angular/cli:commands/update.ts",
+        "//packages/angular/cli:commands/version.ts",
+        "//packages/angular/cli:commands/run.ts",
+        "//packages/angular/cli:commands/xi18n.ts",
+    ],
     data = glob([
         "**/*.json",
         "**/*.md",
@@ -26,13 +48,12 @@ ts_library(
     module_name = "@angular/cli",
     # strict_checks = False,
     deps = [
-        ":command_schemas",
         "//packages/angular_devkit/architect",
-        "//packages/angular_devkit/architect:node",
+        "//packages/angular_devkit/architect/node",
         "//packages/angular_devkit/core",
-        "//packages/angular_devkit/core:node",
+        "//packages/angular_devkit/core/node",
         "//packages/angular_devkit/schematics",
-        "//packages/angular_devkit/schematics:tools",
+        "//packages/angular_devkit/schematics/tools",
         # @node_module: typescript:es2017.object
         "@npm//@types/debug",
         "@npm//@types/node",
@@ -42,33 +63,6 @@ ts_library(
         "@npm//@types/universal-analytics",
         "@npm//@types/uuid",
         "@npm//ansi-colors",
-    ],
-)
-
-ts_library(
-    name = "command_schemas",
-    srcs = [],
-    deps = [
-        ":add_schema",
-        ":analytics_schema",
-        ":build_schema",
-        ":cli_schema",
-        ":config_schema",
-        ":deploy_schema",
-        ":deprecated_schema",
-        ":doc_schema",
-        ":e2e_schema",
-        ":easter_egg_schema",
-        ":generate_schema",
-        ":help_schema",
-        ":lint_schema",
-        ":new_schema",
-        ":run_schema",
-        ":serve_schema",
-        ":test_schema",
-        ":update_schema",
-        ":version_schema",
-        ":xi18n_schema",
     ],
 )
 
@@ -227,4 +221,28 @@ ts_json_schema(
     data = [
         "commands/definitions.json",
     ],
+)
+
+ts_library(
+    name = "angular-cli_test_lib",
+    testonly = True,
+    srcs = glob(
+        include = [
+            "**/*_spec.ts",
+            "**/*_spec_large.ts",
+        ],
+    ),
+    # strict_checks = False,
+    tsconfig = "//:tsconfig-test.json",
+    deps = [
+        ":angular-cli",
+        "//packages/angular_devkit/core",
+        "@npm//@types/jasmine",
+        "@npm//@types/node",
+    ],
+)
+
+jasmine_node_test(
+    name = "angular-cli_test",
+    srcs = [":angular-cli_test_lib"],
 )

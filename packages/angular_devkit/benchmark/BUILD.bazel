@@ -5,6 +5,7 @@
 
 licenses(["notice"])  # MIT
 
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 load("@npm_bazel_jasmine//:index.bzl", "jasmine_node_test")
 load("@npm_bazel_typescript//:index.bzl", "ts_library")
 load("@build_bazel_rules_nodejs//:index.bzl", "pkg_npm")
@@ -25,7 +26,7 @@ ts_library(
     module_root = "src/index.d.ts",
     deps = [
         "//packages/angular_devkit/core",
-        "//packages/angular_devkit/core:node",
+        "//packages/angular_devkit/core/node",
         "@npm//@types/minimist",
         "@npm//@types/node",
         "@npm//rxjs",
@@ -54,7 +55,7 @@ ts_library(
     deps = [
         ":benchmark",
         "//packages/angular_devkit/core",
-        "//packages/angular_devkit/core:node",
+        "//packages/angular_devkit/core/node",
         "@npm//@types/jasmine",
         "@npm//@types/node",
         "@npm//rxjs",
@@ -81,4 +82,12 @@ pkg_npm(
     deps = [
         ":benchmark",
     ],
+)
+
+pkg_tar(
+    name = "npm_package_archive",
+    srcs = [":npm_package"],
+    extension = "tar.gz",
+    strip_prefix = "./npm_package",
+    tags = ["manual"],
 )

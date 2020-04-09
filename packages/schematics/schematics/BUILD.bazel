@@ -22,13 +22,26 @@ ts_library(
             "blank/project-files/**",
             "blank/schematic-files/**",
         ],
+    ) + [
+        "//packages/schematics/schematics:blank/schema.ts",
+        "//packages/schematics/schematics:schematic/schema.ts",
+    ],
+    data = glob(
+        include = [
+            "collection.json",
+            "package.json",
+            "blank/schema.json",
+            "blank/project-files/**/*",
+            "blank/schematic-files/**/*",
+            "schematic/schema.json",
+            "schematic/files/**/*",
+        ],
     ),
+    module_name = "@schematics/schematics",
     deps = [
-        ":blank_schema",
-        ":schematic_schema",
         "//packages/angular_devkit/core",
         "//packages/angular_devkit/schematics",
-        "//packages/angular_devkit/schematics:tasks",
+        "//packages/angular_devkit/schematics/tasks",
         "@npm//@types/node",
         "@npm//rxjs",
     ],
@@ -71,7 +84,7 @@ ts_json_schema(
 #         ":schematics",
 #         "//packages/angular_devkit/core",
 #         "//packages/angular_devkit/schematics",
-#         "//packages/angular_devkit/schematics:testing",
+#         "//packages/angular_devkit/schematics/testing",
 #         "@npm//rxjs",
 #
 #         "@npm//@types/node",

@@ -3,8 +3,6 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file at https://angular.io/license
 
-load("@npm_bazel_typescript//:index.bzl", "ts_library")
-
 # @external_begin
 def _ts_json_schema_interface_impl(ctx):
     args = [
@@ -46,9 +44,9 @@ _ts_json_schema_interface = rule(
 )
 # @external_end
 
-# Generates a library that contains the interface for a JSON Schema file. Takes a single `src`
-# argument as input, an optional data field for reference files, and produces a ts_library()
-# rule containing the typescript interface.
+# Generates a TS file that contains the interface for a JSON Schema file. Takes a single `src`
+# argument as input, an optional data field for reference files, and produces a
+# _ts_json_schema_interface() rule containing the typescript interface.
 # The file produced will have the same name, with the extension replaced from `.json` to `.ts`.
 # Any filename collision will be an error thrown by Bazel.
 def ts_json_schema(name, src, data = []):
@@ -62,16 +60,3 @@ def ts_json_schema(name, src, data = []):
         data = data,
     )
     # @external_end
-
-    ts_library(
-        name = name,
-        deps = [
-            "@npm//@types/node",
-        ],
-        # Remove these to empty the rule, since those files are also compiled elsewhere.
-        # @external_begin
-        srcs = [
-            out,
-        ],
-        # @external_end
-    )

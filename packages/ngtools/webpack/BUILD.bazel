@@ -5,6 +5,7 @@
 
 licenses(["notice"])  # MIT
 
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 load("@npm_bazel_jasmine//:index.bzl", "jasmine_node_test")
 load("@npm_bazel_typescript//:index.bzl", "ts_library")
 load("@build_bazel_rules_nodejs//:index.bzl", "pkg_npm")
@@ -12,52 +13,62 @@ load("@build_bazel_rules_nodejs//:index.bzl", "pkg_npm")
 package(default_visibility = ["//visibility:public"])
 
 ts_library(
-    name = "build_optimizer",
+    name = "webpack",
     srcs = glob(
-        include = ["src/**/*.ts"],
+        include = [
+            "src/**/*.ts",
+        ],
         exclude = [
-            # TODO(@filipesilva): shouldn't need to exclude the cli files but can't exclude them
-            # from jasmine_node_test.
-            "src/**/cli.ts",
             "src/**/*_spec.ts",
-            "src/**/*_spec_large.ts",
-            "src/**/*_benchmark.ts",
+            "src/**/*_spec_helpers.ts",
         ],
     ),
+    data = glob(
+        include = [
+            "src/type_checker_bootstrap.js",
+            "package.json",
+        ],
+    ),
+    module_name = "@ngtools/webpack",
+    module_root = "src/index.d.ts",
     deps = [
+        "//packages/angular_devkit/core",
+        "//packages/angular_devkit/core/node",
+        "@npm//@angular/compiler-cli",
         "@npm//@types/node",
         "@npm//@types/webpack",
         "@npm//@types/webpack-sources",
-        "@npm//source-map",
-        "@npm//tslib",
+        "@npm//enhanced-resolve",
+        "@npm//rxjs",
         "@npm//typescript",
+        "@npm//webpack",
+        "@npm//webpack-sources",
     ],
 )
 
 ts_library(
-    name = "build_optimizer_test_lib",
+    name = "webpack_test_lib",
     testonly = True,
     srcs = glob(
         include = [
             "src/**/*_spec.ts",
-            "src/**/*_spec_large.ts",
+            "src/**/*_spec_helpers.ts",
         ],
     ),
-    # @external_begin
     tsconfig = "//:tsconfig-test.json",
     deps = [
-        ":build_optimizer",
+        ":webpack",
         "//packages/angular_devkit/core",
+        "@npm//@angular/compiler",
         "@npm//@types/jasmine",
-        "@npm//@types/node",
-        "@npm//source-map",
+        "@npm//jasmine",
+        "@npm//typescript",
     ],
-    # @external_end
 )
 
 jasmine_node_test(
-    name = "build_optimizer_test",
-    srcs = [":build_optimizer_test_lib"],
+    name = "webpack_test",
+    srcs = [":webpack_test_lib"],
     deps = [
         "@npm//jasmine",
         "@npm//source-map",
@@ -67,6 +78,14 @@ jasmine_node_test(
 pkg_npm(
     name = "npm_package",
     deps = [
-        ":build_optimizer",
+        ":webpack",
     ],
+)
+
+pkg_tar(
+    name = "npm_package_archive",
+    srcs = [":npm_package"],
+    extension = "tar.gz",
+    strip_prefix = "./npm_package",
+    tags = ["manual"],
 )
