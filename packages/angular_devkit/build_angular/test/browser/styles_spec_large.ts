@@ -259,6 +259,17 @@ describe('Browser Builder styles', () => {
   it(`supports font-awesome imports`, async () => {
     host.writeMultipleFiles({
       'src/styles.scss': `
+        @import "font-awesome/scss/font-awesome";
+      `,
+    });
+
+    const overrides = { extractCss: true, styles: [`src/styles.scss`] };
+    await browserBuild(architect, host, target, overrides);
+  }, 30000);
+
+  it(`supports font-awesome imports (tilde)`, async () => {
+    host.writeMultipleFiles({
+      'src/styles.scss': `
         $fa-font-path: "~font-awesome/fonts";
         @import "~font-awesome/scss/font-awesome";
       `,
@@ -282,15 +293,23 @@ describe('Browser Builder styles', () => {
   it(`uses autoprefixer`, async () => {
     host.writeMultipleFiles({
       'src/styles.css': tags.stripIndents`
+        @import url(imported-styles.css);
         /* normal-comment */
         /*! important-comment */
         div { flex: 1 }`,
+      'src/imported-styles.css': tags.stripIndents`
+        /* normal-comment */
+        /*! important-comment */
+        section { flex: 1 }`,
       '.browserslistrc': 'IE 10',
     });
 
     const overrides = { extractCss: true, optimization: false };
     const { files } = await browserBuild(architect, host, target, overrides);
     expect(await files['styles.css']).toContain(tags.stripIndents`
+      /* normal-comment */
+      /*! important-comment */
+      section { -ms-flex: 1; flex: 1 }
       /* normal-comment */
       /*! important-comment */
       div { -ms-flex: 1; flex: 1 }`);
@@ -570,6 +589,31 @@ describe('Browser Builder styles', () => {
     await browserBuild(architect, host, target, overrides);
   });
 
+  it('causes equal failure for tilde and tilde-slash url()', async () => {
+    host.writeMultipleFiles({
+      'src/styles.css': `
+        body {
+          background-image: url('~/does-not-exist.jpg');
+        }
+      `,
+    });
+
+    const overrides = { extractCss: true, optimization: true };
+    const run = await architect.scheduleTarget(target, overrides);
+    await expectAsync(run.result).toBeResolvedTo(jasmine.objectContaining({ success: false }));
+
+    host.writeMultipleFiles({
+      'src/styles.css': `
+        body {
+          background-image: url('~does-not-exist.jpg');
+        }
+      `,
+    });
+
+    const run2 = await architect.scheduleTarget(target, overrides);
+    await expectAsync(run2.result).toBeResolvedTo(jasmine.objectContaining({ success: false }));
+  });
+
   it('supports Protocol-relative Url', async () => {
     host.writeMultipleFiles({
       'src/styles.css': `
@@ -637,6 +681,55 @@ describe('Browser Builder styles', () => {
       };
       const { files } = await browserBuild(architect, host, target, overrides);
       expect(await files['styles.css']).toMatch(/\.one(.|\n|\r)*\.two(.|\n|\r)*\.three/);
+    });
+  });
+
+  extensionsWithImportSupport.forEach(ext => {
+    it(`adjusts relative resource URLs when using @import in ${ext} (global)`, async () => {
+      host.copyFile('src/spectrum.png', './src/more-styles/images/global-img-relative.png');
+      host.writeMultipleFiles({
+        [`src/styles-one.${ext}`]: tags.stripIndents`
+            @import "more-styles/styles-two.${ext}";
+          `,
+        [`src/more-styles/styles-two.${ext}`]: tags.stripIndents`
+            .two {
+              background-image: url(images/global-img-relative.png);
+            }
+          `,
+      });
+
+      const overrides = {
+        sourceMap: false,
+        extractCss: true,
+        styles: [
+          `src/styles-one.${ext}`,
+        ],
+      };
+      const { files } = await browserBuild(architect, host, target, overrides);
+      expect(await files['styles.css']).toContain('\'global-img-relative.png\'');
+    });
+
+    it(`adjusts relative resource URLs when using @import in ${ext} (component)`, async () => {
+      host.copyFile('src/spectrum.png', './src/app/images/component-img-relative.png');
+      host.writeMultipleFiles({
+        [`src/app/styles/component-styles.${ext}`]: `
+            div { background-image: url(../images/component-img-relative.png); }
+          `,
+        [`src/app/app.component.${ext}`]: `
+            @import "styles/component-styles.${ext}";
+          `,
+      });
+
+      host.replaceInFile(
+        'src/app/app.component.ts',
+        './app.component.css',
+        `./app.component.${ext}`,
+      );
+
+      const overrides = {
+        sourceMap: false,
+      };
+      await browserBuild(architect, host, target, overrides);
     });
   });
 });
