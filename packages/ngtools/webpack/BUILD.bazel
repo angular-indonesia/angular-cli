@@ -5,8 +5,8 @@
 
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 load("@npm_bazel_jasmine//:index.bzl", "jasmine_node_test")
-load("@npm_bazel_typescript//:index.bzl", "ts_library")
 load("@build_bazel_rules_nodejs//:index.bzl", "pkg_npm")
+load("//tools:defaults.bzl", "ts_library")
 
 licenses(["notice"])  # MIT
 
@@ -55,12 +55,10 @@ ts_library(
             "src/**/*_spec_helpers.ts",
         ],
     ),
-    tsconfig = "//:tsconfig-test.json",
     deps = [
         ":webpack",
         "//packages/angular_devkit/core",
         "@npm//@angular/compiler",
-        "@npm//@types/jasmine",
         "@npm//jasmine",
         "@npm//typescript",
     ],

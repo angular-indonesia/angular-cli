@@ -3,9 +3,11 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file at https://angular.io/license
 
-load("@npm_bazel_typescript//:index.bzl", "ts_library")
 load("@npm_bazel_jasmine//:index.bzl", "jasmine_node_test")
+load("//tools:defaults.bzl", "ts_library")
 load("//tools:ts_json_schema.bzl", "ts_json_schema")
+
+licenses(["notice"])  # MIT
 
 licenses(["notice"])  # MIT
 
@@ -23,7 +25,8 @@ ts_library(
         exclude = [
             "pwa/files/**/*",
             "**/*_spec.ts",
-            "**/*_spec_large.ts",
+            # NB: we need to exclude the nested node_modules that is laid out by yarn workspaces
+            "node_modules/**",
         ],
     ) + [
         "//packages/angular/pwa:pwa/schema.ts",
@@ -54,19 +57,11 @@ ts_json_schema(
 ts_library(
     name = "pwa_test_lib",
     testonly = True,
-    srcs = glob(
-        include = [
-            "pwa/**/*_spec.ts",
-            "pwa/**/*_spec_large.ts",
-        ],
-    ),
+    srcs = glob(["pwa/**/*_spec.ts"]),
     # strict_checks = False,
-    tsconfig = "//:tsconfig-test.json",
     deps = [
         ":pwa",
         "//packages/angular_devkit/schematics/testing",
-        "@npm//@types/jasmine",
-        "@npm//@types/node",
     ],
 )
 

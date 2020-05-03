@@ -5,7 +5,7 @@
 
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 load("@npm_bazel_jasmine//:index.bzl", "jasmine_node_test")
-load("@npm_bazel_typescript//:index.bzl", "ts_library")
+load("//tools:defaults.bzl", "ts_library")
 
 # @external_begin
 load("@build_bazel_rules_nodejs//:index.bzl", "pkg_npm")
@@ -41,10 +41,7 @@ ts_library(
     name = "architect",
     srcs = glob(
         include = ["src/**/*.ts"],
-        exclude = [
-            "**/*_spec.ts",
-            "**/*_spec_large.ts",
-        ],
+        exclude = ["**/*_spec.ts"],
     ) + [
         "//packages/angular_devkit/architect:src/input-schema.ts",
         "//packages/angular_devkit/architect:src/output-schema.ts",
@@ -52,7 +49,13 @@ ts_library(
         "//packages/angular_devkit/architect:src/progress-schema.ts",
     ],
     # strict_checks = False,
-    data = glob(["**/*.json"]),
+    data = glob(
+        include = ["**/*.json"],
+        exclude = [
+            # NB: we need to exclude the nested node_modules that is laid out by yarn workspaces
+            "node_modules/**",
+        ],
+    ),
     module_name = "@angular-devkit/architect",
     module_root = "src/index.d.ts",
     deps = [
@@ -66,20 +69,12 @@ ts_library(
 ts_library(
     name = "architect_test_lib",
     testonly = True,
-    srcs = glob(
-        include = [
-            "src/**/*_spec.ts",
-            "src/**/*_spec_large.ts",
-        ],
-    ),
+    srcs = glob(["src/**/*_spec.ts"]),
     # strict_checks = False,
-    tsconfig = "//:tsconfig-test.json",
     deps = [
         ":architect",
         "//packages/angular_devkit/architect/testing",
         "//packages/angular_devkit/core",
-        "@npm//@types/jasmine",
-        "@npm//@types/node",
         "@npm//rxjs",
     ],
 )

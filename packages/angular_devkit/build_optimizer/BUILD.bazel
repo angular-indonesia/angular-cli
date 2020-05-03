@@ -5,8 +5,8 @@
 
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 load("@npm_bazel_jasmine//:index.bzl", "jasmine_node_test")
-load("@npm_bazel_typescript//:index.bzl", "ts_library")
 load("@build_bazel_rules_nodejs//:index.bzl", "pkg_npm")
+load("//tools:defaults.bzl", "ts_library")
 
 licenses(["notice"])  # MIT
 
@@ -21,16 +21,13 @@ ts_library(
             # from jasmine_node_test.
             "src/**/cli.ts",
             "src/**/*_spec.ts",
-            "src/**/*_spec_large.ts",
             "src/**/*_benchmark.ts",
         ],
     ),
-    data = glob(
-        include = [
-            "package.json",
-            "webpack-loader/package.json",
-        ],
-    ),
+    data = [
+        "package.json",
+        "webpack-loader/package.json",
+    ],
     module_name = "@angular-devkit/build-optimizer",
     module_root = "src/index.d.ts",
     deps = [
@@ -46,19 +43,11 @@ ts_library(
 ts_library(
     name = "build_optimizer_test_lib",
     testonly = True,
-    srcs = glob(
-        include = [
-            "src/**/*_spec.ts",
-            "src/**/*_spec_large.ts",
-        ],
-    ),
+    srcs = glob(["src/**/*_spec.ts"]),
     # @external_begin
-    tsconfig = "//:tsconfig-test.json",
     deps = [
         ":build_optimizer",
         "//packages/angular_devkit/core",
-        "@npm//@types/jasmine",
-        "@npm//@types/node",
         "@npm//source-map",
     ],
     # @external_end

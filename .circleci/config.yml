@@ -156,27 +156,6 @@ jobs:
       - custom_attach_workspace
       - run: yarn validate --ci
 
-  test:
-    executor: action-executor
-    steps:
-      - custom_attach_workspace
-      - run: yarn test --full
-
-  test-large:
-    parameters:
-      ve:
-        type: boolean
-        default: false
-      glob:
-        type: string
-        default: ""
-    executor: test-executor
-    parallelism: 4
-    steps:
-      - custom_attach_workspace
-      - run: yarn webdriver-update
-      - run: yarn test-large --full <<# parameters.ve >>--ve<</ parameters.ve >> <<# parameters.glob >>--glob="<< parameters.glob >>"<</ parameters.glob >> --nb-shards=${CIRCLE_NODE_TOTAL} --shard=${CIRCLE_NODE_INDEX}
-
   e2e-cli:
     parameters:
       ve:
@@ -242,25 +221,22 @@ jobs:
       - custom_attach_workspace
       - run: yarn build
 
-  # This is where we put all the misbehaving and flaky tests so we can fine-tune their conditions 
-  # and rerun them faster.
-  flake-jail:
+  test:
     executor: test-executor
-    resource_class: medium
-    steps:
-      - custom_attach_workspace
-      - run: yarn webdriver-update
-      - run: yarn test-large --full --flakey --ve
-      - run: yarn test-large --full --flakey
-
-  build-bazel:
-    executor: action-executor
-    resource_class: large
+    resource_class: xlarge
     steps:
       - custom_attach_workspace
       - setup_bazel_rbe
       - run: sudo cp .circleci/bazel.rc /etc/bazel.bazelrc
       - run: yarn bazel:test
+
+  integration:
+    executor: test-executor
+    resource_class: xlarge
+    steps:
+      - custom_attach_workspace
+      - run: 
+          command: yarn bazel:integration
 
   snapshot_publish:
     executor: action-executor
@@ -322,7 +298,6 @@ jobs:
     steps:
       - custom_attach_workspace
       - setup_windows
-      - run: yarn test --full
       # Run partial e2e suite on PRs only. Master will run the full e2e suite with sharding.
       - run: if (Test-Path env:CIRCLE_PR_NUMBER) { node tests\legacy-cli\run_e2e.js "--glob=tests/{basic,ivy}/**" }
              
@@ -353,21 +328,6 @@ workflows:
             branches:
               ignore:
               - /docs-preview/
-      - build-bazel:
-          requires:
-            - build
-      - test:
-          requires:
-            - build
-      - test-large:
-          requires:
-            - build
-      - test-large:
-          name: test-large-ve
-          ve: true
-          glob: "packages/angular_devkit/@(build_angular|build_ng_packagr)/@(src|test)/@(build|browser)/*_spec_large.ts"
-          requires:
-            - build
       - e2e-cli:
           post-steps:
             - store_artifacts:
@@ -408,7 +368,15 @@ workflows:
       - test-browsers:
           requires:
             - build
-      - flake-jail:
+
+      # Bazel jobs
+      # These jobs only really depend on Setup, but the build job is very quick to run (~35s) and
+      # will catch any build errors before proceeding to the more lengthy and resource intensive 
+      # Bazel jobs.
+      - test:
+          requires:
+            - build
+      - integration:
           requires:
             - build
       
@@ -423,8 +391,8 @@ workflows:
             - build
       - test-win:
           requires:
-            - setup-and-build-win
             - test
+            - setup-and-build-win
       - e2e-cli-win:
           <<: *only_release_branches
           requires:
@@ -435,13 +403,13 @@ workflows:
       - snapshot_publish:
           <<: *only_release_branches
           requires:
-            - test
             - build
+            - test
             - e2e-cli
       - publish:
           requires:
-            - test
             - build
+            - test
             - e2e-cli
             - snapshot_publish
           filters:

@@ -3,9 +3,13 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file at https://angular.io/license
 
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 load("@npm_bazel_jasmine//:index.bzl", "jasmine_node_test")
-load("@npm_bazel_typescript//:index.bzl", "ts_library")
+load("@build_bazel_rules_nodejs//:index.bzl", "pkg_npm")
+load("//tools:defaults.bzl", "ts_library")
 load("//tools:ts_json_schema.bzl", "ts_json_schema")
+
+licenses(["notice"])  # MIT
 
 licenses(["notice"])  # MIT
 
@@ -17,7 +21,13 @@ ALL_SCHEMA_TARGETS = [
         x,
         x.replace("/", "_").replace("-", "_").replace(".json", ""),
     )
-    for x in glob(["*/schema.json"])
+    for x in glob(
+        include = ["*/schema.json"],
+        exclude = [
+            # NB: we need to exclude the nested node_modules that is laid out by yarn workspaces
+            "node_modules/**",
+        ],
+    )
 ]
 
 # Create all the targets.
@@ -35,13 +45,14 @@ ts_library(
         include = ["**/*.ts"],
         exclude = [
             "**/*_spec.ts",
-            "**/*_spec_large.ts",
             "**/*_benchmark.ts",
             # Also exclude templated files.
             "*/files/**/*.ts",
             "*/other-files/**/*.ts",
             # Exclude test helpers.
             "utility/test/**/*.ts",
+            # NB: we need to exclude the nested node_modules that is laid out by yarn workspaces
+            "node_modules/**",
         ],
     ) + [
         "//packages/schematics/angular:" + src.replace(".json", ".ts")
@@ -56,6 +67,10 @@ ts_library(
             "*/schema.json",
             "*/files/**/*",
             "*/other-files/**/*",
+        ],
+        exclude = [
+            # NB: we need to exclude the nested node_modules that is laid out by yarn workspaces
+            "node_modules/**",
         ],
     ),
     module_name = "@schematics/angular",
@@ -87,12 +102,14 @@ ts_library(
     srcs = glob(
         include = [
             "**/*_spec.ts",
-            "**/*_spec_large.ts",
             "utility/test/**/*.ts",
+        ],
+        exclude = [
+            # NB: we need to exclude the nested node_modules that is laid out by yarn workspaces
+            "node_modules/**",
         ],
     ),
     # @external_begin
-    tsconfig = "//:tsconfig-test.json",
     deps = [
         ":angular",
         "//packages/angular_devkit/core",
@@ -102,8 +119,6 @@ ts_library(
         "//packages/schematics/angular/third_party/github.com/Microsoft/TypeScript",
         "@npm//@types/browserslist",
         "@npm//@types/caniuse-lite",
-        "@npm//@types/jasmine",
-        "@npm//@types/node",
         "@npm//rxjs",
         "@npm//tslint",
     ],
@@ -118,4 +133,19 @@ jasmine_node_test(
         "@npm//jasmine",
         "@npm//source-map",
     ],
+)
+
+pkg_npm(
+    name = "npm_package",
+    deps = [
+        ":angular",
+    ],
+)
+
+pkg_tar(
+    name = "npm_package_archive",
+    srcs = [":npm_package"],
+    extension = "tar.gz",
+    strip_prefix = "./npm_package",
+    tags = ["manual"],
 )
