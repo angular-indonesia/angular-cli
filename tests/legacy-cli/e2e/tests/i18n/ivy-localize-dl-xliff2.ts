@@ -1,4 +1,4 @@
-import { appendToFile, expectFileToMatch } from '../../utils/fs';
+import { appendToFile, expectFileToMatch, replaceInFile } from '../../utils/fs';
 import { execAndWaitForOutputToMatch, killAllProcesses, ng } from '../../utils/process';
 import { updateJsonFile } from '../../utils/project';
 import { expectToFail } from '../../utils/utils';
@@ -14,8 +14,17 @@ export default async function() {
 
 export async function executeTest() {
   // Ensure a DL build is used.
+  await replaceInFile(
+    '.browserslistrc',
+    'not IE 9-11',
+    'IE 9-11',
+  );
+
   await updateJsonFile('tsconfig.json', config => {
     config.compilerOptions.target = 'es2015';
+    if (!config.angularCompilerOptions) {
+      config.angularCompilerOptions = {};
+    }
     config.angularCompilerOptions.disableTypeScriptVersionCheck = true;
   });
 

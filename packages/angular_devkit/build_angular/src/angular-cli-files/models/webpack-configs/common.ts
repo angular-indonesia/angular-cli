@@ -349,17 +349,6 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
   const loaderNodeModules = findAllNodeModules(__dirname, projectRoot);
   loaderNodeModules.unshift('node_modules');
 
-  // Load rxjs path aliases.
-  // https://github.com/ReactiveX/rxjs/blob/master/doc/pipeable-operators.md#build-and-treeshaking
-  let alias = {};
-  try {
-    const rxjsPathMappingImport = wco.supportES2015
-      ? 'rxjs/_esm2015/path-mapping'
-      : 'rxjs/_esm5/path-mapping';
-    const rxPaths = require(require.resolve(rxjsPathMappingImport, { paths: [projectRoot] }));
-    alias = rxPaths();
-  } catch {}
-
   const extraMinimizers = [];
   if (stylesOptimization) {
     extraMinimizers.push(
@@ -434,14 +423,14 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
       mangle: allowMangle && buildOptions.platform !== 'server' && !differentialLoadingMode,
     };
 
+    const globalScriptsNames = globalScriptsByBundleName.map(s => s.bundleName);
     extraMinimizers.push(
       new TerserPlugin({
         sourceMap: scriptsSourceMap,
         parallel: maxWorkers,
         cache: !cachingDisabled && findCachePath('terser-webpack'),
         extractComments: false,
-        chunkFilter: (chunk: compilation.Chunk) =>
-          !globalScriptsByBundleName.some(s => s.bundleName === chunk.name),
+        exclude: globalScriptsNames,
         terserOptions,
       }),
       // Script bundles are fully optimized here in one step since they are never downleveled.
@@ -451,8 +440,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
         parallel: maxWorkers,
         cache: !cachingDisabled && findCachePath('terser-webpack'),
         extractComments: false,
-        chunkFilter: (chunk: compilation.Chunk) =>
-          globalScriptsByBundleName.some(s => s.bundleName === chunk.name),
+        include: globalScriptsNames,
         terserOptions: {
           ...terserOptions,
           compress: allowMinify && {
@@ -488,7 +476,6 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
       extensions: ['.ts', '.tsx', '.mjs', '.js'],
       symlinks: !buildOptions.preserveSymlinks,
       modules: [wco.tsConfig.options.baseUrl || projectRoot, 'node_modules'],
-      alias,
       plugins: [PnpWebpackPlugin],
     },
     resolveLoader: {

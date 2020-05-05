@@ -280,6 +280,24 @@ describe('Application Schematic', () => {
     });
   });
 
+  it('sideEffects property should be true when strict mode', async () => {
+    const options = { ...defaultOptions, projectRoot: '', strict: true };
+
+    const tree = await schematicRunner.runSchematicAsync('application', options, workspaceTree)
+      .toPromise();
+    const content = JSON.parse(tree.readContent('/src/app/package.json'));
+    expect(content.sideEffects).toBe(false);
+  });
+
+  it('sideEffects property should be false when not in strict mode', async () => {
+    const options = { ...defaultOptions, projectRoot: '', strict: false };
+
+    const tree = await schematicRunner.runSchematicAsync('application', options, workspaceTree)
+      .toPromise();
+    const content = JSON.parse(tree.readContent('/src/app/package.json'));
+    expect(content.sideEffects).toBe(true);
+  });
+
   describe('custom projectRoot', () => {
     it('should put app files in the right spot', async () => {
       const options = { ...defaultOptions, projectRoot: '' };
@@ -400,5 +418,22 @@ describe('Application Schematic', () => {
       const specTsConfig = JSON.parse(tree.readContent('/foo/tsconfig.spec.json'));
       expect(specTsConfig.extends).toEqual('../tsconfig.json');
     });
+  });
+
+  it(`should add support for IE 9-11 in '.browserslistrc' when 'legacyBrowsers' is true`, async () => {
+    const options: ApplicationOptions = { ...defaultOptions, legacyBrowsers: true };
+    const tree = await schematicRunner.runSchematicAsync('application', options, workspaceTree)
+      .toPromise();
+    const content = tree.readContent('/projects/foo/.browserslistrc');
+    expect(content).not.toContain(`not IE 9-11 # For IE 9-11 support, remove 'not'.`);
+    expect(content).toContain('IE 9-11');
+  });
+
+  it(`should not add support for IE 9-11 in '.browserslistrc' when 'legacyBrowsers' is false`, async () => {
+    const options: ApplicationOptions = { ...defaultOptions, legacyBrowsers: false };
+    const tree = await schematicRunner.runSchematicAsync('application', options, workspaceTree)
+      .toPromise();
+    const content = tree.readContent('/projects/foo/.browserslistrc');
+    expect(content).toContain(`not IE 9-11 # For IE 9-11 support, remove 'not'.`);
   });
 });
