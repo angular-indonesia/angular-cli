@@ -23,7 +23,7 @@
   "dependencies": {
     "@angular-devkit/core": "0.0.0",
     "enhanced-resolve": "4.2.0",
-    "rxjs": "6.5.5",
+    "rxjs": "6.6.0",
     "webpack-sources": "1.4.3"
   },
   "peerDependencies": {
@@ -32,8 +32,8 @@
     "webpack": "^4.0.0"
   },
   "devDependencies": {
-    "@angular/compiler": "10.0.1",
-    "@angular/compiler-cli": "10.0.1",
+    "@angular/compiler": "10.0.2",
+    "@angular/compiler-cli": "10.0.2",
     "typescript": "3.9.5",
     "webpack": "4.42.1"
   }
