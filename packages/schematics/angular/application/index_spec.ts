@@ -88,7 +88,6 @@ describe('Application Schematic', () => {
     expect(references).toEqual([
       { path: './projects/foo/tsconfig.app.json' },
       { path: './projects/foo/tsconfig.spec.json' },
-      { path: './projects/foo/e2e/tsconfig.json' },
     ]);
   });
 
@@ -417,6 +416,9 @@ describe('Application Schematic', () => {
       expect(content.extends).toMatch('tslint:recommended');
       expect(content.rules['component-selector'][2]).toMatch('app');
       expect(content.rules['no-console']).toBeDefined();
+      // codelyzer rules should be after base tslint rules
+      expect(Object.keys(content.rules).indexOf('component-selector'))
+        .toBeGreaterThan(Object.keys(content.rules).indexOf('no-console'));
     });
 
     it(`should create correct paths when 'newProjectRoot' is blank`, async () => {
