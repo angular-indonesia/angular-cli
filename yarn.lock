@@ -9,10 +9,10 @@
   dependencies:
     tslib "^2.0.0"
 
-"@angular/cdk@10.0.2":
-  version "10.0.2"
-  resolved "https://registry.yarnpkg.com/@angular/cdk/-/cdk-10.0.2.tgz#9d2770fc4ed6ccdaf1088cc8c68bcb9d28cb4c9c"
-  integrity sha512-ZvZkeh7qXllAGSOFvWSYurCslflTmB0JD3gonmUKOBl/O/AcOTPntP+iOrUaC3+eR3ohsfL5SswxChW0NF+oHQ==
+"@angular/cdk@10.1.0":
+  version "10.1.0"
+  resolved "https://registry.yarnpkg.com/@angular/cdk/-/cdk-10.1.0.tgz#e01a48db1ff23b82ac718ed5b6d73139ad7911f8"
+  integrity sha512-zSZcpsfhRWdNAzNXnKZIlaX1uAWY+8W2zV7ktQNJoNypo9X02rY0YtmPBzlPjT0ITjM4EqohZ07nfd+5bLUw4A==
   dependencies:
     tslib "^2.0.0"
   optionalDependencies:
@@ -84,10 +84,10 @@
     glob "7.1.2"
     yargs "15.3.0"
 
-"@angular/material@10.0.2":
-  version "10.0.2"
-  resolved "https://registry.yarnpkg.com/@angular/material/-/material-10.0.2.tgz#a240d6324c29508f716e1b61d005b0f8aca0bb47"
-  integrity sha512-xG8lCG+QS+r61aDoBauH6RyNuOHai4yxhn3e8cb2ua86liarJmF9jqlW0tB49tE1ZLz9U/+ybJKkos2kX1eF1Q==
+"@angular/material@10.1.0":
+  version "10.1.0"
+  resolved "https://registry.yarnpkg.com/@angular/material/-/material-10.1.0.tgz#f36f4c2a7b7199178e449c6b759a89203ac2c194"
+  integrity sha512-zHJxMHYAyfJbhXGhsWUFTABBBQVzWNexuJGWh19MQx0jQn7aLek5nYQ0oLG00+ArISVAg/XMOtnbdRaemFWVzw==
   dependencies:
     tslib "^2.0.0"
 
@@ -11264,6 +11264,11 @@ regenerator-runtime@0.13.5, regenerator-runtime@^0.13.4:
   resolved "https://registry.yarnpkg.com/regenerator-runtime/-/regenerator-runtime-0.13.5.tgz#d878a1d094b4306d10b9096484b33ebd55e26697"
   integrity sha512-ZS5w8CpKFinUzOwW3c83oPeVXoNsrLsaCoLtJvAClH135j/R77RuymhiSErhm2lKcwSCIpmvIWSbDkIfAqKQlA==
 
+regenerator-runtime@0.13.6:
+  version "0.13.6"
+  resolved "https://registry.yarnpkg.com/regenerator-runtime/-/regenerator-runtime-0.13.6.tgz#d236043c46ffab2968c1ef651803d8acdea8ed65"
+  integrity sha512-GmwlGiazQEbOwQWDdbbaP10i15pGtScYWLbMZuu+RKRz0cZ+g8IUONazBnaZqe7j1670IV1HgE4/8iy7CQPf4Q==
+
 regenerator-transform@^0.14.2:
   version "0.14.4"
   resolved "https://registry.yarnpkg.com/regenerator-transform/-/regenerator-transform-0.14.4.tgz#5266857896518d1616a78a0479337a30ea974cc7"
@@ -11626,10 +11631,10 @@ rollup-plugin-sourcemaps@^0.6.0:
     "@rollup/pluginutils" "^3.0.9"
     source-map-resolve "^0.6.0"
 
-rollup@2.22.1:
-  version "2.22.1"
-  resolved "https://registry.yarnpkg.com/rollup/-/rollup-2.22.1.tgz#8700522aa5feb12c6bd51810df8a276699d136b1"
-  integrity sha512-K9AUQUCJkVqC+A7uUDacfhmpEeAjc2uOmSpvGI5xaYsm8pXgy4ZWEM8wHPfKj11xvCwFZppkRDo8a0RESJXCnw==
+rollup@2.22.2:
+  version "2.22.2"
+  resolved "https://registry.yarnpkg.com/rollup/-/rollup-2.22.2.tgz#94d51fc8c30a2e545d1ff6358cc4fa14131332ee"
+  integrity sha512-2a4Mch4f0W2lEvkPuxtz0GfrtfgLj9bdd/oC9L3LozGOCnmLqO7ivMfKbCJoRgqWIU2UqAcbxRFSwmIKx+uStA==
   optionalDependencies:
     fsevents "~2.1.2"
 
