@@ -9,14 +9,17 @@
 
 version: 2.1
 
+orbs:
+  browser-tools: circleci/browser-tools@1.0.1
+
 # Variables
 
 ## IMPORTANT
 # Windows needs its own cache key because binaries in node_modules are different.
 # See https://circleci.com/docs/2.0/caching/#restoring-cache for how prefixes work in CircleCI.
-var_1: &cache_key angular_devkit-12.9-{{ checksum "yarn.lock" }}
-var_1_win: &cache_key_win angular_devkit-win-12.9-{{ checksum "yarn.lock" }}
-var_3: &default_nodeversion "12.9"
+var_1: &cache_key angular_devkit-12.18-{{ checksum "yarn.lock" }}
+var_1_win: &cache_key_win angular_devkit-win-12.18-{{ checksum "yarn.lock" }}
+var_3: &default_nodeversion "12.18"
 # Workspace initially persisted by the `setup` job, and then enhanced by `setup-and-build-win`.
 # https://circleci.com/docs/2.0/workflows/#using-workspaces-to-share-data-among-jobs
 # https://circleci.com/blog/deep-diving-into-circleci-workspaces/
@@ -38,7 +41,7 @@ executors:
         type: string
         default: *default_nodeversion
     docker:
-      - image: circleci/node:<< parameters.nodeversion >>
+      - image: cimg/node:<< parameters.nodeversion >>
     working_directory: ~/ng
     resource_class: small
 
@@ -48,7 +51,7 @@ executors:
         type: string
         default: *default_nodeversion
     docker:
-      - image: circleci/node:<< parameters.nodeversion >>-browsers
+      - image: cimg/node:<< parameters.nodeversion >>
     working_directory: ~/ng
     environment:
       NPM_CONFIG_PREFIX: ~/.npm-global
@@ -107,6 +110,15 @@ commands:
             sudo bash -c "echo -e 'build --config=remote' >> .bazelrc.user";
             echo "Reading from remote cache for bazel remote jobs.";
 
+  install_python:
+    steps:
+      - run:
+          name: "Install Python 2"
+          command: |
+            sudo apt-get update > /dev/null 2>&1
+            sudo apt-get install -y python
+            python --version
+
 # Job definitions
 jobs:
   setup:
@@ -154,7 +166,14 @@ jobs:
     executor: action-executor
     steps:
       - custom_attach_workspace
-      - run: yarn validate --ci
+      - run:
+          name: Validate Commit Messages
+          command: yarn -s admin validate-commits
+      - run:
+          name: Validate "do not submit" Commits
+          command: yarn -s admin validate-do-not-submit
+      - run:
+          command: yarn -s admin validate --ci
 
   e2e-cli:
     parameters:
@@ -168,6 +187,7 @@ jobs:
     parallelism: 6
     steps:
       - custom_attach_workspace
+      - browser-tools/install-chrome
       - run:
           name: Initialize Environment
           command: ./.circleci/env.sh
@@ -182,6 +202,7 @@ jobs:
     parallelism: 4
     steps:
       - custom_attach_workspace
+      - browser-tools/install-chrome
       - run:
           name: Initialize Environment
           command: |
@@ -226,6 +247,7 @@ jobs:
     resource_class: xlarge
     steps:
       - custom_attach_workspace
+      - browser-tools/install-chrome
       - setup_bazel_rbe
       - run: sudo cp .circleci/bazel.rc /etc/bazel.bazelrc
       - run: yarn bazel:test
@@ -235,6 +257,7 @@ jobs:
     resource_class: xlarge
     steps:
       - custom_attach_workspace
+      - install_python
       - run: 
           command: yarn bazel:integration
 
@@ -254,19 +277,6 @@ jobs:
           name: Deployment to Snapshot
           command: |
             yarn admin snapshots --verbose --githubTokenFile=${HOME}/github_token
-
-  publish:
-    executor: action-executor
-    steps:
-      - custom_attach_workspace
-      - run:
-          name: Decrypt Credentials
-          command: |
-            openssl aes-256-cbc -d -in .circleci/npm_token -k "${KEY}" -out ~/.npmrc
-      - run:
-          name: Deployment to NPM
-          command: |
-            yarn admin publish --verbose
 
   # Windows jobs
   # CircleCI support for Windows jobs is still in preview.
@@ -406,14 +416,3 @@ workflows:
             - build
             - test
             - e2e-cli
-      - publish:
-          requires:
-            - build
-            - test
-            - e2e-cli
-            - snapshot_publish
-          filters:
-            tags:
-              only: /^v\d+/
-            branches:
-              ignore: /.*/

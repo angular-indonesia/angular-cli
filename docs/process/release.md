@@ -42,20 +42,7 @@ When a PR is merged, if the `PR target` label includes a branch other than
 `master`, commits will need to be cherry-picked to an associated branch. In
 particular, the `patch` target simply refers to the latest patch branch (eg.
 `1.2.x` or `1.3.x-rc.0`). This branch should be updated by cherry-picking all
-_applicable_ commits to it, such as those with messages beginning with `fix()`,
-`docs()`, or `refactor()`.
-
-Say the following PR is merged;
-
-```text
-* fix(@angular/cli): fix path when doing stuff
-* refactor(@angular-devkit/core): replace Fizz with Buzz
-* feat(@angular-devkit/core): add new feature
-* fix(@angular-devkit/core): fix something related to new feature
-* refactor(@angular-devkit/core): move stuff to new feature
-```
-
-Only the first 2 commits should be cherry picked to the patch branch, as the last 3 are related to a new feature.
+commits from the PR to it.
 
 Cherry picking is done by checking out the patch branch and cherry picking the new commit onto it.
 The patch branch is simply named as a version number, with a X in the relevant spot, such as `9.0.x`.
@@ -121,7 +108,7 @@ As commits are cherry-picked when PRs are merged, creating the release should be
 
 ```bash
 git commit -a -m 'release: vXX'
-git tag 'vXX'
+git tag -a 'vXX' -m 'release: tag vXX'
 ```
 
 The package versions we are about to publish are derived from the git tag that
@@ -132,11 +119,11 @@ following command.
 yarn admin packages --version
 ```
 
-Now push the commit and the tag to the upstream repository.
-**Make sure to run these commands together, as missing tags can cause CI failures.**
+Now push the commit and the tag to the upstream repository. **Make sure to use
+`--follow-tags, as tags need to be pushed immediately or CI may fail!**
 
 ```bash
-git push upstream && git push upstream --tags
+git push upstream --follow-tags
 ```
 
 ### Authenticating
@@ -168,13 +155,23 @@ For the first release of a major version, follow the instructions in
 For non-major release, check out the patch branch (e.g. `9.1.x`), then run:
 ```bash
 yarn # Reload dependencies
-yarn admin publish
+yarn admin publish --tag latest
 ```
 
 If also publishing a prerelease, check out `master`, then run:
 ```bash
 yarn # Reload dependencies
 yarn admin publish --tag next
+```
+
+If also publish an LTS branch, check out that patch branch (e.g. `8.3.x`), then
+run:
+
+**Make sure to update the NPM tag for the version you are releasing!**
+
+```bash
+yarn # Reload dependencies
+yarn admin publish --tag v8-lts
 ```
 
 ### Release Notes
