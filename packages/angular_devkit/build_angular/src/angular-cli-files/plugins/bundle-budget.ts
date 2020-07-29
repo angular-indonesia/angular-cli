@@ -5,9 +5,10 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import { Compiler, compilation } from 'webpack';
+import { Compiler } from 'webpack';
 import { Budget } from '../../browser/schema';
 import { ProcessBundleResult } from '../../utils/process-bundle';
+import { addError, addWarning } from '../../utils/webpack-diagnostics';
 import { ThresholdSeverity, checkBudgets } from '../utilities/bundle-calculator';
 
 export interface BundleBudgetPluginOptions {
@@ -24,26 +25,22 @@ export class BundleBudgetPlugin {
       return;
     }
 
-    compiler.hooks.afterEmit.tap('BundleBudgetPlugin', (compilation: compilation.Compilation) => {
-      this.runChecks(budgets, compilation);
-    });
-  }
+    compiler.hooks.afterEmit.tap('BundleBudgetPlugin', (compilation) => {
+      // No process bundle results because this plugin is only used when differential
+      // builds are disabled.
+      const processResults: ProcessBundleResult[] = [];
 
-  private runChecks(budgets: Budget[], compilation: compilation.Compilation) {
-    // No process bundle results because this plugin is only used when differential
-    // builds are disabled.
-    const processResults: ProcessBundleResult[] = [];
-
-    const stats = compilation.getStats().toJson();
-    for (const { severity, message } of checkBudgets(budgets, stats, processResults)) {
-      switch (severity) {
-        case ThresholdSeverity.Warning:
-          compilation.warnings.push(`budgets: ${message}`);
-          break;
-        case ThresholdSeverity.Error:
-          compilation.errors.push(`budgets: ${message}`);
-          break;
+      const stats = compilation.getStats().toJson();
+      for (const { severity, message } of checkBudgets(budgets, stats, processResults)) {
+        switch (severity) {
+          case ThresholdSeverity.Warning:
+            addWarning(compilation, `budgets: ${message}`);
+            break;
+          case ThresholdSeverity.Error:
+            addError(compilation, `budgets: ${message}`);
+            break;
+        }
       }
-    }
+    });
   }
 }

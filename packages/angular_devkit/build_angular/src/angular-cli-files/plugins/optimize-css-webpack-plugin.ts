@@ -9,6 +9,7 @@ import * as cssNano from 'cssnano';
 import { ProcessOptions, Result } from 'postcss';
 import { Compiler, compilation } from 'webpack';
 import { RawSource, Source, SourceMapSource } from 'webpack-sources';
+import { addWarning } from '../../utils/webpack-diagnostics';
 
 export interface OptimizeCssWebpackPluginOptions {
   sourceMap: boolean;
@@ -19,17 +20,14 @@ function hook(
   compiler: Compiler,
   action: (
     compilation: compilation.Compilation,
-    chunks: compilation.Chunk[],
-  ) => Promise<void | void[]>,
+    chunks: Iterable<compilation.Chunk>,
+  ) => Promise<void>,
 ) {
-  compiler.hooks.compilation.tap(
-    'optimize-css-webpack-plugin',
-    (compilation: compilation.Compilation) => {
-      compilation.hooks.optimizeChunkAssets.tapPromise('optimize-css-webpack-plugin', chunks =>
-        action(compilation, chunks),
-      );
-    },
-  );
+  compiler.hooks.compilation.tap('optimize-css-webpack-plugin', (compilation) => {
+    compilation.hooks.optimizeChunkAssets.tapPromise('optimize-css-webpack-plugin', (chunks) =>
+      action(compilation, chunks),
+    );
+  });
 }
 
 export class OptimizeCssWebpackPlugin {
@@ -44,14 +42,18 @@ export class OptimizeCssWebpackPlugin {
   }
 
   apply(compiler: Compiler): void {
-    hook(compiler, (compilation: compilation.Compilation, chunks: compilation.Chunk[]) => {
+    hook(compiler, (compilation: compilation.Compilation, chunks: Iterable<compilation.Chunk>) => {
       const files: string[] = [...compilation.additionalChunkAssets];
 
-      chunks.forEach(chunk => {
-        if (chunk.files && chunk.files.length > 0) {
-          files.push(...chunk.files);
+      for (const chunk of chunks) {
+        if (!chunk.files) {
+          continue;
         }
-      });
+
+        for (const file of chunk.files) {
+          files.push(file);
+        }
+      }
 
       const actions = files
         .filter(file => this._options.test(file))
@@ -98,9 +100,8 @@ export class OptimizeCssWebpackPlugin {
               .catch(reject);
           });
 
-          const warnings = output.warnings();
-          if (warnings.length) {
-            compilation.warnings.push(...warnings.map(({ text }) => text));
+          for (const { text } of output.warnings()) {
+            addWarning(compilation, text);
           }
 
           let newSource;
@@ -120,7 +121,7 @@ export class OptimizeCssWebpackPlugin {
           compilation.assets[file] = newSource;
         });
 
-      return Promise.all(actions);
+      return Promise.all(actions).then(() => {});
     });
   }
 }
