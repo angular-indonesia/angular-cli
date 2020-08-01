@@ -8,15 +8,15 @@
   "builders": "builders.json",
   "dependencies": {
     "@angular-devkit/architect": "0.0.0",
-    "rxjs": "6.6.0"
+    "rxjs": "6.6.2"
   },
   "peerDependencies": {
     "ng-packagr": "^10.0.0",
     "tsickle": "~0.39.0"
   },
   "devDependencies": {
-    "@angular/compiler": "10.0.6",
-    "@angular/compiler-cli": "10.0.6",
+    "@angular/compiler": "10.0.7",
+    "@angular/compiler-cli": "10.0.7",
     "@angular-devkit/core": "0.0.0",
     "ng-packagr": "~10.0.0-next.0",
     "tslib": "^2.0.0"
