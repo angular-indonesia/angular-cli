@@ -26,7 +26,7 @@ import {
   insertImport,
   isImported,
 } from '../utility/ast-utils';
-import { Change, InsertChange } from '../utility/change';
+import { applyToUpdateRecorder } from '../utility/change';
 import { getAppModulePath } from '../utility/ng-ast-utils';
 import { targetBuildNotFoundError } from '../utility/project-targets';
 import { getWorkspace, updateWorkspace } from '../utility/workspace';
@@ -110,11 +110,11 @@ function getBootstrapComponentPath(
   const componentSymbol = arrLiteral.elements[0].getText();
 
   const relativePath = getSourceNodes(moduleSource)
-    .filter(node => node.kind === ts.SyntaxKind.ImportDeclaration)
+    .filter(ts.isImportDeclaration)
     .filter(imp => {
       return findNode(imp, ts.SyntaxKind.Identifier, componentSymbol);
     })
-    .map((imp: ts.ImportDeclaration) => {
+    .map(imp => {
       const pathStringLiteral = imp.moduleSpecifier as ts.StringLiteral;
 
       return pathStringLiteral.text;
@@ -191,11 +191,7 @@ function addRouterModule(mainPath: string): Rule {
     const moduleSource = getSourceFile(host, modulePath);
     const changes = addImportToModule(moduleSource, modulePath, 'RouterModule', '@angular/router');
     const recorder = host.beginUpdate(modulePath);
-    changes.forEach((change: Change) => {
-      if (change instanceof InsertChange) {
-        recorder.insertLeft(change.pos, change.toAdd);
-      }
-    });
+    applyToUpdateRecorder(recorder, changes);
     host.commitUpdate(recorder);
 
     return host;
@@ -205,8 +201,8 @@ function addRouterModule(mainPath: string): Rule {
 function getMetadataProperty(metadata: ts.Node, propertyName: string): ts.PropertyAssignment {
   const properties = (metadata as ts.ObjectLiteralExpression).properties;
   const property = properties
-    .filter(prop => prop.kind === ts.SyntaxKind.PropertyAssignment)
-    .filter((prop: ts.PropertyAssignment) => {
+    .filter(ts.isPropertyAssignment)
+    .filter((prop) => {
       const name = prop.name;
       switch (name.kind) {
         case ts.SyntaxKind.Identifier:
@@ -248,9 +244,9 @@ function addServerRoutes(options: AppShellOptions): Rule {
       const routesChange = insertImport(moduleSource,
                                         modulePath,
                                         'Routes',
-                                        '@angular/router') as InsertChange;
-      if (routesChange.toAdd) {
-        recorder.insertLeft(routesChange.pos, routesChange.toAdd);
+                                        '@angular/router');
+      if (routesChange) {
+        applyToUpdateRecorder(recorder, [routesChange]);
       }
 
       const imports = getSourceNodes(moduleSource)
@@ -269,18 +265,16 @@ function addServerRoutes(options: AppShellOptions): Rule {
       const routerModuleChange = insertImport(moduleSource,
                                               modulePath,
                                               'RouterModule',
-                                              '@angular/router') as InsertChange;
+                                              '@angular/router');
 
-      if (routerModuleChange.toAdd) {
-        recorder.insertLeft(routerModuleChange.pos, routerModuleChange.toAdd);
+      if (routerModuleChange) {
+        applyToUpdateRecorder(recorder, [routerModuleChange]);
       }
 
       const metadataChange = addSymbolToNgModuleMetadata(
           moduleSource, modulePath, 'imports', 'RouterModule.forRoot(routes)');
       if (metadataChange) {
-        metadataChange.forEach((change: InsertChange) => {
-          recorder.insertRight(change.pos, change.toAdd);
-        });
+        applyToUpdateRecorder(recorder, metadataChange);
       }
       host.commitUpdate(recorder);
     }
