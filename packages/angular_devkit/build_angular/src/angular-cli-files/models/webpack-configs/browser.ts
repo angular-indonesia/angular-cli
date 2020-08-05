@@ -8,11 +8,7 @@
 import * as webpack from 'webpack';
 import { CommonJsUsageWarnPlugin } from '../../plugins/webpack';
 import { WebpackConfigOptions } from '../build-options';
-import { getSourceMapDevTool, isPolyfillsEntry, normalizeExtraEntryPoints } from './utils';
-
-const SubresourceIntegrityPlugin = require('webpack-subresource-integrity');
-const LicenseWebpackPlugin = require('license-webpack-plugin').LicenseWebpackPlugin;
-
+import { getSourceMapDevTool } from './utils';
 
 export function getBrowserConfig(wco: WebpackConfigOptions): webpack.Configuration {
   const { buildOptions } = wco;
@@ -22,7 +18,6 @@ export function getBrowserConfig(wco: WebpackConfigOptions): webpack.Configurati
     extractLicenses,
     vendorChunk,
     commonChunk,
-    styles,
     allowedCommonJsDependencies,
   } = buildOptions;
 
@@ -35,12 +30,14 @@ export function getBrowserConfig(wco: WebpackConfigOptions): webpack.Configurati
   } = buildOptions.sourceMap;
 
   if (subresourceIntegrity) {
+    const SubresourceIntegrityPlugin = require('webpack-subresource-integrity');
     extraPlugins.push(new SubresourceIntegrityPlugin({
       hashFuncNames: ['sha384'],
     }));
   }
 
   if (extractLicenses) {
+    const LicenseWebpackPlugin = require('license-webpack-plugin').LicenseWebpackPlugin;
     extraPlugins.push(new LicenseWebpackPlugin({
       stats: {
         warnings: false,
@@ -58,9 +55,6 @@ export function getBrowserConfig(wco: WebpackConfigOptions): webpack.Configurati
       wco.differentialLoadingMode ? true : hiddenSourceMap,
     ));
   }
-
-  const globalStylesBundleNames = normalizeExtraEntryPoints(styles, 'styles')
-    .map(style => style.bundleName);
 
   let crossOriginLoading: 'anonymous' | 'use-credentials' | false = false;
   if (subresourceIntegrity && crossOrigin === 'none') {
@@ -95,17 +89,11 @@ export function getBrowserConfig(wco: WebpackConfigOptions): webpack.Configurati
             priority: 5,
           },
           vendors: false,
-          vendor: !!vendorChunk && {
+          defaultVendors: !!vendorChunk && {
             name: 'vendor',
-            chunks: 'initial',
+            chunks: (chunk) => chunk.name === 'main',
             enforce: true,
-            test: (module: { nameForCondition?: Function }, chunks: Array<{ name: string }>) => {
-              const moduleName = module.nameForCondition ? module.nameForCondition() : '';
-
-              return /[\\/]node_modules[\\/]/.test(moduleName)
-                && !chunks.some(({ name }) => isPolyfillsEntry(name)
-                  || globalStylesBundleNames.includes(name));
-            },
+            test: /[\\/]node_modules[\\/]/,
           },
         },
       },
