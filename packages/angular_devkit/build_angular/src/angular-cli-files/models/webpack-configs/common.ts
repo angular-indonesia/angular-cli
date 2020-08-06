@@ -327,15 +327,13 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
     extraPlugins.push(new BundleBudgetPlugin({ budgets: buildOptions.budgets }));
   }
 
-  let sourceMapUseRule;
   if ((scriptsSourceMap || stylesSourceMap) && vendorSourceMap) {
-    sourceMapUseRule = {
-      use: [
-        {
-          loader: require.resolve('source-map-loader'),
-        },
-      ],
-    };
+    extraRules.push({
+      test: /\.m?js$/,
+      exclude: /(ngfactory|ngstyle)\.js$/,
+      enforce: 'pre',
+      loader: require.resolve('source-map-loader'),
+    });
   }
 
   let buildOptimizerUseRule: RuleSetLoader[] = [];
@@ -478,7 +476,6 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
       modules: [wco.tsConfig.options.baseUrl || projectRoot, 'node_modules'],
       plugins: [
         PnpWebpackPlugin,
-        new DedupeModuleResolvePlugin({ verbose: buildOptions.verbose }),
       ],
     },
     resolveLoader: {
@@ -583,12 +580,6 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
             ...buildOptimizerUseRule,
           ],
         },
-        {
-          test: /\.m?js$/,
-          exclude: /(ngfactory|ngstyle)\.js$/,
-          enforce: 'pre',
-          ...sourceMapUseRule,
-        },
         ...extraRules,
       ],
     },
@@ -602,6 +593,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
       // https://github.com/angular/angular/issues/11580
       // With VE the correct context is added in @ngtools/webpack, but Ivy doesn't need it at all.
       new ContextReplacementPlugin(/\@angular(\\|\/)core(\\|\/)/),
+      new DedupeModuleResolvePlugin({ verbose: buildOptions.verbose }),
       ...extraPlugins,
     ],
   };
