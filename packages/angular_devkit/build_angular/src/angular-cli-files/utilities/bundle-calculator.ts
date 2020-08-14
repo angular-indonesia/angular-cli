@@ -114,7 +114,8 @@ function calculateSizes(
   }
 
   type NonComponentStyleBudgetTypes = Exclude<Budget['type'], Type.AnyComponentStyle>;
-  const calculatorMap: Record<NonComponentStyleBudgetTypes, { new(...args: unknown[]): Calculator }> = {
+  type CalculatorTypes = { new(budget: Budget, chunks: Chunk[], assets: Asset[], processResults: ProcessBundleResult[]): Calculator };
+  const calculatorMap: Record<NonComponentStyleBudgetTypes, CalculatorTypes> = {
     all: AllCalculator,
     allScript: AllScriptCalculator,
     any: AnyCalculator,
@@ -333,9 +334,9 @@ function calculateBytes(
 }
 
 export function* checkBudgets(
-    budgets: Budget[],
-    webpackStats: webpack.Stats.ToJsonOutput,
-    processResults: ProcessBundleResult[],
+  budgets: Budget[],
+  webpackStats: webpack.Stats.ToJsonOutput,
+  processResults: ProcessBundleResult[],
 ): IterableIterator<{ severity: ThresholdSeverity, message: string }> {
   // Ignore AnyComponentStyle budgets as these are handled in `AnyComponentStyleBudgetChecker`.
   const computableBudgets = budgets.filter((budget) => budget.type !== Type.AnyComponentStyle);
@@ -380,8 +381,7 @@ export function* checkThresholds(thresholds: IterableIterator<Threshold>, size: 
         };
         break;
       } default: {
-        assertNever(threshold.type);
-        break;
+        throw new Error(`Unexpected threshold type: ${ThresholdType[threshold.type]}`);
       }
     }
   }
@@ -416,22 +416,6 @@ function mergeDifferentialBuildSizes(buildSizes: Size[], mergeLabel: string): Si
 }
 
 /** Returns whether or not all items in the list are equivalent to each other. */
-function allEquivalent<T>(items: T[]): boolean {
-  if (items.length === 0) {
-    return true;
-  }
-
-  const first = items[0];
-  for (const item of items.slice(1)) {
-    if (item !== first) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-function assertNever(input: never): never {
-  throw new Error(`Unexpected call to assertNever() with input: ${
-      JSON.stringify(input, null /* replacer */, 4 /* tabSize */)}`);
+function allEquivalent<T>(items: Iterable<T>): boolean {
+  return new Set(items).size < 2;
 }
