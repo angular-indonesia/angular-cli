@@ -9,15 +9,12 @@ import { BuilderContext, BuilderOutput, createBuilder } from '@angular-devkit/ar
 import { resolve } from 'path';
 import { Observable, from } from 'rxjs';
 import { mapTo, switchMap } from 'rxjs/operators';
-import { Schema } from './schema';
-
-/** @deprecated Since 10.1 use `NgPackagrBuilderOptions` from `@angular-devkit/build-angular` instead. */
-export type NgPackagrBuilderOptions = Schema;
+import { Schema as NgPackagrBuilderOptions } from './schema';
 
 async function initialize(
   options: NgPackagrBuilderOptions,
   root: string,
-): Promise<import ('ng-packagr').NgPackagr> {
+): Promise<import('ng-packagr').NgPackagr> {
   const packager = (await import('ng-packagr')).ngPackagr();
 
   packager.forProject(resolve(root, options.project));
@@ -29,7 +26,6 @@ async function initialize(
   return packager;
 }
 
-/** @deprecated Since 10.1 use `executeNgPackagrBuilder` from `@angular-devkit/build-angular` instead. */
 export function execute(
   options: NgPackagrBuilderOptions,
   context: BuilderContext,
@@ -40,4 +36,5 @@ export function execute(
   );
 }
 
+export { NgPackagrBuilderOptions };
 export default createBuilder<Record<string, string> & NgPackagrBuilderOptions>(execute);

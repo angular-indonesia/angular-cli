@@ -50,7 +50,7 @@
     "regenerator-runtime": "0.13.7",
     "resolve-url-loader": "3.1.1",
     "rimraf": "3.0.2",
-    "rollup": "2.25.0",
+    "rollup": "2.26.2",
     "rxjs": "6.6.2",
     "sass": "1.26.10",
     "sass-loader": "9.0.3",
@@ -62,7 +62,7 @@
     "style-loader": "1.2.1",
     "stylus": "0.54.8",
     "stylus-loader": "3.0.2",
-    "terser": "5.0.0",
+    "terser": "5.1.0",
     "terser-webpack-plugin": "4.1.0",
     "tree-kill": "1.2.2",
     "webpack": "4.44.1",
@@ -75,10 +75,14 @@
   },
   "peerDependencies": {
     "@angular/compiler-cli": ">=10.1.0-next.0 < 11",
+    "ng-packagr": "^10.0.0",
     "typescript": ">=3.9 < 3.10"
   },
   "peerDependenciesMeta": {
     "@angular/localize": {
+      "optional": true
+    },
+    "ng-packagr": {
       "optional": true
     }
   }
