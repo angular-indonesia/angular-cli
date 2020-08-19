@@ -447,8 +447,7 @@ export class CoreSchemaRegistry implements SchemaRegistry {
   }
 
   addFormat(format: SchemaFormat): void {
-    // tslint:disable-next-line:no-any
-    const validate = (data: any) => {
+    const validate = (data: unknown) => {
       const result = format.formatter.validate(data);
 
       if (typeof result == 'boolean') {
@@ -461,9 +460,7 @@ export class CoreSchemaRegistry implements SchemaRegistry {
     this._ajv.addFormat(format.name, {
       async: format.formatter.async,
       validate,
-    // AJV typings list `compare` as required, but it is optional.
-    // tslint:disable-next-line:no-any
-    } as any);
+    });
   }
 
   addSmartDefaultProvider<T>(source: string, provider: SmartDefaultProvider<T>) {
@@ -754,5 +751,18 @@ export class CoreSchemaRegistry implements SchemaRegistry {
         });
       }),
     );
+  }
+
+  useXDeprecatedProvider(onUsage: (message: string) => void): void {
+    this._ajv.addKeyword('x-deprecated', {
+      validate: (schema, _data, _parentSchema, _dataPath, _parentDataObject, propertyName) => {
+        if (schema) {
+          onUsage(`Option "${propertyName}" is deprecated${typeof schema == 'string' ? ': ' + schema : '.'}`);
+        }
+
+        return true;
+      },
+      errors: false,
+    });
   }
 }
