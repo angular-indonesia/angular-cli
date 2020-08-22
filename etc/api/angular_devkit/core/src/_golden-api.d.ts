@@ -214,7 +214,7 @@ export interface CordHostRename {
 
 export declare class CoreSchemaRegistry implements SchemaRegistry {
     constructor(formats?: SchemaFormat[]);
-    protected _resolver(ref: string, validate: ajv.ValidateFunction): {
+    protected _resolver(ref: string, validate?: ajv.ValidateFunction): {
         context?: ajv.ValidateFunction;
         schema?: JsonObject;
     };
@@ -228,6 +228,8 @@ export declare class CoreSchemaRegistry implements SchemaRegistry {
     usePromptProvider(provider: PromptProvider): void;
     useXDeprecatedProvider(onUsage: (message: string) => void): void;
 }
+
+export declare function createSyncHost<StatsT extends object = {}>(handler: SyncHostHandler<StatsT>): Host<StatsT>;
 
 export declare function createWorkspaceHost(host: virtualFs.Host): WorkspaceHost;
 
@@ -1048,6 +1050,18 @@ export declare class SyncDelegateHost<T extends object = {}> {
     write(path: Path, content: FileBufferLike): void;
 }
 
+export interface SyncHostHandler<StatsT extends object = {}> {
+    delete(path: Path): void;
+    exists(path: Path): boolean;
+    isDirectory(path: Path): boolean;
+    isFile(path: Path): boolean;
+    list(path: Path): PathFragment[];
+    read(path: Path): FileBuffer;
+    rename(from: Path, to: Path): void;
+    stat(path: Path): Stats<StatsT> | null;
+    write(path: Path, content: FileBufferLike): void;
+}
+
 export declare class SynchronousDelegateExpectedException extends BaseException {
     constructor();
 }
@@ -1133,7 +1147,7 @@ export declare namespace test {
     };
     class TestHost extends SimpleMemoryHost {
         protected _records: TestLogRecord[];
-        protected _sync: SyncDelegateHost<{}>;
+        protected _sync: SyncDelegateHost<{}> | null;
         get files(): Path[];
         get records(): TestLogRecord[];
         get sync(): SyncDelegateHost<{}>;

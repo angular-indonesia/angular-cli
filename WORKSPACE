@@ -8,8 +8,8 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
 http_archive(
     name = "build_bazel_rules_nodejs",
-    sha256 = "84abf7ac4234a70924628baa9a73a5a5cbad944c4358cf9abdb4aab29c9a5b77",
-    urls = ["https://github.com/bazelbuild/rules_nodejs/releases/download/1.7.0/rules_nodejs-1.7.0.tar.gz"],
+    sha256 = "10fffa29f687aa4d8eb6dfe8731ab5beb63811ab00981fc84a93899641fd4af1",
+    urls = ["https://github.com/bazelbuild/rules_nodejs/releases/download/2.0.3/rules_nodejs-2.0.3.tar.gz"],
 )
 
 # We use protocol buffers for the Build Event Protocol
@@ -37,7 +37,7 @@ Angular has a dependency on the @bazel/bazelisk package which supplies it.
 Try running `yarn bazel` instead.
     (If you did run that, check that you've got a fresh `yarn install`)
 """,
-    minimum_bazel_version = "0.27.0",
+    minimum_bazel_version = "3.0.0",
 )
 
 # The NodeJS rules version must be at least the following version because:
@@ -52,7 +52,7 @@ Try running `yarn bazel` instead.
 #   - 0.32.1 remove override of @bazel/tsetse & exclude typescript lib declarations in node_module_library transitive_declarations
 #   - 0.32.2 resolves bug in @bazel/hide-bazel-files postinstall step
 #   - 0.34.0 introduces protractor rule
-check_rules_nodejs_version(minimum_version_string = "1.5.0")
+check_rules_nodejs_version(minimum_version_string = "2.0.0")
 
 # Setup the Node.js toolchain
 node_repositories(
@@ -80,26 +80,12 @@ yarn_install(
 
 load("@npm//:install_bazel_dependencies.bzl", "install_bazel_dependencies")
 
-install_bazel_dependencies()
-
-load("@npm_bazel_typescript//:index.bzl", "ts_setup_workspace")
-
-ts_setup_workspace()
-
-# Load karma dependencies
-load("@npm_bazel_karma//:package.bzl", "npm_bazel_karma_dependencies")
-
-npm_bazel_karma_dependencies()
+install_bazel_dependencies(suppress_warning = True)
 
 # Load labs dependencies
-load("@npm_bazel_labs//:package.bzl", "npm_bazel_labs_dependencies")
+load("@npm//@bazel/labs:package.bzl", "npm_bazel_labs_dependencies")
 
 npm_bazel_labs_dependencies()
-
-# Setup the rules_webtesting toolchain
-load("@io_bazel_rules_webtesting//web:repositories.bzl", "web_test_repositories")
-
-web_test_repositories()
 
 ##########################
 # Remote Execution Setup #
@@ -107,9 +93,9 @@ web_test_repositories()
 # Bring in bazel_toolchains for RBE setup configuration.
 http_archive(
     name = "bazel_toolchains",
-    sha256 = "882fecfc88d3dc528f5c5681d95d730e213e39099abff2e637688a91a9619395",
-    strip_prefix = "bazel-toolchains-3.4.0",
-    url = "https://github.com/bazelbuild/bazel-toolchains/archive/3.4.0.tar.gz",
+    sha256 = "7ebb200ed3ca3d1f7505659c7dfed01c4b5cb04c3a6f34140726fe22f5d35e86",
+    strip_prefix = "bazel-toolchains-3.4.1",
+    url = "https://github.com/bazelbuild/bazel-toolchains/archive/3.4.1.tar.gz",
 )
 
 load("@bazel_toolchains//rules:environments.bzl", "clang_env")
@@ -120,17 +106,18 @@ rbe_autoconfig(
     # Need to specify a base container digest in order to ensure that we can use the checked-in
     # platform configurations for the "ubuntu16_04" image. Otherwise the autoconfig rule would
     # need to pull the image and run it in order determine the toolchain configuration. See:
-    # https://github.com/bazelbuild/bazel-toolchains/blob/1.1.2/configs/ubuntu16_04_clang/versions.bzl
-    base_container_digest = "sha256:1ab40405810effefa0b2f45824d6d608634ccddbf06366760c341ef6fbead011",
+    # https://github.com/bazelbuild/bazel-toolchains/blob/3.4.1/configs/ubuntu16_04_clang/versions.bzl
+    base_container_digest = "sha256:b27c9c4786d5bd1c709aa979b7432328806e0ff671e2175d696584eec4fd0ec3",
     # Note that if you change the `digest`, you might also need to update the
     # `base_container_digest` to make sure marketplace.gcr.io/google/rbe-ubuntu16-04-webtest:<digest>
     # and marketplace.gcr.io/google/rbe-ubuntu16-04:<base_container_digest> have
     # the same Clang and JDK installed. Clang is needed because of the dependency on
     # @com_google_protobuf. Java is needed for the Bazel's test executor Java tool.
-    digest = "sha256:0b8fa87db4b8e5366717a7164342a029d1348d2feea7ecc4b18c780bc2507059",
+    digest = "sha256:f743114235a43355bf8324e2ba0fa6a597236fe06f7bc99aaa9ac703631c306b",
     env = clang_env(),
     registry = "marketplace.gcr.io",
     # We can't use the default "ubuntu16_04" RBE image provided by the autoconfig because we need
     # a specific Linux kernel that comes with "libx11" in order to run headless browser tests.
     repository = "google/rbe-ubuntu16-04-webtest",
+    use_checked_in_confs = "Force",
 )
