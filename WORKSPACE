@@ -93,9 +93,9 @@ npm_bazel_labs_dependencies()
 # Bring in bazel_toolchains for RBE setup configuration.
 http_archive(
     name = "bazel_toolchains",
-    sha256 = "caf516464966470c075c33fae53c33ada5f32f1d43dbeaaea7388fe6e006d001",
-    strip_prefix = "bazel-toolchains-3.4.2",
-    url = "https://github.com/bazelbuild/bazel-toolchains/archive/3.4.2.tar.gz",
+    sha256 = "89a053218639b1c5e3589a859bb310e0a402dedbe4ee369560e66026ae5ef1f2",
+    strip_prefix = "bazel-toolchains-3.5.0",
+    url = "https://github.com/bazelbuild/bazel-toolchains/archive/3.5.0.tar.gz",
 )
 
 load("@bazel_toolchains//rules:environments.bzl", "clang_env")
@@ -106,8 +106,8 @@ rbe_autoconfig(
     # Need to specify a base container digest in order to ensure that we can use the checked-in
     # platform configurations for the "ubuntu16_04" image. Otherwise the autoconfig rule would
     # need to pull the image and run it in order determine the toolchain configuration. See:
-    # https://github.com/bazelbuild/bazel-toolchains/blob/3.4.1/configs/ubuntu16_04_clang/versions.bzl
-    base_container_digest = "sha256:b27c9c4786d5bd1c709aa979b7432328806e0ff671e2175d696584eec4fd0ec3",
+    # https://github.com/bazelbuild/bazel-toolchains/blob/3.5.0/configs/ubuntu16_04_clang/versions.bzl
+    base_container_digest = "sha256:f6568d8168b14aafd1b707019927a63c2d37113a03bcee188218f99bd0327ea1",
     # Note that if you change the `digest`, you might also need to update the
     # `base_container_digest` to make sure marketplace.gcr.io/google/rbe-ubuntu16-04-webtest:<digest>
     # and marketplace.gcr.io/google/rbe-ubuntu16-04:<base_container_digest> have

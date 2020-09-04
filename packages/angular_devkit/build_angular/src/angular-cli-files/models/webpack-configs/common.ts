@@ -471,6 +471,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
     devtool: false,
     profile: buildOptions.statsJson,
     resolve: {
+      roots: [projectRoot],
       extensions: ['.ts', '.tsx', '.mjs', '.js'],
       symlinks: !buildOptions.preserveSymlinks,
       modules: [wco.tsConfig.options.baseUrl || projectRoot, 'node_modules'],
@@ -489,7 +490,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
       ],
       plugins: [PnpWebpackPlugin.moduleLoader(module)],
     },
-    context: projectRoot,
+    context: root,
     entry: entryPoints,
     output: {
       futureEmitAssets: true,
