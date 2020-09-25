@@ -5,22 +5,13 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import { JsonAstObject, join, logging, normalize } from '@angular-devkit/core';
-import { Rule, Tree, UpdateRecorder } from '@angular-devkit/schematics';
+import { join, logging, normalize, workspaces } from '@angular-devkit/core';
+import { Rule, Tree } from '@angular-devkit/schematics';
 import { dirname, relative } from 'path';
-import {
-  findPropertyInAstObject,
-  insertPropertyInAstObjectInOrder,
-  removePropertyInAstObject,
-} from '../../utility/json-utils';
+import { JSONFile } from '../../utility/json-file';
+import { allTargetOptions, allWorkspaceTargets, getWorkspace } from '../../utility/workspace';
 import { Builders } from '../../utility/workspace-models';
-import {
-  forwardSlashPath,
-  getAllOptions,
-  getTargets,
-  getWorkspace,
-  readJsonFileAsAstObject,
-} from './utils';
+import { forwardSlashPath } from './utils';
 
 /**
  * Update the tsconfig files for applications
@@ -29,170 +20,145 @@ import {
  * - Sets module compiler option to esnext or commonjs
  */
 export function updateApplicationTsConfigs(): Rule {
-  return (tree, context) => {
-    const workspace = getWorkspace(tree);
-    const logger = context.logger;
+  return async (tree, { logger }) => {
+    const workspace = await getWorkspace(tree);
 
     // Add `module` option in the workspace tsconfig
     updateModuleCompilerOption(tree, '/tsconfig.json');
 
-    for (const { target, project } of getTargets(workspace, 'build', Builders.Browser)) {
-      updateTsConfig(tree, target, project, Builders.Browser, logger);
-    }
+    for (const [targetName, target, , project] of allWorkspaceTargets(workspace)) {
+      switch (targetName) {
+        case 'build':
+          if (target.builder !== Builders.Browser) {
+            continue;
+          }
+          break;
+        case 'server':
+          if (target.builder !== Builders.Server) {
+            continue;
+          }
+          break;
+        case 'test':
+          if (target.builder !== Builders.Karma) {
+            continue;
+          }
+          break;
+        default:
+          continue;
+      }
 
-    for (const { target, project } of getTargets(workspace, 'server', Builders.Server)) {
-      updateTsConfig(tree, target, project, Builders.Server, logger);
+      updateTsConfig(tree, target, project.sourceRoot, logger);
     }
-
-    for (const { target, project } of getTargets(workspace, 'test', Builders.Karma)) {
-      updateTsConfig(tree, target, project, Builders.Karma, logger);
-    }
-
-    return tree;
   };
 }
 
 function updateTsConfig(
   tree: Tree,
-  builderConfig: JsonAstObject,
-  project: JsonAstObject,
-  builderName: Builders,
+  builderConfig: workspaces.TargetDefinition,
+  projectSourceRoot: string | undefined,
   logger: logging.LoggerApi,
 ) {
-  const options = getAllOptions(builderConfig);
-  for (const option of options) {
-    let recorder: UpdateRecorder;
-    const tsConfigOption = findPropertyInAstObject(option, 'tsConfig');
-
-    if (!tsConfigOption || tsConfigOption.kind !== 'string') {
+  for (const [, options] of allTargetOptions(builderConfig)) {
+    const tsConfigPath = options.tsConfig;
+    if (!tsConfigPath || typeof tsConfigPath !== 'string') {
       continue;
     }
 
-    const tsConfigPath = tsConfigOption.value;
-    let tsConfigAst = readJsonFileAsAstObject(tree, tsConfigPath);
-    if (!tsConfigAst) {
+    // Update 'module' compilerOption
+    updateModuleCompilerOption(tree, tsConfigPath, builderConfig.builder);
+
+    let tsConfigJson;
+    try {
+      tsConfigJson = new JSONFile(tree, tsConfigPath);
+    } catch {
       logger.warn(`Cannot find file: ${tsConfigPath}`);
       continue;
     }
 
     // Remove 'enableIvy: true' since this is the default in version 9.
-    const angularCompilerOptions = findPropertyInAstObject(tsConfigAst, 'angularCompilerOptions');
-    if (angularCompilerOptions && angularCompilerOptions.kind === 'object') {
-      const enableIvy = findPropertyInAstObject(angularCompilerOptions, 'enableIvy');
-      if (enableIvy && enableIvy.kind === 'true') {
-        recorder = tree.beginUpdate(tsConfigPath);
-        if (angularCompilerOptions.properties.length === 1) {
-          // remove entire 'angularCompilerOptions'
-          removePropertyInAstObject(recorder, tsConfigAst, 'angularCompilerOptions');
-        } else {
-          removePropertyInAstObject(recorder, angularCompilerOptions, 'enableIvy');
-        }
-        tree.commitUpdate(recorder);
+    if (tsConfigJson.get(['angularCompilerOptions', 'enableIvy']) === true) {
+      const angularCompilerOptions = tsConfigJson.get(['angularCompilerOptions']);
+      const keys = Object.keys(angularCompilerOptions as object);
+
+      if (keys.length === 1) {
+        // remove entire 'angularCompilerOptions'
+        tsConfigJson.remove(['angularCompilerOptions']);
+      } else {
+        // leave other options
+        tsConfigJson.remove(['angularCompilerOptions', 'enableIvy']);
       }
     }
 
-    // Update 'module' compilerOption
-    updateModuleCompilerOption(tree, tsConfigPath, builderName);
-
     // Add stricter file inclusions to avoid unused file warning during compilation
-    if (builderName !== Builders.Karma) {
-      // Note: we need to re-read the tsconfig after very commit because
-      // otherwise the updates will be out of sync since we are ammending the same node.
+    if (builderConfig.builder !== Builders.Karma) {
 
-      // we are already checking that tsconfig exists above!
-      // tslint:disable-next-line: no-non-null-assertion
-      tsConfigAst = readJsonFileAsAstObject(tree, tsConfigPath)!;
-      const include = findPropertyInAstObject(tsConfigAst, 'include');
-
-      if (include && include.kind === 'array') {
-        const tsInclude = include.elements.find(({ value }) => typeof value === 'string' && value.endsWith('**/*.ts'));
-        if (tsInclude) {
-          const { start, end } = tsInclude;
-          recorder = tree.beginUpdate(tsConfigPath);
-          recorder.remove(start.offset, end.offset - start.offset);
+      const include = tsConfigJson.get(['include']);
+      if (include && Array.isArray(include)) {
+        const tsInclude = include.findIndex((value) => typeof value === 'string' && value.endsWith('**/*.ts'));
+        if (tsInclude !== -1) {
           // Replace ts includes with d.ts
-          recorder.insertLeft(start.offset, tsInclude.text.replace('.ts', '.d.ts'));
-          tree.commitUpdate(recorder);
+          tsConfigJson.modify(['include', tsInclude], include[tsInclude].replace('.ts', '.d.ts'));
         }
       } else {
         // Includes are not present, add includes to dts files
         // By default when 'include' nor 'files' fields are used TypeScript
         // will include all ts files.
-        const srcRootAst = findPropertyInAstObject(project, 'sourceRoot');
-        const include = srcRootAst?.kind === 'string'
-          ? join(normalize(srcRootAst.value), '**/*.d.ts')
+        const include = projectSourceRoot !== undefined
+          ? join(normalize(projectSourceRoot), '**/*.d.ts')
           : '**/*.d.ts';
 
-        recorder = tree.beginUpdate(tsConfigPath);
-        insertPropertyInAstObjectInOrder(recorder, tsConfigAst, 'include', [include], 2);
-        tree.commitUpdate(recorder);
+        tsConfigJson.modify(['include'], [include]);
       }
 
-      const files = findPropertyInAstObject(tsConfigAst, 'files');
-      if (!files) {
+      const files = tsConfigJson.get(['files']);
+      if (files === undefined) {
         const newFiles: string[] = [];
         const tsConfigDir = dirname(forwardSlashPath(tsConfigPath));
 
-        const mainOption = findPropertyInAstObject(option, 'main');
-        if (mainOption && mainOption.kind === 'string') {
+        const mainOption = options.main;
+        if (mainOption && typeof mainOption === 'string') {
           newFiles.push(
-            forwardSlashPath(relative(tsConfigDir, forwardSlashPath(mainOption.value))));
+            forwardSlashPath(relative(tsConfigDir, forwardSlashPath(mainOption))));
         }
 
-        const polyfillsOption = findPropertyInAstObject(option, 'polyfills');
-        if (polyfillsOption && polyfillsOption.kind === 'string') {
+        const polyfillsOption = options.polyfills;
+        if (polyfillsOption && typeof polyfillsOption === 'string') {
           newFiles.push(
-            forwardSlashPath(relative(tsConfigDir, forwardSlashPath(polyfillsOption.value))));
+            forwardSlashPath(relative(tsConfigDir, forwardSlashPath(polyfillsOption))));
         }
 
         if (newFiles.length) {
-          recorder = tree.beginUpdate(tsConfigPath);
-          // tslint:disable-next-line: no-non-null-assertion
-          tsConfigAst = readJsonFileAsAstObject(tree, tsConfigPath)!;
-          insertPropertyInAstObjectInOrder(recorder, tsConfigAst, 'files', newFiles, 2);
-          tree.commitUpdate(recorder);
+          tsConfigJson.modify(['files'], newFiles);
         }
 
-        recorder = tree.beginUpdate(tsConfigPath);
-        // tslint:disable-next-line: no-non-null-assertion
-        tsConfigAst = readJsonFileAsAstObject(tree, tsConfigPath)!;
-        removePropertyInAstObject(recorder, tsConfigAst, 'exclude');
-        tree.commitUpdate(recorder);
+        tsConfigJson.remove(['exclude']);
       }
     }
   }
 }
 
-function updateModuleCompilerOption(tree: Tree, tsConfigPath: string, builderName?: Builders) {
-  const tsConfigAst = readJsonFileAsAstObject(tree, tsConfigPath);
-
-  if (!tsConfigAst) {
+function updateModuleCompilerOption(tree: Tree, tsConfigPath: string, builderName?: string) {
+  let tsConfigJson;
+  try {
+    tsConfigJson = new JSONFile(tree, tsConfigPath);
+  } catch {
     return;
   }
 
-  const compilerOptions = findPropertyInAstObject(tsConfigAst, 'compilerOptions');
-  if (!compilerOptions || compilerOptions.kind !== 'object') {
+  const compilerOptions = tsConfigJson.get(['compilerOptions']);
+  if (!compilerOptions || typeof compilerOptions !== 'object') {
     return;
   }
 
-  const configExtends = findPropertyInAstObject(tsConfigAst, 'extends');
-  const isExtendedConfig = configExtends && configExtends.kind === 'string';
-  const recorder = tree.beginUpdate(tsConfigPath);
+  const configExtends = tsConfigJson.get(['extends']);
+  const isExtended = configExtends && typeof configExtends === 'string';
 
   // Server tsconfig should have a module of commonjs
   const moduleType = builderName === Builders.Server ? 'commonjs' : 'esnext';
-  if (isExtendedConfig && builderName !== Builders.Server) {
-    removePropertyInAstObject(recorder, compilerOptions, 'module');
-  } else {
-    const scriptModule = findPropertyInAstObject(compilerOptions, 'module');
-    if (!scriptModule) {
-      insertPropertyInAstObjectInOrder(recorder, compilerOptions, 'module', moduleType, 4);
-    } else if (scriptModule.value !== moduleType) {
-      const { start, end } = scriptModule;
-      recorder.remove(start.offset, end.offset - start.offset);
-      recorder.insertLeft(start.offset, `"${moduleType}"`);
-    }
-  }
 
-  tree.commitUpdate(recorder);
+  if (isExtended && builderName !== Builders.Server) {
+    tsConfigJson.remove(['compilerOptions', 'module']);
+  } else {
+    tsConfigJson.modify(['compilerOptions', 'module'], moduleType);
+  }
 }

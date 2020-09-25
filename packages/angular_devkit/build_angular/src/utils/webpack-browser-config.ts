@@ -27,22 +27,19 @@ import {
 import { WebpackConfigOptions } from '../utils/build-options';
 import { readTsconfig } from '../utils/read-tsconfig';
 import { getEsVersionForFileName } from '../webpack/utils/helpers';
-import { BuildBrowserFeatures } from './build-browser-features';
 import { profilingEnabled } from './environment-options';
 import { I18nOptions, configureI18nBuild } from './i18n-options';
-
-const SpeedMeasurePlugin = require('speed-measure-webpack-plugin');
 
 export type BrowserWebpackConfigOptions = WebpackConfigOptions<NormalizedBrowserBuilderSchema>;
 
 export async function generateWebpackConfig(
-  context: BuilderContext,
   workspaceRoot: string,
   projectRoot: string,
   sourceRoot: string | undefined,
   options: NormalizedBrowserBuilderSchema,
   webpackPartialGenerator: (wco: BrowserWebpackConfigOptions) => webpack.Configuration[],
   logger: logging.LoggerApi,
+  differentialLoadingMode: boolean,
 ): Promise<webpack.Configuration> {
   // Ensure Build Optimizer is only used with AOT.
   if (options.buildOptimizer && !options.aot) {
@@ -66,27 +63,11 @@ export async function generateWebpackConfig(
 
   // tslint:disable-next-line:no-implicit-dependencies
   const ts = await import('typescript');
-
-  // At the moment, only the browser builder supports differential loading
-  // However this config generation is used by multiple builders such as dev-server
   const scriptTarget = tsConfig.options.target || ts.ScriptTarget.ES5;
-  const buildBrowserFeatures = new BuildBrowserFeatures(projectRoot, scriptTarget);
-  const differentialLoading =
-    context.builder.builderName === 'browser' &&
-    !options.watch &&
-    buildBrowserFeatures.isDifferentialLoadingNeeded();
-
-  let buildOptions: NormalizedBrowserBuilderSchema = { ...options };
-  if (differentialLoading) {
-    buildOptions = {
-      ...options,
-      // Under downlevel differential loading we copy the assets outside of webpack.
-      assets: [],
-      esVersionInFileName: true,
-    };
-  }
 
   const supportES2015 = scriptTarget !== ts.ScriptTarget.JSON && scriptTarget > ts.ScriptTarget.ES5;
+
+  const buildOptions: NormalizedBrowserBuilderSchema = { ...options };
   const wco: BrowserWebpackConfigOptions = {
     root: workspaceRoot,
     logger: logger.createChild('webpackConfigOptions'),
@@ -96,7 +77,7 @@ export async function generateWebpackConfig(
     tsConfig,
     tsConfigPath,
     supportES2015,
-    differentialLoadingMode: differentialLoading,
+    differentialLoadingMode,
   };
 
   wco.buildOptions.progress = defaultProgress(wco.buildOptions.progress);
@@ -123,9 +104,10 @@ export async function generateWebpackConfig(
   if (profilingEnabled) {
     const esVersionInFileName = getEsVersionForFileName(
       tsConfig.options.target,
-      wco.buildOptions.esVersionInFileName,
+      wco.differentialLoadingMode,
     );
 
+    const SpeedMeasurePlugin = await import('speed-measure-webpack-plugin');
     const smp = new SpeedMeasurePlugin({
       outputFormat: 'json',
       outputTarget: path.resolve(
@@ -145,9 +127,16 @@ export async function generateI18nBrowserWebpackConfigFromContext(
   context: BuilderContext,
   webpackPartialGenerator: (wco: BrowserWebpackConfigOptions) => webpack.Configuration[],
   host: virtualFs.Host<fs.Stats> = new NodeJsSyncHost(),
+  differentialLoadingMode = false,
 ): Promise<{ config: webpack.Configuration; projectRoot: string; projectSourceRoot?: string, i18n: I18nOptions }> {
   const { buildOptions, i18n } = await configureI18nBuild(context, options);
-  const result = await generateBrowserWebpackConfigFromContext(buildOptions, context, webpackPartialGenerator, host);
+  const result = await generateBrowserWebpackConfigFromContext(
+    buildOptions,
+    context,
+    webpackPartialGenerator,
+    host,
+    differentialLoadingMode,
+  );
   const config = result.config;
 
   if (i18n.shouldInline) {
@@ -208,6 +197,7 @@ export async function generateBrowserWebpackConfigFromContext(
   context: BuilderContext,
   webpackPartialGenerator: (wco: BrowserWebpackConfigOptions) => webpack.Configuration[],
   host: virtualFs.Host<fs.Stats> = new NodeJsSyncHost(),
+  differentialLoadingMode = false,
 ): Promise<{ config: webpack.Configuration; projectRoot: string; projectSourceRoot?: string }> {
   const projectName = context.target && context.target.project;
   if (!projectName) {
@@ -231,13 +221,13 @@ export async function generateBrowserWebpackConfigFromContext(
   );
 
   const config = await generateWebpackConfig(
-    context,
     getSystemPath(workspaceRoot),
     getSystemPath(projectRoot),
     sourceRoot && getSystemPath(sourceRoot),
     normalizedOptions,
     webpackPartialGenerator,
     context.logger,
+    differentialLoadingMode,
   );
 
   return {
