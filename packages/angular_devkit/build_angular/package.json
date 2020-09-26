@@ -54,7 +54,7 @@
     "regenerator-runtime": "0.13.7",
     "resolve-url-loader": "3.1.1",
     "rimraf": "3.0.2",
-    "rollup": "2.28.1",
+    "rollup": "2.28.2",
     "rxjs": "6.6.3",
     "sass": "1.26.11",
     "sass-loader": "10.0.2",
@@ -81,14 +81,26 @@
   "peerDependencies": {
     "@angular/compiler-cli": "^11.0.0 || ^11.0.0-next",
     "@angular/localize": "^11.0.0 || ^11.0.0-next",
+    "karma": "^5.2.0",
     "ng-packagr": "^10.0.0",
+    "protractor": "^7.0.0",
+    "tslint": "^6.1.0",
     "typescript": ">=3.9 < 4.1"
   },
   "peerDependenciesMeta": {
     "@angular/localize": {
       "optional": true
     },
+    "karma": {
+      "optional": true
+    },
     "ng-packagr": {
+      "optional": true
+    },
+    "protractor": {
+      "optional": true
+    },
+    "tslint": {
       "optional": true
     }
   }
