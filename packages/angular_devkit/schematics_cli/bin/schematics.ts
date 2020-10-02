@@ -10,21 +10,10 @@
 // symbol polyfill must go first
 import 'symbol-observable';
 // tslint:disable-next-line:ordered-imports import-groups
-import {
-  JsonObject,
-  logging,
-  normalize,
-  schema,
-  tags,
-  virtualFs,
-} from '@angular-devkit/core';
-import { NodeJsSyncHost, ProcessOutput, createConsoleLogger } from '@angular-devkit/core/node';
-import {
-  DryRunEvent,
-  UnsuccessfulWorkflowExecution,
-  formats,
-} from '@angular-devkit/schematics';
-import { NodeWorkflow, validateOptionsWithSchema } from '@angular-devkit/schematics/tools';
+import { logging, schema, tags } from '@angular-devkit/core';
+import { ProcessOutput, createConsoleLogger } from '@angular-devkit/core/node';
+import { UnsuccessfulWorkflowExecution } from '@angular-devkit/schematics';
+import { NodeWorkflow } from '@angular-devkit/schematics/tools';
 import * as ansiColors from 'ansi-colors';
 import * as inquirer from 'inquirer';
 import * as minimist from 'minimist';
@@ -77,7 +66,7 @@ function _listSchematics(workflow: NodeWorkflow, collectionName: string, logger:
 }
 
 function _createPromptProvider(): schema.PromptProvider {
-  return (definitions: Array<schema.PromptDefinition>) => {
+  return (definitions) => {
     const questions: inquirer.QuestionCollection = definitions.map(definition => {
       const question: inquirer.Question = {
         name: definition.id,
@@ -158,16 +147,12 @@ export async function main({
   const force = argv['force'];
   const allowPrivate = argv['allow-private'];
 
-  /** Create a Virtual FS Host scoped to where the process is being run. **/
-  const fsHost = new virtualFs.ScopedHost(new NodeJsSyncHost(), normalize(process.cwd()));
-  const registry = new schema.CoreSchemaRegistry(formats.standardFormats);
-
-  /** Create the workflow that will be executed with this run. */
-  const workflow = new NodeWorkflow(fsHost, {
+  /** Create the workflow scoped to the working directory that will be executed with this run. */
+  const workflow = new NodeWorkflow(process.cwd(), {
     force,
     dryRun,
-    registry,
     resolvePaths: [process.cwd(), __dirname],
+    schemaValidation: true,
   });
 
   /** If the user wants to list schematics, we simply show all the schematic names. */
@@ -180,9 +165,6 @@ export async function main({
 
     return 1;
   }
-
-  registry.addPostTransform(schema.transforms.addUndefinedDefaults);
-  workflow.engineHost.registerOptionsTransform(validateOptionsWithSchema(registry));
 
   // Indicate to the user when nothing has been done. This is automatically set to off when there's
   // a new DryRunEvent.
@@ -203,7 +185,7 @@ export async function main({
    *
    * This is a simple way to only show errors when an error occur.
    */
-  workflow.reporter.subscribe((event: DryRunEvent) => {
+  workflow.reporter.subscribe((event) => {
     nothingDone = false;
     // Strip leading slash to prevent confusion.
     const eventPath = event.path.startsWith('/') ? event.path.substr(1) : event.path;
@@ -216,14 +198,10 @@ export async function main({
         logger.error(`ERROR! ${eventPath} ${desc}.`);
         break;
       case 'update':
-        loggingQueue.push(tags.oneLine`
-        ${colors.cyan('UPDATE')} ${eventPath} (${event.content.length} bytes)
-      `);
+        loggingQueue.push(`${colors.cyan('UPDATE')} ${eventPath} (${event.content.length} bytes)`);
         break;
       case 'create':
-        loggingQueue.push(tags.oneLine`
-        ${colors.green('CREATE')} ${eventPath} (${event.content.length} bytes)
-      `);
+        loggingQueue.push(`${colors.green('CREATE')} ${eventPath} (${event.content.length} bytes)`);
         break;
       case 'delete':
         loggingQueue.push(`${colors.yellow('DELETE')} ${eventPath}`);
@@ -273,7 +251,7 @@ export async function main({
   workflow.registry.useXDeprecatedProvider(msg => logger.warn(msg));
 
   // Pass the rest of the arguments as the smart default "argv". Then delete it.
-  workflow.registry.addSmartDefaultProvider('argv', (schema: JsonObject) => {
+  workflow.registry.addSmartDefaultProvider('argv', (schema) => {
     if ('index' in schema) {
       return argv._[Number(schema['index'])];
     } else {
