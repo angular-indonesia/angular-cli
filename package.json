@@ -32,7 +32,6 @@
     "lint": "tslint --project tsconfig.json",
     "templates": "node ./bin/devkit-admin templates",
     "validate": "node ./bin/devkit-admin validate",
-    "validate-commits": "./bin/devkit-admin validate-commits",
     "preinstall": "node ./tools/yarn/check-yarn.js",
     "postinstall": "yarn webdriver-update && yarn ngcc",
     "//webdriver-update-README": "ChromeDriver version must match Puppeteer Chromium version, see https://github.com/GoogleChrome/puppeteer/releases http://chromedriver.chromium.org/downloads",
@@ -71,6 +70,7 @@
     "@angular/compiler": "11.0.0-next.4",
     "@angular/compiler-cli": "11.0.0-next.4",
     "@angular/core": "11.0.0-next.4",
+    "@angular/dev-infra-private": "https://github.com/angular/dev-infra-private-builds.git#0364a68f33191747a0bb7580e44a9ad6d50add10",
     "@angular/forms": "11.0.0-next.4",
     "@angular/localize": "11.0.0-next.4",
     "@angular/material": "10.2.3",
@@ -110,6 +110,7 @@
     "@types/node": "10.12.30",
     "@types/node-fetch": "^2.1.6",
     "@types/npm-package-arg": "^6.1.0",
+    "@types/parse5-html-rewriting-stream": "^5.1.2",
     "@types/pidusage": "^2.0.1",
     "@types/progress": "^2.0.3",
     "@types/request": "^2.47.1",
@@ -156,7 +157,7 @@
     "jasmine": "^3.3.1",
     "jasmine-core": "~3.6.0",
     "jasmine-spec-reporter": "~6.0.0",
-    "jest-worker": "26.3.0",
+    "jest-worker": "26.5.0",
     "jquery": "^3.3.1",
     "jsonc-parser": "2.3.1",
     "karma": "~5.2.0",
@@ -179,9 +180,7 @@
     "open": "7.3.0",
     "ora": "5.1.0",
     "pacote": "11.1.4",
-    "parse5": "6.0.1",
     "parse5-html-rewriting-stream": "6.0.1",
-    "parse5-htmlparser2-tree-adapter": "6.0.1",
     "pidtree": "^0.5.0",
     "pidusage": "^2.0.17",
     "pnp-webpack-plugin": "1.6.4",
@@ -239,7 +238,8 @@
   },
   "husky": {
     "hooks": {
-      "pre-push": "node ./bin/devkit-admin hooks/pre-push"
+      "commit-msg": "yarn -s ng-dev commit-message pre-commit-validate --file-env-variable HUSKY_GIT_PARAMS",
+      "prepare-commit-msg": "yarn -s ng-dev commit-message restore-commit-message-draft --file-env-variable HUSKY_GIT_PARAMS"
     }
   }
 }
