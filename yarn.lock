@@ -17,10 +17,10 @@
     "@angular/core" "^10.0.0-0 || ^11.0.0"
     reflect-metadata "^0.1.13"
 
-"@angular/cdk@10.2.3":
-  version "10.2.3"
-  resolved "https://registry.yarnpkg.com/@angular/cdk/-/cdk-10.2.3.tgz#49eb09ae68f91f1ecec388592091a0f8f1dd5dce"
-  integrity sha512-ne3uSnWLQyUfYQ32zTvDauudyPONRPPBSbdOzFSsvFQuPxUcMQ3mFHJuq2OXei47TfSatmmyuKSuw9EtmTRbQw==
+"@angular/cdk@10.2.4":
+  version "10.2.4"
+  resolved "https://registry.yarnpkg.com/@angular/cdk/-/cdk-10.2.4.tgz#656095648af005e7fa02c4cc68865be4bf59fc10"
+  integrity sha512-Ccm/iRb6zELWwMem6qTnFCalMVX/aS17hhN65efpNKrH3ovhyQSPWtF4p9IaEJ3rZpfXqXMPBneJ9ZXAA/iKog==
   dependencies:
     tslib "^2.0.0"
   optionalDependencies:
@@ -83,9 +83,9 @@
   dependencies:
     tslib "^2.0.0"
 
-"@angular/dev-infra-private@https://github.com/angular/dev-infra-private-builds.git#0364a68f33191747a0bb7580e44a9ad6d50add10":
+"@angular/dev-infra-private@https://github.com/angular/dev-infra-private-builds.git#0af99f8d6ff88f0d9a96c9941336dd191ed3ec97":
   version "0.0.0"
-  resolved "https://github.com/angular/dev-infra-private-builds.git#0364a68f33191747a0bb7580e44a9ad6d50add10"
+  resolved "https://github.com/angular/dev-infra-private-builds.git#0af99f8d6ff88f0d9a96c9941336dd191ed3ec97"
   dependencies:
     "@angular/benchpress" "0.2.1"
     "@bazel/buildifier" "^0.29.0"
@@ -103,6 +103,7 @@
     multimatch "^4.0.0"
     node-fetch "^2.6.0"
     node-uuid "1.4.8"
+    ora "^5.0.0"
     protractor "^5.4.2"
     selenium-webdriver "3.5.0"
     semver "^6.3.0"
@@ -130,10 +131,10 @@
     glob "7.1.2"
     yargs "15.3.0"
 
-"@angular/material@10.2.3":
-  version "10.2.3"
-  resolved "https://registry.yarnpkg.com/@angular/material/-/material-10.2.3.tgz#d0f249d839a46522538ce98d542a8f210128890c"
-  integrity sha512-xqMC1A/CVX7RESnVm5EcK46MVXe1ROSMOf1RBuUeS6K+fnvx8kUxwmUcSY3LNREvW5hncFup7+MxSPfeFxv71A==
+"@angular/material@10.2.4":
+  version "10.2.4"
+  resolved "https://registry.yarnpkg.com/@angular/material/-/material-10.2.4.tgz#9a3e4958ed72ae77c1638075efe5bff5158b2ba4"
+  integrity sha512-m5pRzCZQlpb7BZrc+LV+eeMU9M76obWVbNy8or6gvBPa6awfbwOz8uBryIvVngdkhoIieqAu1iV4bG7b7Xp3sg==
   dependencies:
     tslib "^2.0.0"
 
@@ -8840,7 +8841,7 @@ optionator@^0.8.1:
     type-check "~0.3.2"
     word-wrap "~1.2.3"
 
-ora@5.1.0:
+ora@5.1.0, ora@^5.0.0:
   version "5.1.0"
   resolved "https://registry.yarnpkg.com/ora/-/ora-5.1.0.tgz#b188cf8cd2d4d9b13fd25383bc3e5cba352c94f8"
   integrity sha512-9tXIMPvjZ7hPTbk8DFq1f7Kow/HU/pQYB60JbNq+QnGwcyhWVZaQ4hM9zQDEsPxw/muLpgiHSaumUZxCAmod/w==
@@ -12149,15 +12150,20 @@ ts-pnp@^1.1.6:
   resolved "https://registry.yarnpkg.com/ts-pnp/-/ts-pnp-1.2.0.tgz#a500ad084b0798f1c3071af391e65912c86bca92"
   integrity sha512-csd+vJOb/gkzvcCHgTGSChYpy5f1/XKNsmvBGO4JXS+z1v2HobugDz4s1IeFXM3wZB44uczs+eazB5Q/ccdhQw==
 
-tslib@2.0.1, tslib@^2.0.0:
-  version "2.0.1"
-  resolved "https://registry.yarnpkg.com/tslib/-/tslib-2.0.1.tgz#410eb0d113e5b6356490eec749603725b021b43e"
-  integrity sha512-SgIkNheinmEBgx1IUNirK0TUD4X9yjjBRTqqjggWCU3pUEqIk3/Uwl3yRixYKT6WjQuGiwDv4NomL3wqRCj+CQ==
+tslib@2.0.2:
+  version "2.0.2"
+  resolved "https://registry.yarnpkg.com/tslib/-/tslib-2.0.2.tgz#462295631185db44b21b1ea3615b63cd1c038242"
+  integrity sha512-wAH28hcEKwna96/UacuWaVspVLkg4x1aDM9JlzqaQTOFczCktkVAb5fmXChgandR1EraDPs2w8P+ozM+oafwxg==
 
 tslib@^1.10.0, tslib@^1.13.0, tslib@^1.8.1, tslib@^1.9.0, tslib@^1.9.3:
   version "1.13.0"
   resolved "https://registry.yarnpkg.com/tslib/-/tslib-1.13.0.tgz#c881e13cc7015894ed914862d276436fa9a47043"
   integrity sha512-i/6DQjL8Xf3be4K/E6Wgpekn5Qasl1usyw++dAA35Ue5orEn65VIxOA+YvNNl9HV3qv70T7CNwjODHZrLwvd1Q==
+
+tslib@^2.0.0:
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/tslib/-/tslib-2.0.1.tgz#410eb0d113e5b6356490eec749603725b021b43e"
+  integrity sha512-SgIkNheinmEBgx1IUNirK0TUD4X9yjjBRTqqjggWCU3pUEqIk3/Uwl3yRixYKT6WjQuGiwDv4NomL3wqRCj+CQ==
 
 tslint-no-circular-imports@^0.7.0:
   version "0.7.0"
@@ -12830,10 +12836,10 @@ webpack-log@^2.0.0:
     ansi-colors "^3.0.0"
     uuid "^3.3.2"
 
-webpack-merge@5.1.4:
-  version "5.1.4"
-  resolved "https://registry.yarnpkg.com/webpack-merge/-/webpack-merge-5.1.4.tgz#a2c3a0c38ac2c02055c47bb1d42de1f072f1aea4"
-  integrity sha512-LSmRD59mxREGkCBm9PCW3AaV4doDqxykGlx1NvioEE0FgkT2GQI54Wyvg39ptkiq2T11eRVoV39udNPsQvK+QQ==
+webpack-merge@5.2.0:
+  version "5.2.0"
+  resolved "https://registry.yarnpkg.com/webpack-merge/-/webpack-merge-5.2.0.tgz#31cbcc954f8f89cd4b06ca8d97a38549f7f3f0c9"
+  integrity sha512-QBglJBg5+lItm3/Lopv8KDDK01+hjdg2azEwi/4vKJ8ZmGPdtJsTpjtNNOW3a4WiqzXdCATtTudOZJngE7RKkA==
   dependencies:
     clone-deep "^4.0.1"
     wildcard "^2.0.0"

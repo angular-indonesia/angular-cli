@@ -308,8 +308,6 @@ export declare function isJsonArray(value: JsonValue): value is JsonArray;
 
 export declare function isJsonObject(value: JsonValue): value is JsonObject;
 
-export declare function isObservable(obj: any | Observable<any>): obj is Observable<any>;
-
 export declare function isPromise(obj: any): obj is Promise<any>;
 
 export declare function join(p1: Path, ...others: string[]): Path;
@@ -546,7 +544,6 @@ export declare enum NgCliAnalyticsDimensions {
     RamInGigabytes = 3,
     NodeVersion = 4,
     NgAddCollection = 6,
-    NgBuildBuildEventLog = 7,
     NgIvyEnabled = 8,
     BuildErrors = 20
 }
