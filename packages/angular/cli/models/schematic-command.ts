@@ -258,19 +258,6 @@ export abstract class SchematicCommand<
         : [__dirname, process.cwd()],
       schemaValidation: true,
     });
-    workflow.engineHost.registerContextTransform(context => {
-      // This is run by ALL schematics, so if someone uses `externalSchematics(...)` which
-      // is safelisted, it would move to the right analytics (even if their own isn't).
-      const collectionName: string = context.schematic.collection.description.name;
-      if (isPackageNameSafeForAnalytics(collectionName)) {
-        return {
-          ...context,
-          analytics: this.analytics,
-        };
-      } else {
-        return context;
-      }
-    });
 
     const getProjectName = () => {
       if (this.workspace) {
@@ -304,53 +291,61 @@ export abstract class SchematicCommand<
       ...(await getSchematicDefaults(schematic.collection.name, schematic.name, getProjectName())),
       ...current,
     });
+
     workflow.engineHost.registerOptionsTransform(defaultOptionTransform);
 
-    if (options.defaults) {
-      workflow.registry.addPreTransform(schema.transforms.addUndefinedDefaults);
-    } else {
-      workflow.registry.addPostTransform(schema.transforms.addUndefinedDefaults);
-    }
-
+    workflow.registry.addPostTransform(schema.transforms.addUndefinedDefaults);
     workflow.registry.addSmartDefaultProvider('projectName', getProjectName);
     workflow.registry.useXDeprecatedProvider(msg => this.logger.warn(msg));
 
+    let shouldReportAnalytics = true;
+    workflow.engineHost.registerOptionsTransform(async (_, options) => {
+      if (shouldReportAnalytics) {
+        shouldReportAnalytics = false;
+        await this.reportAnalytics([this.description.name], options as Arguments);
+      }
+
+      return options;
+    });
+
     if (options.interactive !== false && isTTY()) {
       workflow.registry.usePromptProvider((definitions: Array<schema.PromptDefinition>) => {
-        const questions: inquirer.QuestionCollection = definitions.map(definition => {
-          const question: inquirer.Question = {
-            name: definition.id,
-            message: definition.message,
-            default: definition.default,
-          };
+        const questions: inquirer.QuestionCollection = definitions
+          .filter(definition => !options.defaults || definition.default === undefined)
+          .map(definition => {
+            const question: inquirer.Question = {
+              name: definition.id,
+              message: definition.message,
+              default: definition.default,
+            };
 
-          const validator = definition.validator;
-          if (validator) {
-            question.validate = input => validator(input);
-          }
+            const validator = definition.validator;
+            if (validator) {
+              question.validate = input => validator(input);
+            }
 
-          switch (definition.type) {
-            case 'confirmation':
-              question.type = 'confirm';
-              break;
-            case 'list':
-              question.type = definition.multiselect ? 'checkbox' : 'list';
-              (question as inquirer.CheckboxQuestion).choices = definition.items?.map(item => {
-                return typeof item == 'string'
-                  ? item
-                  : {
-                    name: item.label,
-                    value: item.value,
-                  };
-              });
-              break;
-            default:
-              question.type = definition.type;
-              break;
-          }
+            switch (definition.type) {
+              case 'confirmation':
+                question.type = 'confirm';
+                break;
+              case 'list':
+                question.type = definition.multiselect ? 'checkbox' : 'list';
+                (question as inquirer.CheckboxQuestion).choices = definition.items?.map(item => {
+                  return typeof item == 'string'
+                    ? item
+                    : {
+                      name: item.label,
+                      value: item.value,
+                    };
+                });
+                break;
+              default:
+                question.type = definition.type;
+                break;
+            }
 
-          return question;
-        });
+            return question;
+          });
 
         return inquirer.prompt(questions);
       });
@@ -482,9 +477,6 @@ export abstract class SchematicCommand<
       ...input,
       ...options.additionalOptions,
     };
-
-    const transformOptions = await workflow.engine.transformOptions(schematic, input).toPromise();
-    await this.reportAnalytics([this.description.name], transformOptions as Arguments);
 
     workflow.reporter.subscribe((event: DryRunEvent) => {
       nothingDone = false;
