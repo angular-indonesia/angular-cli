@@ -46,7 +46,7 @@ import {
   ScriptsWebpackPlugin,
   WebpackRollupLoader,
 } from '../plugins';
-import { getEsVersionForFileName, getOutputHashFormat, normalizeExtraEntryPoints } from '../utils/helpers';
+import { getEsVersionForFileName, getOutputHashFormat, getWatchOptions, normalizeExtraEntryPoints } from '../utils/helpers';
 
 const TerserPlugin = require('terser-webpack-plugin');
 const PnpWebpackPlugin = require('pnp-webpack-plugin');
@@ -70,7 +70,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
 
   const targetInFileName = getEsVersionForFileName(
     tsConfig.options.target,
-    wco.differentialLoadingMode,
+    buildOptions.differentialLoadingMode,
   );
 
   if (buildOptions.main) {
@@ -121,7 +121,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
     }
   }
 
-  const differentialLoadingMode = !!wco.differentialLoadingMode;
+  const differentialLoadingMode = buildOptions.differentialLoadingMode;
   if (wco.buildOptions.platform !== 'server') {
     if (differentialLoadingMode || tsConfig.options.target === ScriptTarget.ES5) {
       const buildBrowserFeatures = new BuildBrowserFeatures(
@@ -277,6 +277,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
         to: output.replace(/^\//, ''),
         from: glob,
         noErrorOnMissing: true,
+        force: true,
         globOptions: {
           dot: true,
           ignore: [
@@ -366,28 +367,10 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
   }
 
   if (scriptsOptimization) {
-    let angularGlobalDefinitions = {
-      ngDevMode: false,
-      ngI18nClosureMode: false,
-    };
-
-    // Try to load known global definitions from @angular/compiler-cli.
-    const GLOBAL_DEFS_FOR_TERSER = require('@angular/compiler-cli').GLOBAL_DEFS_FOR_TERSER;
-    if (GLOBAL_DEFS_FOR_TERSER) {
-      angularGlobalDefinitions = GLOBAL_DEFS_FOR_TERSER;
-    }
-
-    if (buildOptions.aot) {
-      // Also try to load AOT-only global definitions.
-      const GLOBAL_DEFS_FOR_TERSER_WITH_AOT = require('@angular/compiler-cli')
-        .GLOBAL_DEFS_FOR_TERSER_WITH_AOT;
-      if (GLOBAL_DEFS_FOR_TERSER_WITH_AOT) {
-        angularGlobalDefinitions = {
-          ...angularGlobalDefinitions,
-          ...GLOBAL_DEFS_FOR_TERSER_WITH_AOT,
-        };
-      }
-    }
+    const { GLOBAL_DEFS_FOR_TERSER, GLOBAL_DEFS_FOR_TERSER_WITH_AOT } = require('@angular/compiler-cli');
+    const angularGlobalDefinitions = buildOptions.aot
+      ? GLOBAL_DEFS_FOR_TERSER_WITH_AOT
+      : GLOBAL_DEFS_FOR_TERSER;
 
     // TODO: Investigate why this fails for some packages: wco.supportES2015 ? 6 : 5;
     const terserEcma = 5;
@@ -504,13 +487,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
       filename: `[name]${targetInFileName}${hashFormat.chunk}.js`,
     },
     watch: buildOptions.watch,
-    watchOptions: {
-      poll: buildOptions.poll,
-      ignored:
-        buildOptions.poll === undefined
-          ? undefined
-          : withWebpackFourOrFive(/[\\\/]node_modules[\\\/]/, 'node_modules/**'),
-    },
+    watchOptions: getWatchOptions(buildOptions.poll),
     performance: {
       hints: false,
     },

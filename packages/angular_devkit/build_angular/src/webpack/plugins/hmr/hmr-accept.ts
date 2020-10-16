@@ -6,14 +6,29 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-// TODO: change the file to TypeScript and build soley using Bazel.
-
-import { ApplicationRef, PlatformRef, ɵresetCompiledComponents } from '@angular/core';
+// tslint:disable-next-line: no-implicit-dependencies
+import { ApplicationRef, PlatformRef, Type, ɵresetCompiledComponents } from '@angular/core';
 import { filter, take } from 'rxjs/operators';
 
-if (module['hot']) {
-  module['hot'].accept();
-  module['hot'].dispose(() => {
+// For the time being we cannot use the DOM lib because it conflicts with @types/node,
+// In future when we remove `yarn admin build` we should have this as a seperate compilation unit
+// which includes DOM lib.
+
+// tslint:disable: no-console
+// tslint:disable: no-any
+declare const ng: any;
+declare const document: any;
+declare const MutationObserver: any;
+declare const KeyboardEvent: any;
+declare const Event: any;
+
+export default function (mod: any): void {
+  if (!mod['hot']) {
+    return;
+  }
+
+  mod['hot'].accept();
+  mod['hot'].dispose(() => {
     if (typeof ng === 'undefined') {
       console.warn(`[NG HMR] Cannot find global 'ng'. Likely this is caused because scripts optimization is enabled.`);
 
@@ -67,14 +82,14 @@ if (module['hot']) {
 
     // Use a `MutationObserver` to wait until the app-root element has been bootstrapped.
     // ie: when the ng-version attribute is added.
-    new MutationObserver((_mutationsList, observer) => {
+    new MutationObserver((_mutationsList: any, observer: any) => {
       observer.disconnect();
 
       const newAppRoot = getAppRoot();
       if (!newAppRoot) {
         return;
       }
-      
+
       const newAppRef = getApplicationRef(newAppRoot);
       if (!newAppRef) {
         return;
@@ -88,15 +103,15 @@ if (module['hot']) {
         )
         .subscribe(() => restoreFormValues(oldInputs, oldOptions));
     })
-    .observe(bodyElement, {
-      attributes: true,
-      subtree: true,
-      attributeFilter: ['ng-version'],
-    });
+      .observe(bodyElement, {
+        attributes: true,
+        subtree: true,
+        attributeFilter: ['ng-version'],
+      });
   });
 }
 
-function getAppRoot() {
+function getAppRoot(): any {
   const appRoot = document.querySelector('[ng-version]');
   if (!appRoot) {
     console.warn('[NG HMR] Cannot find the application root component.');
@@ -107,11 +122,11 @@ function getAppRoot() {
   return appRoot;
 }
 
-function getToken(appRoot, token) {
+function getToken<T>(appRoot: any, token: Type<T> ): T | undefined {
   return typeof ng === 'object' && ng.getInjector(appRoot).get(token) || undefined;
 }
 
-function getApplicationRef(appRoot) {
+function getApplicationRef(appRoot: any): ApplicationRef | undefined {
   const appRef = getToken(appRoot, ApplicationRef);
   if (!appRef) {
     console.warn(`[NG HMR] Cannot get 'ApplicationRef'.`);
@@ -122,7 +137,7 @@ function getApplicationRef(appRoot) {
   return appRef;
 }
 
-function getPlatformRef(appRoot) {
+function getPlatformRef(appRoot: any): PlatformRef | undefined {
   const platformRef = getToken(appRoot, PlatformRef);
   if (!platformRef) {
     console.warn(`[NG HMR] Cannot get 'PlatformRef'.`);
@@ -133,7 +148,7 @@ function getPlatformRef(appRoot) {
   return platformRef;
 }
 
-function dispatchEvents(element) {
+function dispatchEvents(element: any): void {
   element.dispatchEvent(new Event('input', {
     bubbles: true,
     cancelable: true,
@@ -144,7 +159,7 @@ function dispatchEvents(element) {
   element.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter' }));
 }
 
-function restoreFormValues(oldInputs, oldOptions) {
+function restoreFormValues(oldInputs: any[], oldOptions: any[]): void {
   // Restore input
   const newInputs = document.querySelectorAll('input, textarea');
   if (newInputs.length && newInputs.length === oldInputs.length) {
@@ -170,11 +185,9 @@ function restoreFormValues(oldInputs, oldOptions) {
         case 'email':
         case 'file':
         case 'hidden':
-        case 'image':
         case 'month':
         case 'number':
         case 'password':
-        case 'radio':
         case 'range':
         case 'search':
         case 'tel':
@@ -192,7 +205,7 @@ function restoreFormValues(oldInputs, oldOptions) {
 
       dispatchEvents(newElement);
     }
-  } else {
+  } else if (oldInputs.length) {
     console.warn('[NG HMR] Cannot restore input/textarea values.');
   }
 
@@ -206,7 +219,7 @@ function restoreFormValues(oldInputs, oldOptions) {
 
       dispatchEvents(newElement);
     }
-  } else {
+  } else if (oldOptions.length) {
     console.warn('[NG HMR] Cannot restore selected options.');
   }
 }

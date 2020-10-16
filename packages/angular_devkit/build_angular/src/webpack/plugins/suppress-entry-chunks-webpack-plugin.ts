@@ -58,7 +58,10 @@ export class SuppressExtractedTextChunksWebpackPlugin {
               return (
                 name === 'CssDependency' ||
                 name === 'SingleEntryDependency' ||
-                name === 'MultiEntryDependency'
+                name === 'MultiEntryDependency' ||
+                name === 'HarmonyCompatibilityDependency' ||
+                name === 'HarmonyExportHeaderDependency' ||
+                name === 'HarmonyInitDependency'
               );
             });
 

@@ -14,10 +14,12 @@ import {
   CrossOrigin,
   ExtraEntryPoint,
   I18NMissingTranslation,
+  IndexUnion,
   Localize,
   OptimizationClass,
   SourceMapClass,
 } from '../browser/schema';
+import { Schema as DevServerSchema } from '../dev-server/schema';
 import { NormalizedFileReplacement } from './normalize-file-replacements';
 
 export interface BuildOptions {
@@ -46,9 +48,9 @@ export interface BuildOptions {
   bundleDependencies?: boolean;
   externalDependencies?: string[];
   watch?: boolean;
-  hmr?: boolean;
   outputHashing?: string;
   poll?: number;
+  index?: IndexUnion;
   deleteOutputPath?: boolean;
   preserveSymlinks?: boolean;
   extractLicenses?: boolean;
@@ -61,7 +63,7 @@ export interface BuildOptions {
   webWorkerTsConfig?: string;
   statsJson: boolean;
   forkTypeChecker: boolean;
-
+  hmr?: boolean;
   main: string;
   polyfills?: string;
   budgets: Budget[];
@@ -78,12 +80,16 @@ export interface BuildOptions {
 
   experimentalRollupPass?: boolean;
   allowedCommonJsDependencies?: string[];
+
+  differentialLoadingMode?: boolean;
 }
 
 export interface WebpackTestOptions extends BuildOptions {
   codeCoverage?: boolean;
   codeCoverageExclude?: string[];
 }
+
+export interface WebpackDevServerOptions extends BuildOptions, Omit<DevServerSchema, 'optimization' | 'sourceMap' | 'browserTarget'> { }
 
 export interface WebpackConfigOptions<T = BuildOptions> {
   root: string;
@@ -94,5 +100,4 @@ export interface WebpackConfigOptions<T = BuildOptions> {
   tsConfig: ParsedConfiguration;
   tsConfigPath: string;
   supportES2015: boolean;
-  differentialLoadingMode?: boolean;
 }

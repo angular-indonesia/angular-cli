@@ -39,7 +39,7 @@ export async function generateWebpackConfig(
   options: NormalizedBrowserBuilderSchema,
   webpackPartialGenerator: (wco: BrowserWebpackConfigOptions) => webpack.Configuration[],
   logger: logging.LoggerApi,
-  differentialLoadingMode: boolean,
+  extraBuildOptions: Partial<NormalizedBrowserBuilderSchema>,
 ): Promise<webpack.Configuration> {
   // Ensure Build Optimizer is only used with AOT.
   if (options.buildOptimizer && !options.aot) {
@@ -67,7 +67,7 @@ export async function generateWebpackConfig(
 
   const supportES2015 = scriptTarget !== ts.ScriptTarget.JSON && scriptTarget > ts.ScriptTarget.ES5;
 
-  const buildOptions: NormalizedBrowserBuilderSchema = { ...options };
+  const buildOptions: NormalizedBrowserBuilderSchema = { ...options, ...extraBuildOptions };
   const wco: BrowserWebpackConfigOptions = {
     root: workspaceRoot,
     logger: logger.createChild('webpackConfigOptions'),
@@ -77,7 +77,6 @@ export async function generateWebpackConfig(
     tsConfig,
     tsConfigPath,
     supportES2015,
-    differentialLoadingMode,
   };
 
   wco.buildOptions.progress = defaultProgress(wco.buildOptions.progress);
@@ -104,7 +103,7 @@ export async function generateWebpackConfig(
   if (profilingEnabled) {
     const esVersionInFileName = getEsVersionForFileName(
       tsConfig.options.target,
-      wco.differentialLoadingMode,
+      buildOptions.differentialLoadingMode,
     );
 
     const SpeedMeasurePlugin = await import('speed-measure-webpack-plugin');
@@ -127,7 +126,7 @@ export async function generateI18nBrowserWebpackConfigFromContext(
   context: BuilderContext,
   webpackPartialGenerator: (wco: BrowserWebpackConfigOptions) => webpack.Configuration[],
   host: virtualFs.Host<fs.Stats> = new NodeJsSyncHost(),
-  differentialLoadingMode = false,
+  extraBuildOptions: Partial<NormalizedBrowserBuilderSchema> = {},
 ): Promise<{ config: webpack.Configuration; projectRoot: string; projectSourceRoot?: string, i18n: I18nOptions }> {
   const { buildOptions, i18n } = await configureI18nBuild(context, options);
   const result = await generateBrowserWebpackConfigFromContext(
@@ -135,7 +134,7 @@ export async function generateI18nBrowserWebpackConfigFromContext(
     context,
     webpackPartialGenerator,
     host,
-    differentialLoadingMode,
+    extraBuildOptions,
   );
   const config = result.config;
 
@@ -197,7 +196,7 @@ export async function generateBrowserWebpackConfigFromContext(
   context: BuilderContext,
   webpackPartialGenerator: (wco: BrowserWebpackConfigOptions) => webpack.Configuration[],
   host: virtualFs.Host<fs.Stats> = new NodeJsSyncHost(),
-  differentialLoadingMode = false,
+  extraBuildOptions: Partial<NormalizedBrowserBuilderSchema> = {},
 ): Promise<{ config: webpack.Configuration; projectRoot: string; projectSourceRoot?: string }> {
   const projectName = context.target && context.target.project;
   if (!projectName) {
@@ -227,7 +226,7 @@ export async function generateBrowserWebpackConfigFromContext(
     normalizedOptions,
     webpackPartialGenerator,
     context.logger,
-    differentialLoadingMode,
+    extraBuildOptions,
   );
 
   return {
@@ -237,18 +236,18 @@ export async function generateBrowserWebpackConfigFromContext(
   };
 }
 
-export function getIndexOutputFile(options: BrowserBuilderSchema): string {
-  if (typeof options.index === 'string') {
-    return path.basename(options.index);
+export function getIndexOutputFile(index: BrowserBuilderSchema['index']): string {
+  if (typeof index === 'string') {
+    return path.basename(index);
   } else {
-    return options.index.output || 'index.html';
+    return index.output || 'index.html';
   }
 }
 
-export function getIndexInputFile(options: BrowserBuilderSchema): string {
-  if (typeof options.index === 'string') {
-    return options.index;
+export function getIndexInputFile(index: BrowserBuilderSchema['index']): string {
+  if (typeof index === 'string') {
+    return index;
   } else {
-    return options.index.input;
+    return index.input;
   }
 }

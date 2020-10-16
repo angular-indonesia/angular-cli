@@ -1,5 +1,6 @@
 import { createProjectFromAsset } from '../../utils/assets';
 import { expectFileMatchToExist, expectFileToExist, expectFileToMatch } from '../../utils/fs';
+import { installWorkspacePackages } from '../../utils/packages';
 import { ng, noSilentNg, silentNpm } from '../../utils/process';
 import { isPrereleaseCli, useBuiltPackages, useCIChrome, useCIDefaults } from '../../utils/project';
 import { expectToFail } from '../../utils/utils';
@@ -27,17 +28,17 @@ export default async function() {
   await useCIChrome('src/');
   await useCIChrome('e2e/');
   await useCIDefaults('seven-oh-project');
-  await silentNpm('install');
+  await installWorkspacePackages(false);
 
   // Update Angular.
   const extraUpdateArgs = (await isPrereleaseCli()) ? ['--next', '--force'] : [];
   await ng('update', '@angular/core', ...extraUpdateArgs);
+  await silentNpm('run', 'webdriver-update');
 
   // Run CLI commands.
   await ng('generate', 'component', 'my-comp');
   await ng('test', '--watch=false');
-  // TODO: Re-enable after v11.0.0-next.4 release.
-  // await ng('lint');
+  await ng('lint');
   await ng('e2e');
   await ng('e2e', '--prod');
 

@@ -34,6 +34,7 @@ import { copyAssets } from '../utils/copy-assets';
 import { cachingDisabled } from '../utils/environment-options';
 import { i18nInlineEmittedFiles } from '../utils/i18n-inlining';
 import { I18nOptions } from '../utils/i18n-options';
+import { getHtmlTransforms } from '../utils/index-file/transforms';
 import {
   IndexHtmlTransform,
   writeIndexHtml,
@@ -49,11 +50,11 @@ import { readTsconfig } from '../utils/read-tsconfig';
 import { augmentAppWithServiceWorker } from '../utils/service-worker';
 import { assertCompatibleAngularVersion } from '../utils/version';
 import {
-  BrowserWebpackConfigOptions,
   generateI18nBrowserWebpackConfigFromContext,
   getIndexInputFile,
   getIndexOutputFile,
 } from '../utils/webpack-browser-config';
+import { isWebpackFiveOrHigher } from '../utils/webpack-version';
 import {
   getAotConfig,
   getBrowserConfig,
@@ -99,32 +100,7 @@ interface ConfigFromContextReturn {
   i18n: I18nOptions;
 }
 
-export async function buildBrowserWebpackConfigFromContext(
-  options: BrowserBuilderSchema,
-  context: BuilderContext,
-  host: virtualFs.Host<fs.Stats> = new NodeJsSyncHost(),
-  differentialLoadingMode = false,
-): Promise<ConfigFromContextReturn> {
-  const webpackPartialGenerator = (wco: BrowserWebpackConfigOptions) => [
-    getCommonConfig(wco),
-    getBrowserConfig(wco),
-    getStylesConfig(wco),
-    getStatsConfig(wco),
-    getAnalyticsConfig(wco, context),
-    getCompilerConfig(wco),
-    wco.buildOptions.webWorkerTsConfig ? getWorkerConfig(wco) : {},
-  ];
-
-  return generateI18nBrowserWebpackConfigFromContext(
-    options,
-    context,
-    webpackPartialGenerator,
-    host,
-    differentialLoadingMode,
-  );
-}
-
-function getAnalyticsConfig(
+export function getAnalyticsConfig(
   wco: WebpackConfigOptions,
   context: BuilderContext,
 ): webpack.Configuration {
@@ -151,7 +127,7 @@ function getAnalyticsConfig(
   return {};
 }
 
-function getCompilerConfig(wco: WebpackConfigOptions): webpack.Configuration {
+export function getCompilerConfig(wco: WebpackConfigOptions): webpack.Configuration {
   if (wco.buildOptions.main || wco.buildOptions.polyfills) {
     return wco.buildOptions.aot ? getAotConfig(wco) : getNonAotConfig(wco);
   }
@@ -176,12 +152,35 @@ async function initialize(
   // Assets are processed directly by the builder except when watching
   const adjustedOptions = options.watch ? options : { ...options, assets: [] };
 
+  // TODO_WEBPACK_5: Investigate build/serve issues with the `license-webpack-plugin` package
+  if (adjustedOptions.extractLicenses && isWebpackFiveOrHigher()) {
+    adjustedOptions.extractLicenses = false;
+    context.logger.warn(
+      'Warning: License extraction is currently disabled when using Webpack 5. ' +
+        'This is temporary and will be corrected in a future update.',
+    );
+  }
+
   const {
     config,
     projectRoot,
     projectSourceRoot,
     i18n,
-  } = await buildBrowserWebpackConfigFromContext(adjustedOptions, context, host, differentialLoadingMode);
+  } = await generateI18nBrowserWebpackConfigFromContext(
+    adjustedOptions,
+    context,
+    wco => [
+      getCommonConfig(wco),
+      getBrowserConfig(wco),
+      getStylesConfig(wco),
+      getStatsConfig(wco),
+      getAnalyticsConfig(wco, context),
+      getCompilerConfig(wco),
+      wco.buildOptions.webWorkerTsConfig ? getWorkerConfig(wco) : {},
+    ],
+    host,
+    { differentialLoadingMode },
+  );
 
   // Validate asset option values if processed directly
   if (options.assets?.length && !adjustedOptions.assets?.length) {
@@ -280,6 +279,12 @@ export function buildWebpackBrowser(
       switchMap(({ config, projectRoot, projectSourceRoot, i18n, buildBrowserFeatures, isDifferentialLoadingNeeded, target }) => {
         const useBundleDownleveling = isDifferentialLoadingNeeded && !options.watch;
         const startTime = Date.now();
+        const normalizedOptimization = normalizeOptimization(options.optimization);
+        const indexTransforms = getHtmlTransforms(
+          normalizedOptimization,
+          buildBrowserFeatures,
+          transforms.indexHtml,
+        );
 
         return runWebpack(config, context, {
           webpackFactory: require('webpack') as typeof webpack,
@@ -356,7 +361,7 @@ export function buildWebpackBrowser(
                 // Common options for all bundle process actions
                 const sourceMapOptions = normalizeSourceMaps(options.sourceMap || false);
                 const actionOptions: Partial<ProcessBundleOptions> = {
-                  optimize: normalizeOptimization(options.optimization).scripts,
+                  optimize: normalizedOptimization.scripts,
                   sourceMaps: sourceMapOptions.scripts,
                   hiddenSourceMaps: sourceMapOptions.hidden,
                   vendorSourceMaps: sourceMapOptions.vendor,
@@ -728,8 +733,8 @@ export function buildWebpackBrowser(
                   if (options.index) {
                     await writeIndexHtml({
                       host,
-                      outputPath: path.join(outputPath, getIndexOutputFile(options)),
-                      indexPath: path.join(context.workspaceRoot, getIndexInputFile(options)),
+                      outputPath: path.join(outputPath, getIndexOutputFile(options.index)),
+                      indexPath: path.join(context.workspaceRoot, getIndexInputFile(options.index)),
                       files,
                       noModuleFiles,
                       moduleFiles,
@@ -738,7 +743,7 @@ export function buildWebpackBrowser(
                       sri: options.subresourceIntegrity,
                       scripts: options.scripts,
                       styles: options.styles,
-                      postTransform: transforms.indexHtml,
+                      postTransforms: indexTransforms,
                       crossOrigin: options.crossOrigin,
                       // i18nLocale is used when Ivy is disabled
                       lang: locale || options.i18nLocale,
