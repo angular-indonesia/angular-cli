@@ -65,7 +65,7 @@
     "style-loader": "2.0.0",
     "stylus": "0.54.8",
     "stylus-loader": "4.1.1",
-    "terser": "5.3.5",
+    "terser": "5.3.7",
     "terser-webpack-plugin": "4.2.3",
     "text-table": "0.2.0",
     "tree-kill": "1.2.2",
@@ -74,7 +74,7 @@
     "webpack-dev-server": "3.11.0",
     "webpack-merge": "5.2.0",
     "webpack-sources": "2.0.1",
-    "webpack-subresource-integrity": "1.5.0",
+    "webpack-subresource-integrity": "1.5.1",
     "worker-plugin": "5.0.0"
   },
   "peerDependencies": {
