@@ -6,7 +6,8 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import { BuilderContext, BuilderOutput, createBuilder } from '@angular-devkit/architect';
-import { getSystemPath, json, normalize, resolve } from '@angular-devkit/core';
+import { json } from '@angular-devkit/core';
+import { resolve as pathResolve } from 'path';
 import { Observable, from, isObservable, of } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import * as webpack from 'webpack';
@@ -52,6 +53,12 @@ export function runWebpack(
 
   return createWebpack({ ...config, watch: false }).pipe(
     switchMap(webpackCompiler => new Observable<BuildResult>(obs => {
+      // Webpack 5 has a compiler level close function
+      // The close function will crash if caching is disabled
+      const compilerClose = webpackCompiler.options.cache !== false
+        ? (webpackCompiler as { close?(callback: () => void): void }).close
+        : undefined;
+
       const callback = (err?: Error, stats?: webpack.Stats) => {
         if (err) {
           return obs.error(err);
@@ -71,7 +78,11 @@ export function runWebpack(
         } as unknown as BuildResult);
 
         if (!config.watch) {
-          obs.complete();
+          if (compilerClose) {
+            compilerClose(() => obs.complete());
+          } else {
+            obs.complete();
+          }
         }
       };
 
@@ -81,7 +92,10 @@ export function runWebpack(
           const watching = webpackCompiler.watch(watchOptions, callback);
 
           // Teardown logic. Close the watcher when unsubscribed from.
-          return () => watching.close(() => { });
+          return () => {
+            watching.close(() => { });
+            compilerClose?.(() => { });
+          };
         } else {
           webpackCompiler.run(callback);
         }
@@ -97,9 +111,9 @@ export function runWebpack(
 
 
 export default createBuilder<WebpackBuilderSchema>((options, context) => {
-  const configPath = resolve(normalize(context.workspaceRoot), normalize(options.webpackConfig));
+  const configPath = pathResolve(context.workspaceRoot, options.webpackConfig);
 
-  return from(import(getSystemPath(configPath))).pipe(
+  return from(import(configPath)).pipe(
     switchMap((config: webpack.Configuration) => runWebpack(config, context)),
   );
 });
