@@ -5,24 +5,40 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-
-import {
-  JsonAstObject,
-  JsonObject,
-  JsonParseMode,
-  json,
-  parseJson,
-  parseJsonAst,
-  workspaces,
-} from '@angular-devkit/core';
-import { NodeJsSyncHost } from '@angular-devkit/core/node';
-import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { json, parseJsonAst, workspaces } from '@angular-devkit/core';
+import { existsSync, readFileSync, statSync, writeFileSync } from 'fs';
+import { parse as parseJson } from 'jsonc-parser';
 import * as os from 'os';
 import * as path from 'path';
 import { findUp } from './find-up';
 
 function isJsonObject(value: json.JsonValue | undefined): value is json.JsonObject {
   return value !== undefined && json.isJsonObject(value);
+}
+
+function createWorkspaceHost(): workspaces.WorkspaceHost {
+  return {
+    async readFile(path) {
+      return readFileSync(path, 'utf-8');
+    },
+    async writeFile(path, data) {
+      writeFileSync(path, data);
+    },
+    async isDirectory(path) {
+      try {
+        return statSync(path).isDirectory();
+      } catch {
+        return false;
+      }
+    },
+    async isFile(path) {
+      try {
+        return statSync(path).isFile();
+      } catch {
+        return false;
+      }
+    },
+  };
 }
 
 function getSchemaLocation(): string {
@@ -116,7 +132,7 @@ export class AngularWorkspace {
 
     const result = await workspaces.readWorkspace(
       workspaceFilePath,
-      workspaces.createWorkspaceHost(new NodeJsSyncHost()),
+      createWorkspaceHost(),
       workspaces.WorkspaceFormat.JSON,
     );
 
@@ -143,13 +159,7 @@ export async function getWorkspace(
   }
 
   try {
-    const result = await workspaces.readWorkspace(
-      configPath,
-      workspaces.createWorkspaceHost(new NodeJsSyncHost()),
-      workspaces.WorkspaceFormat.JSON,
-    );
-
-    const workspace = new AngularWorkspace(result.workspace, configPath);
+    const workspace = await AngularWorkspace.load(configPath);
     cachedWorkspaces.set(level, workspace);
 
     return workspace;
@@ -175,7 +185,7 @@ export function createGlobalSettings(): string {
 
 export function getWorkspaceRaw(
   level: 'local' | 'global' = 'local',
-): [JsonAstObject | null, string | null] {
+): [json.JsonAstObject | null, string | null] {
   let configPath = level === 'local' ? projectFilePath() : globalFilePath();
 
   if (!configPath) {
@@ -193,7 +203,7 @@ export function getWorkspaceRaw(
     start = 3;
   }
   const content = data.toString('utf-8', start);
-  const ast = parseJsonAst(content, JsonParseMode.Loose);
+  const ast = parseJsonAst(content, json.JsonParseMode.Loose);
 
   if (ast.kind != 'object') {
     throw new Error(`Invalid JSON file: ${configPath}`);
@@ -202,12 +212,12 @@ export function getWorkspaceRaw(
   return [ast, configPath];
 }
 
-export async function validateWorkspace(data: JsonObject): Promise<void> {
+export async function validateWorkspace(data: json.JsonObject): Promise<void> {
   const schemaContent = readFileSync(
     path.join(__dirname, '..', 'lib', 'config', 'schema.json'),
     'utf-8',
   );
-  const schema = parseJson(schemaContent, JsonParseMode.Loose) as json.schema.JsonSchema;
+  const schema = parseJson(schemaContent) as json.schema.JsonSchema;
   const { formats } = await import('@angular-devkit/schematics');
   const registry = new json.schema.CoreSchemaRegistry(formats.standardFormats);
   const validator = await registry.compile(schema).toPromise();
@@ -322,12 +332,12 @@ export function migrateLegacyGlobalConfig(): boolean {
     const legacyGlobalConfigPath = path.join(homeDir, '.angular-cli.json');
     if (existsSync(legacyGlobalConfigPath)) {
       const content = readFileSync(legacyGlobalConfigPath, 'utf-8');
-      const legacy = parseJson(content, JsonParseMode.Loose);
+      const legacy = parseJson(content);
       if (!isJsonObject(legacy)) {
         return false;
       }
 
-      const cli: JsonObject = {};
+      const cli: json.JsonObject = {};
 
       if (
         legacy.packageManager &&
@@ -346,7 +356,7 @@ export function migrateLegacyGlobalConfig(): boolean {
       }
 
       if (isJsonObject(legacy.warnings)) {
-        const warnings: JsonObject = {};
+        const warnings: json.JsonObject = {};
         if (typeof legacy.warnings.versionMismatch == 'boolean') {
           warnings['versionMismatch'] = legacy.warnings.versionMismatch;
         }
@@ -376,7 +386,7 @@ function getLegacyPackageManager(): string | null {
     if (existsSync(legacyGlobalConfigPath)) {
       const content = readFileSync(legacyGlobalConfigPath, 'utf-8');
 
-      const legacy = parseJson(content, JsonParseMode.Loose);
+      const legacy = parseJson(content);
       if (!isJsonObject(legacy)) {
         return null;
       }
