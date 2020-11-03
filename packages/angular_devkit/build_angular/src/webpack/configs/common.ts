@@ -9,7 +9,6 @@ import {
   BuildOptimizerWebpackPlugin,
   buildOptimizerLoaderPath,
 } from '@angular-devkit/build-optimizer';
-import { tags } from '@angular-devkit/core';
 import * as CopyWebpackPlugin from 'copy-webpack-plugin';
 import { existsSync } from 'fs';
 import * as path from 'path';
@@ -37,6 +36,7 @@ import {
   shouldBeautify,
 } from '../../utils/environment-options';
 import { findAllNodeModules } from '../../utils/find-up';
+import { Spinner } from '../../utils/spinner';
 import { isWebpackFiveOrHigher, withWebpackFourOrFive } from '../../utils/webpack-version';
 import {
   BundleBudgetPlugin,
@@ -54,12 +54,18 @@ const PnpWebpackPlugin = require('pnp-webpack-plugin');
 // tslint:disable-next-line:no-big-function
 export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
   const { root, projectRoot, buildOptions, tsConfig } = wco;
-  const { styles: stylesOptimization, scripts: scriptsOptimization } = buildOptions.optimization;
   const {
-    styles: stylesSourceMap,
-    scripts: scriptsSourceMap,
-    vendor: vendorSourceMap,
-  } = buildOptions.sourceMap;
+    platform = 'browser',
+    sourceMap: {
+      styles: stylesSourceMap,
+      scripts: scriptsSourceMap,
+      vendor: vendorSourceMap,
+    },
+    optimization: {
+      styles: stylesOptimization,
+      scripts: scriptsOptimization,
+    },
+  } = buildOptions;
 
   const extraPlugins: { apply(compiler: Compiler): void }[] = [];
   const extraRules: RuleSetRule[] = [];
@@ -122,7 +128,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
   }
 
   const differentialLoadingMode = buildOptions.differentialLoadingMode;
-  if (wco.buildOptions.platform !== 'server') {
+  if (platform !== 'server') {
     if (differentialLoadingMode || tsConfig.options.target === ScriptTarget.ES5) {
       const buildBrowserFeatures = new BuildBrowserFeatures(
         projectRoot,
@@ -301,7 +307,23 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
 
   if (buildOptions.progress) {
     const ProgressPlugin = require('webpack/lib/ProgressPlugin');
-    extraPlugins.push(new ProgressPlugin({ profile: buildOptions.verbose }));
+    const spinner = new Spinner();
+
+    extraPlugins.push(new ProgressPlugin({
+      handler: (percentage: number, message: string) => {
+        switch (percentage) {
+          case 0:
+            spinner.start(`Generating ${platform} application bundles...`);
+            break;
+          case 1:
+            spinner.succeed(`${platform.replace(/^\w/, s => s.toUpperCase())} application bundle generation complete.`);
+            break;
+          default:
+            spinner.text = `Generating ${platform} application bundles (phase: ${message})...`;
+            break;
+        }
+      },
+    }));
   }
 
   if (buildOptions.showCircularDependencies) {
@@ -394,7 +416,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
       // to remove dev code, and ngI18nClosureMode to remove Closure compiler i18n code
       compress:
         allowMinify &&
-        (buildOptions.platform == 'server'
+        (platform === 'server'
           ? {
             ecma: terserEcma,
             global_defs: angularGlobalDefinitions,
@@ -410,7 +432,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
           }),
       // We also want to avoid mangling on server.
       // Name mangling is handled within the browser builder
-      mangle: allowMangle && buildOptions.platform !== 'server' && !differentialLoadingMode,
+      mangle: allowMangle && platform !== 'server' && !differentialLoadingMode,
     };
 
     const globalScriptsNames = globalScriptsByBundleName.map(s => s.bundleName);
@@ -441,21 +463,10 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
             ...terserOptions.output,
             ecma: 5,
           },
-          mangle: allowMangle && buildOptions.platform !== 'server',
+          mangle: allowMangle && platform !== 'server',
         },
       }),
     );
-  }
-
-  if (
-    wco.tsConfig.options.target !== undefined &&
-    wco.tsConfig.options.target >= ScriptTarget.ES2017
-  ) {
-    wco.logger.warn(tags.stripIndent`
-      Warning: Zone.js does not support native async/await in ES2017.
-      These blocks are not intercepted by zone.js and will not triggering change detection.
-      See: https://github.com/angular/zone.js/pull/1140 for more information.
-    `);
   }
 
   return {
@@ -503,7 +514,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
           options: {
             name: `[name]${hashFormat.file}.[ext]`,
             // Re-use emitted files from browser builder on the server.
-            emitFile: wco.buildOptions.platform !== 'server',
+            emitFile: platform !== 'server',
           },
         },
         {

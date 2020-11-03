@@ -42,7 +42,7 @@ function getI18nOutfile(format: string | undefined) {
   }
 }
 
-async function getSerializer(format: Format, sourceLocale: string, basePath: string, useLegacyIds = true) {
+async function getSerializer(format: Format, sourceLocale: string, basePath: string, useLegacyIds: boolean) {
   switch (format) {
     case Format.Xmb:
       const { XmbTranslationSerializer } =
@@ -68,6 +68,32 @@ async function getSerializer(format: Format, sourceLocale: string, basePath: str
   }
 }
 
+function normalizeFormatOption(options: ExtractI18nBuilderOptions) {
+  let format;
+  if (options.i18nFormat !== Format.Xlf) {
+    format = options.i18nFormat;
+  } else {
+    format = options.format;
+  }
+
+  switch (format) {
+    case Format.Xlf:
+    case Format.Xlif:
+    case Format.Xliff:
+      format = Format.Xlf;
+      break;
+    case Format.Xlf2:
+    case Format.Xliff2:
+      format = Format.Xlf2;
+      break;
+    case undefined:
+      format = Format.Xlf;
+      break;
+  }
+
+  return format;
+}
+
 class NoEmitPlugin {
   apply(compiler: webpack.Compiler): void {
     compiler.hooks.shouldEmit.tap('angular-no-emit', () => false);
@@ -90,24 +116,7 @@ export async function execute(
     await context.getBuilderNameForTarget(browserTarget),
   );
 
-  if (options.i18nFormat !== Format.Xlf) {
-    options.format = options.i18nFormat;
-  }
-
-  switch (options.format) {
-    case Format.Xlf:
-    case Format.Xlif:
-    case Format.Xliff:
-      options.format = Format.Xlf;
-      break;
-    case Format.Xlf2:
-    case Format.Xliff2:
-      options.format = Format.Xlf2;
-      break;
-    case undefined:
-      options.format = Format.Xlf;
-      break;
-  }
+  const format = normalizeFormatOption(options);
 
   // We need to determine the outFile name so that AngularCompiler can retrieve it.
   let outFile = options.outFile || getI18nOutfile(options.format);
@@ -125,6 +134,7 @@ export async function execute(
   const i18n = createI18nOptions(metadata);
 
   let usingIvy = false;
+  let useLegacyIds = true;
 
   const ivyMessages: LocalizeMessage[] = [];
   const { config, projectRoot } = await generateBrowserWebpackConfigFromContext(
@@ -141,7 +151,7 @@ export async function execute(
       },
       buildOptimizer: false,
       i18nLocale: options.i18nLocale || i18n.sourceLocale,
-      i18nFormat: options.format,
+      i18nFormat: format,
       i18nFile: outFile,
       aot: true,
       progress: options.progress,
@@ -153,6 +163,9 @@ export async function execute(
     context,
     (wco) => {
       const isIvyApplication = wco.tsConfig.options.enableIvy !== false;
+
+      // Default value for legacy message ids is currently true
+      useLegacyIds = wco.tsConfig.options.enableI18nLegacyMessageIdFormat ?? true;
 
       // Ivy extraction is the default for Ivy applications.
       usingIvy = (isIvyApplication && options.ivy === undefined) || !!options.ivy;
@@ -239,11 +252,38 @@ export async function execute(
     return webpackResult;
   }
 
+  const basePath = config.context || projectRoot;
+
+  const { checkDuplicateMessages } = await import(
+    // tslint:disable-next-line: trailing-comma
+    '@angular/localize/src/tools/src/extract/duplicates'
+  );
+
+  // The filesystem is used to create a relative path for each file
+  // from the basePath.  This relative path is then used in the error message.
+  const checkFileSystem = {
+    relative(from: string, to: string): string {
+      return path.relative(from, to);
+    },
+  };
+  const diagnostics = checkDuplicateMessages(
+    // tslint:disable-next-line: no-any
+    checkFileSystem as any,
+    ivyMessages,
+    'warning',
+    // tslint:disable-next-line: no-any
+    basePath as any,
+  );
+  if (diagnostics.messages.length > 0) {
+    context.logger.warn(diagnostics.formatDiagnostics(''));
+  }
+
   // Serialize all extracted messages
   const serializer = await getSerializer(
-    options.format,
+    format,
     i18n.sourceLocale,
-    config.context || projectRoot,
+    basePath,
+    useLegacyIds,
   );
   const content = serializer.serialize(ivyMessages);
 
