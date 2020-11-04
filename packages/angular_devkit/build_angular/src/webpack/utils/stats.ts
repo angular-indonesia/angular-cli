@@ -21,11 +21,13 @@ export function formatSize(size: number): string {
 
   const abbreviations = ['bytes', 'kB', 'MB', 'GB'];
   const index = Math.floor(Math.log(size) / Math.log(1024));
-
-  return `${+(size / Math.pow(1024, index)).toPrecision(3)} ${abbreviations[index]}`;
+  const roundedSize = size / Math.pow(1024, index);
+  // bytes don't have a fraction
+  const fractionDigits = index === 0 ? 0 : 2;
+  return `${roundedSize.toFixed(fractionDigits)} ${abbreviations[index]}`;
 }
 
-export type BundleStatsData = [files: string, names: string, size: string];
+export type BundleStatsData = [files: string, names: string, size: number | string];
 
 export interface BundleStats {
   initial: boolean;
@@ -43,35 +45,50 @@ export function generateBundleStats(
   },
   colors: boolean,
 ): BundleStats {
-  const g = (x: string) => (colors ? ansiColors.greenBright(x) : x);
-  const c = (x: string) => (colors ? ansiColors.cyanBright(x) : x);
-
-  const size = typeof info.size === 'number' ? formatSize(info.size) : '-';
+  const size = typeof info.size === 'number' ? info.size : '-';
   const files = info.files.filter(f => !f.endsWith('.map')).map(f => path.basename(f)).join(', ');
   const names = info.names?.length ? info.names.join(', ') : '-';
   const initial = !!(info.entry || info.initial);
 
   return {
     initial,
-    stats: [g(files), names, c(size)],
+    stats: [files, names, size],
   }
 }
 
-function generateBuildStatsTable(data: BundleStats[], colors: boolean): string {
+function generateBuildStatsTable(data: BundleStats[], colors: boolean, showTotalSize: boolean): string {
+  const g = (x: string) => colors ? ansiColors.greenBright(x) : x;
+  const c = (x: string) => colors ? ansiColors.cyanBright(x) : x;
+  const bold = (x: string) => colors ? ansiColors.bold(x) : x;
+  const dim = (x: string) => colors ? ansiColors.dim(x) : x;
+
   const changedEntryChunksStats: BundleStatsData[] = [];
   const changedLazyChunksStats: BundleStatsData[] = [];
+
+  let initialTotalSize = 0;
+
   for (const { initial, stats } of data) {
+    const [files, names, size] = stats;
+
+    const data: BundleStatsData = [
+      g(files),
+      names,
+      c(typeof size === 'number' ? formatSize(size) : size),
+    ];
+
     if (initial) {
-      changedEntryChunksStats.push(stats);
+      changedEntryChunksStats.push(data);
+
+      if (typeof size === 'number') {
+        initialTotalSize += size;
+      }
+
     } else {
-      changedLazyChunksStats.push(stats);
+      changedLazyChunksStats.push(data);
     }
   }
 
-  const bundleInfo: string[][] = [];
-
-  const bold = (x: string) => colors ? ansiColors.bold(x) : x;
-  const dim = (x: string) => colors ? ansiColors.dim(x) : x;
+  const bundleInfo: (string | number)[][] = [];
 
   // Entry chunks
   if (changedEntryChunksStats.length) {
@@ -79,6 +96,11 @@ function generateBuildStatsTable(data: BundleStats[], colors: boolean): string {
       ['Initial Chunk Files', 'Names', 'Size'].map(bold),
       ...changedEntryChunksStats,
     );
+
+    if (showTotalSize) {
+      bundleInfo.push([]);
+      bundleInfo.push([' ', 'Initial Total', formatSize(initialTotalSize)].map(bold));
+    }
   }
 
   // Seperator
@@ -97,6 +119,7 @@ function generateBuildStatsTable(data: BundleStats[], colors: boolean): string {
   return textTable(bundleInfo, {
     hsep: dim(' | '),
     stringLength: s => removeColor(s).length,
+    align: ['l', 'l', 'r'],
   });
 }
 
@@ -124,7 +147,20 @@ function statsToString(json: any, statsConfig: any, bundleState?: BundleStats[])
     unchangedChunkNumber = json.chunks.length - changedChunksStats.length;
   }
 
-  const statsTable = generateBuildStatsTable(changedChunksStats, colors);
+  // Sort chunks by size in descending order
+  changedChunksStats.sort((a, b) => {
+    if (a.stats[2] > b.stats[2]) {
+      return -1;
+    }
+
+    if (a.stats[2] < b.stats[2]) {
+      return 1;
+    }
+
+    return 0;
+  });
+
+  const statsTable = generateBuildStatsTable(changedChunksStats, colors, unchangedChunkNumber === 0);
 
   // In some cases we do things outside of webpack context 
   // Such us index generation, service worker augmentation etc...
