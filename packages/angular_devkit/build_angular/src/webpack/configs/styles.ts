@@ -134,16 +134,9 @@ export function getStylesConfig(wco: WebpackConfigOptions) {
       test: /\.styl$/,
       use: [
         {
-          loader: require.resolve('resolve-url-loader'),
-          options: {
-            sourceMap: cssSourceMap,
-          },
-        },
-        {
           loader: require.resolve('stylus-loader'),
           options: {
             sourceMap: cssSourceMap,
-            webpackImporter: false,
             stylusOptions: {
               compress: false,
               sourceMap: { comment: false },
@@ -198,7 +191,7 @@ export function getStylesConfig(wco: WebpackConfigOptions) {
     cssSourceMap
     // Never use component css sourcemap when style optimizations are on.
     // It will just increase bundle size without offering good debug experience.
-    && !buildOptions.optimization.styles
+    && !buildOptions.optimization.styles.minify
     // Inline all sourcemap types except hidden ones, which are the same as no sourcemaps
     // for component css.
     && !buildOptions.sourceMap.hidden
