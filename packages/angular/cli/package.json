@@ -33,19 +33,19 @@
     "@yarnpkg/lockfile": "1.1.0",
     "ansi-colors": "4.1.1",
     "debug": "4.3.1",
-    "ini": "1.3.6",
+    "ini": "2.0.0",
     "inquirer": "7.3.3",
     "jsonc-parser": "3.0.0",
     "npm-package-arg": "8.1.0",
     "npm-pick-manifest": "6.1.0",
     "open": "7.3.0",
-    "pacote": "9.5.12",
+    "pacote": "11.1.13",
     "resolve": "1.19.0",
     "rimraf": "3.0.2",
-    "semver": "7.3.2",
+    "semver": "7.3.4",
     "symbol-observable": "3.0.0",
     "universal-analytics": "0.4.23",
-    "uuid": "8.3.1"
+    "uuid": "8.3.2"
   },
   "ng-update": {
     "migrations": "@schematics/angular/migrations/migration-collection.json",
