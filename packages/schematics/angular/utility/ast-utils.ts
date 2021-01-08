@@ -231,18 +231,6 @@ export function insertAfterLastOccurrence(nodes: ts.Node[],
   return new InsertChange(file, lastItemPosition, toInsert);
 }
 
-
-export function getContentOfKeyLiteral(_source: ts.SourceFile, node: ts.Node): string | null {
-  if (node.kind == ts.SyntaxKind.Identifier) {
-    return (node as ts.Identifier).text;
-  } else if (node.kind == ts.SyntaxKind.StringLiteral) {
-    return (node as ts.StringLiteral).text;
-  } else {
-    return null;
-  }
-}
-
-
 function _angularImportsFromNode(node: ts.ImportDeclaration,
                                  _sourceFile: ts.SourceFile): {[name: string]: string} {
   const ms = node.moduleSpecifier;
@@ -336,38 +324,6 @@ export function getDecoratorMetadata(source: ts.SourceFile, identifier: string,
     .map(expr => expr.arguments[0] as ts.ObjectLiteralExpression);
 }
 
-function findClassDeclarationParent(node: ts.Node): ts.ClassDeclaration|undefined {
-  if (ts.isClassDeclaration(node)) {
-    return node;
-  }
-
-  return node.parent && findClassDeclarationParent(node.parent);
-}
-
-/**
- * Given a source file with @NgModule class(es), find the name of the first @NgModule class.
- *
- * @param source source file containing one or more @NgModule
- * @returns the name of the first @NgModule, or `undefined` if none is found
- */
-export function getFirstNgModuleName(source: ts.SourceFile): string|undefined {
-  // First, find the @NgModule decorators.
-  const ngModulesMetadata = getDecoratorMetadata(source, 'NgModule', '@angular/core');
-  if (ngModulesMetadata.length === 0) {
-    return undefined;
-  }
-
-  // Then walk parent pointers up the AST, looking for the ClassDeclaration parent of the NgModule
-  // metadata.
-  const moduleClass = findClassDeclarationParent(ngModulesMetadata[0]);
-  if (!moduleClass || !moduleClass.name) {
-    return undefined;
-  }
-
-  // Get the class name of the module ClassDeclaration.
-  return moduleClass.name.text;
-}
-
 export function getMetadataField(
   node: ts.ObjectLiteralExpression,
   metadataField: string,
@@ -377,8 +333,7 @@ export function getMetadataField(
     // Filter out every fields that's not "metadataField". Also handles string literals
     // (but not expressions).
     .filter(({ name }) => {
-      return (ts.isIdentifier(name) || ts.isStringLiteral(name))
-        && name.getText() === metadataField;
+      return (ts.isIdentifier(name) || ts.isStringLiteral(name)) && name.text === metadataField;
     });
 }
 
