@@ -85,9 +85,9 @@
   dependencies:
     tslib "^2.0.0"
 
-"@angular/dev-infra-private@https://github.com/angular/dev-infra-private-builds.git#8cfa1d0e3a36bad2e34ad6c0795cac6bc3816d72":
+"@angular/dev-infra-private@https://github.com/angular/dev-infra-private-builds.git#579e491f4308ab4733a5c28ef7c5c734e3bf405e":
   version "0.0.0"
-  resolved "https://github.com/angular/dev-infra-private-builds.git#8cfa1d0e3a36bad2e34ad6c0795cac6bc3816d72"
+  resolved "https://github.com/angular/dev-infra-private-builds.git#579e491f4308ab4733a5c28ef7c5c734e3bf405e"
   dependencies:
     "@angular/benchpress" "0.2.1"
     "@bazel/buildifier" "^0.29.0"
@@ -1618,10 +1618,10 @@
   dependencies:
     "@types/node" "*"
 
-"@types/license-checker-webpack-plugin@^0.0.2":
-  version "0.0.2"
-  resolved "https://registry.yarnpkg.com/@types/license-checker-webpack-plugin/-/license-checker-webpack-plugin-0.0.2.tgz#ee35e2b36a0eccea48254dc1bcc47429f8290384"
-  integrity sha512-ad6Z7r3PdexKQI1MQD3o7VVHPdfduZbTRiob7bKBKihZC6Z3BzKvoZjHWIpkkxXjk6SaEhPjWdDGYQbFtsCQBg==
+"@types/license-checker-webpack-plugin@^0.0.3":
+  version "0.0.3"
+  resolved "https://registry.yarnpkg.com/@types/license-checker-webpack-plugin/-/license-checker-webpack-plugin-0.0.3.tgz#20016a5ed6aec0a43a55e790713dbfc26f902c26"
+  integrity sha512-rbtXJfZPFdr7z6vOYAE/jhBmOiB7NQkS/dDtxv5Xor5mkB6Kml4l14quNSDolRUdDFM5xKx1AcpqtuUN+Nwc+Q==
   dependencies:
     "@types/webpack" "*"
 
@@ -4775,10 +4775,10 @@ engine.io@~3.5.0:
     engine.io-parser "~2.2.0"
     ws "~7.4.2"
 
-enhanced-resolve@5.4.1:
-  version "5.4.1"
-  resolved "https://registry.yarnpkg.com/enhanced-resolve/-/enhanced-resolve-5.4.1.tgz#c89b0c34f17f931902ef2913a125d4b825b49b6f"
-  integrity sha512-4GbyIMzYktTFoRSmkbgZ1LU+RXwf4AQ8Z+rSuuh1dC8plp0PPeaWvx6+G4hh4KnUJ48VoxKbNyA1QQQIUpXjYA==
+enhanced-resolve@5.6.0:
+  version "5.6.0"
+  resolved "https://registry.yarnpkg.com/enhanced-resolve/-/enhanced-resolve-5.6.0.tgz#ad19a1665f230a6e384724a30acf3f7332b2b3f0"
+  integrity sha512-C3GGDfFZmqUa21o10YRKbZN60DPl0HyXKXxoEnQMWso9u7KMU23L7CBHfr/rVxORddY/8YQZaU2MZ1ewTS8Pcw==
   dependencies:
     graceful-fs "^4.2.4"
     tapable "^2.2.0"
@@ -7342,10 +7342,10 @@ license-checker@^25.0.0:
     spdx-satisfies "^4.0.0"
     treeify "^1.1.0"
 
-license-webpack-plugin@2.3.10:
-  version "2.3.10"
-  resolved "https://registry.yarnpkg.com/license-webpack-plugin/-/license-webpack-plugin-2.3.10.tgz#6d391b51148efa66e995b82ab7935190d2ebc0b4"
-  integrity sha512-WU+tVS0465NwdaV/DLb0t7GmQUwdaGI7QVWVKvvwLSlpYERKUD7DwcWIqSaXO+uoXM+6T3IAw3fCaGyVnI3DIQ==
+license-webpack-plugin@2.3.11:
+  version "2.3.11"
+  resolved "https://registry.yarnpkg.com/license-webpack-plugin/-/license-webpack-plugin-2.3.11.tgz#0d93188a31fce350a44c86212badbaf33dcd29d8"
+  integrity sha512-0iVGoX5vx0WDy8dmwTTpOOMYiGqILyUbDeVMFH52AjgBlS58lHwOlFMSoqg5nY8Kxl6+FRKyUZY/UdlQaOyqDw==
   dependencies:
     "@types/webpack-sources" "^0.1.5"
     webpack-sources "^1.2.0"
@@ -10446,10 +10446,10 @@ safe-regex@^1.1.0:
   resolved "https://registry.yarnpkg.com/safer-buffer/-/safer-buffer-2.1.2.tgz#44fa161b0187b9549dd84bb91802f9bd8385cd6a"
   integrity sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg==
 
-sass-loader@10.1.0:
-  version "10.1.0"
-  resolved "https://registry.yarnpkg.com/sass-loader/-/sass-loader-10.1.0.tgz#1727fcc0c32ab3eb197cda61d78adf4e9174a4b3"
-  integrity sha512-ZCKAlczLBbFd3aGAhowpYEy69Te3Z68cg8bnHHl6WnSCvnKpbM6pQrz957HWMa8LKVuhnD9uMplmMAHwGQtHeg==
+sass-loader@10.1.1:
+  version "10.1.1"
+  resolved "https://registry.yarnpkg.com/sass-loader/-/sass-loader-10.1.1.tgz#4ddd5a3d7638e7949065dd6e9c7c04037f7e663d"
+  integrity sha512-W6gVDXAd5hR/WHsPicvZdjAWHBcEJ44UahgxcIE196fW2ong0ZHMPO1kZuI5q0VlvMQZh32gpv69PLWQm70qrw==
   dependencies:
     klona "^2.0.4"
     loader-utils "^2.0.0"
@@ -10457,7 +10457,14 @@ sass-loader@10.1.0:
     schema-utils "^3.0.0"
     semver "^7.3.2"
 
-sass@1.32.2, sass@^1.23.0:
+sass@1.32.4:
+  version "1.32.4"
+  resolved "https://registry.yarnpkg.com/sass/-/sass-1.32.4.tgz#308bf29dd7f53d44ae4f06580e9a910ad9aa411e"
+  integrity sha512-N0BT0PI/t3+gD8jKa83zJJUb7ssfQnRRfqN+GIErokW6U4guBpfYl8qYB+OFLEho+QvnV5ZH1R9qhUC/Z2Ch9w==
+  dependencies:
+    chokidar ">=2.0.0 <4.0.0"
+
+sass@^1.23.0:
   version "1.32.2"
   resolved "https://registry.yarnpkg.com/sass/-/sass-1.32.2.tgz#66dc0250bc86c15d19ddee7135e93d0cf3d3257b"
   integrity sha512-u1pUuzqwz3SAgvHSWp1k0mRhX82b2DdlVnP6UIetQPZtYbuJUDaPQhZE12jyjB7vYeOScfz9WPsZJB6Rpk7heA==
