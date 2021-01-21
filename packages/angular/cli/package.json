@@ -39,7 +39,7 @@
     "npm-package-arg": "8.1.0",
     "npm-pick-manifest": "6.1.0",
     "open": "7.3.1",
-    "pacote": "11.2.1",
+    "pacote": "11.2.2",
     "resolve": "1.19.0",
     "rimraf": "3.0.2",
     "semver": "7.3.4",
@@ -51,6 +51,7 @@
     "migrations": "@schematics/angular/migrations/migration-collection.json",
     "packageGroup": {
       "@angular/cli": "0.0.0",
+      "@angular-devkit/architect": "0.0.0",
       "@angular-devkit/build-angular": "0.0.0",
       "@angular-devkit/build-webpack": "0.0.0",
       "@angular-devkit/core": "0.0.0",
