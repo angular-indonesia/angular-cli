@@ -249,7 +249,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
     return prev;
   }, []);
 
-    // Add a new asset for each entry.
+  // Add a new asset for each entry.
   for (const script of globalScriptsByBundleName) {
     // Lazy scripts don't get a hash, otherwise they can't be loaded by name.
     const hash = script.inject ? hashFormat.script : '';
@@ -361,10 +361,15 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
     );
   }
 
-  if (!differentialLoadingMode) {
+  if (buildOptions.budgets.length && !differentialLoadingMode) {
     // Budgets are computed after differential builds, not via a plugin.
     // https://github.com/angular/angular-cli/blob/master/packages/angular_devkit/build_angular/src/browser/index.ts
-    extraPlugins.push(new BundleBudgetPlugin({ budgets: buildOptions.budgets }));
+    const extraEntryPoints = [
+      ...normalizeExtraEntryPoints(buildOptions.styles || [], 'styles'),
+      ...normalizeExtraEntryPoints(buildOptions.scripts || [], 'scripts'),
+    ];
+
+    extraPlugins.push(new BundleBudgetPlugin({ budgets: buildOptions.budgets, extraEntryPoints }));
   }
 
   if ((scriptsSourceMap || stylesSourceMap)) {

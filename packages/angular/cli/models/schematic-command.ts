@@ -23,7 +23,6 @@ import {
   FileSystemCollection,
   FileSystemEngine,
   FileSystemSchematic,
-  FileSystemSchematicDescription,
   NodeWorkflow,
 } from '@angular-devkit/schematics/tools';
 import * as inquirer from 'inquirer';
@@ -37,6 +36,7 @@ import { isPackageNameSafeForAnalytics } from './analytics';
 import { BaseCommandOptions, Command } from './command';
 import { Arguments, CommandContext, CommandDescription, Option } from './interface';
 import { parseArguments, parseFreeFormArguments } from './parser';
+import { SchematicEngineHost } from './schematic-engine-host';
 
 export interface BaseSchematicSchema {
   debug?: boolean;
@@ -258,6 +258,7 @@ export abstract class SchematicCommand<
           ...current,
         }),
       ],
+      engineHostCreator: (options) => new SchematicEngineHost(options.resolvePaths),
     });
 
     const getProjectName = () => {
@@ -519,7 +520,7 @@ export abstract class SchematicCommand<
               // "See above" because we already printed the error.
               this.logger.fatal('The Schematic workflow failed. See above.');
             } else if (debug) {
-              this.logger.fatal(`An error occured:\n${err.message}\n${err.stack}`);
+              this.logger.fatal(`An error occurred:\n${err.message}\n${err.stack}`);
             } else {
               this.logger.fatal(err.message);
             }
