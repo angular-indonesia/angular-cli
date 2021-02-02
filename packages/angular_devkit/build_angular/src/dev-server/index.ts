@@ -14,7 +14,7 @@ import {
 } from '@angular-devkit/build-webpack';
 import { json, tags } from '@angular-devkit/core';
 import * as path from 'path';
-import { Observable, from, of } from 'rxjs';
+import { Observable, from } from 'rxjs';
 import { concatMap, switchMap } from 'rxjs/operators';
 import * as ts from 'typescript';
 import * as url from 'url';
@@ -34,8 +34,14 @@ import { readTsconfig } from '../utils/read-tsconfig';
 import { assertCompatibleAngularVersion } from '../utils/version';
 import { generateI18nBrowserWebpackConfigFromContext, getIndexInputFile, getIndexOutputFile } from '../utils/webpack-browser-config';
 import { addError, addWarning } from '../utils/webpack-diagnostics';
-import { getBrowserConfig, getCommonConfig, getStatsConfig, getStylesConfig, getWorkerConfig } from '../webpack/configs';
-import { getDevServerConfig } from '../webpack/configs/dev-server';
+import {
+  getBrowserConfig,
+  getCommonConfig,
+  getDevServerConfig,
+  getStatsConfig,
+  getStylesConfig,
+  getWorkerConfig,
+} from '../webpack/configs';
 import { IndexHtmlWebpackPlugin } from '../webpack/plugins/index-html-webpack-plugin';
 import { createWebpackLoggingCallback } from '../webpack/utils/stats';
 import { Schema } from './schema';
@@ -307,7 +313,7 @@ export function serveWebpackBrowser(
           webpackDevServerFactory: require('webpack-dev-server') as typeof webpackDevServer,
         },
       ).pipe(
-        concatMap((buildEvent, index) => {
+        concatMap(async (buildEvent, index) => {
           // Resolve serve address.
           const serverAddress = url.format({
             protocol: options.ssl ? 'https' : 'http',
@@ -325,8 +331,8 @@ export function serveWebpackBrowser(
             ` + '\n');
 
             if (options.open) {
-              const open = require('open');
-              open(serverAddress);
+              const open = await import('open');
+              await open(serverAddress);
             }
           }
 
@@ -334,7 +340,7 @@ export function serveWebpackBrowser(
             logger.info(`\n${colors.greenBright(colors.symbols.check)} Compiled successfully.`);
           }
 
-          return of({ ...buildEvent, baseUrl: serverAddress } as DevServerBuilderOutput);
+          return { ...buildEvent, baseUrl: serverAddress } as DevServerBuilderOutput;
         }),
       );
     }),
