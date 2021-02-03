@@ -296,6 +296,7 @@ export function buildWebpackBrowser(
 
               return { success };
             } else {
+              const processResults: ProcessBundleResult[] = [];
               const bundleInfoStats: BundleStats[] = [];
               outputPaths = ensureOutputPaths(baseOutputPath, i18n);
 
@@ -445,7 +446,6 @@ export function buildWebpackBrowser(
 
                 const processActions: typeof actions = [];
                 let processRuntimeAction: ProcessBundleOptions | undefined;
-                const processResults: ProcessBundleResult[] = [];
                 for (const action of actions) {
                   // If SRI is enabled always process the runtime bundle
                   // Lazy route integrity values are stored in the runtime bundle
@@ -598,22 +598,6 @@ export function buildWebpackBrowser(
                   const asset = webpackStats.assets?.find(a => a.name === chunk.files[0]);
                   bundleInfoStats.push(generateBundleStats({ ...chunk, size: asset?.size }));
                 }
-
-                // Check for budget errors and display them to the user.
-                const budgets = options.budgets || [];
-                const budgetFailures = checkBudgets(budgets, webpackStats, processResults);
-                for (const { severity, message } of budgetFailures) {
-                  switch (severity) {
-                    case ThresholdSeverity.Warning:
-                      webpackStats.warnings.push(message);
-                      break;
-                    case ThresholdSeverity.Error:
-                      webpackStats.errors.push(message);
-                      break;
-                    default:
-                      assertNever(severity);
-                  }
-                }
               } else {
                 files = emittedFiles.filter(x => x.name !== 'polyfills-es5');
                 noModuleFiles = emittedFiles.filter(x => x.name === 'polyfills-es5');
@@ -636,29 +620,48 @@ export function buildWebpackBrowser(
                 }
               }
 
-              // Copy assets
-              if (!options.watch && options.assets?.length) {
-                spinner.start('Copying assets...');
-                try {
-                  await copyAssets(
-                    normalizeAssetPatterns(
-                      options.assets,
-                      root,
-                      normalize(projectRoot),
-                      projectSourceRoot === undefined ? undefined : normalize(projectSourceRoot),
-                    ),
-                    Array.from(outputPaths.values()),
-                    context.workspaceRoot,
-                  );
-                  spinner.succeed('Copying assets complete.');
-                } catch (err) {
-                  spinner.fail(colors.redBright('Copying of assets failed.'));
-
-                  return { success: false, error: 'Unable to copy assets: ' + err.message };
+              // Check for budget errors and display them to the user.
+              const budgets = options.budgets;
+              if (budgets?.length) {
+                const budgetFailures = checkBudgets(budgets, webpackStats, processResults);
+                for (const { severity, message } of budgetFailures) {
+                  switch (severity) {
+                    case ThresholdSeverity.Warning:
+                      webpackStats.warnings.push(message);
+                      break;
+                    case ThresholdSeverity.Error:
+                      webpackStats.errors.push(message);
+                      break;
+                    default:
+                      assertNever(severity);
+                  }
                 }
               }
 
-              if (success) {
+              const buildSuccess = success && !statsHasErrors(webpackStats);
+              if (buildSuccess) {
+                // Copy assets
+                if (!options.watch && options.assets?.length) {
+                  spinner.start('Copying assets...');
+                  try {
+                    await copyAssets(
+                      normalizeAssetPatterns(
+                        options.assets,
+                        root,
+                        normalize(projectRoot),
+                        projectSourceRoot === undefined ? undefined : normalize(projectSourceRoot),
+                      ),
+                      Array.from(outputPaths.values()),
+                      context.workspaceRoot,
+                    );
+                    spinner.succeed('Copying assets complete.');
+                  } catch (err) {
+                    spinner.fail(colors.redBright('Copying of assets failed.'));
+
+                    return { success: false, error: 'Unable to copy assets: ' + err.message };
+                  }
+                }
+
                 if (options.index) {
                   spinner.start('Generating index html...');
 
@@ -735,7 +738,7 @@ export function buildWebpackBrowser(
 
               webpackStatsLogger(context.logger, webpackStats, config, bundleInfoStats);
 
-              return { success: !statsHasErrors(webpackStats) };
+              return { success: buildSuccess };
             }
           }),
           map(
