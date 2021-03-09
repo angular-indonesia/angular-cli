@@ -492,9 +492,14 @@
                       "@angular-devkit/build-angular:karma",
                       "@angular-devkit/build-angular:protractor",
                       "@angular-devkit/build-angular:server",
-                      "@angular-devkit/build-angular:tslint"
+                      "@angular-devkit/build-angular:tslint",
+                      "@angular-devkit/build-angular:ng-packagr"
                     ]
                   }
+                },
+                "defaultConfiguration": {
+                  "type": "string",
+                  "description": "A default named configuration to use when a target configuration is not provided."
                 },
                 "options": {
                   "type": "object"
@@ -516,6 +521,10 @@
               "properties": {
                 "builder": { "const": "@angular-devkit/build-angular:app-shell" },
                 "options": { "$ref": "#/definitions/targetOptions/definitions/appShell" },
+                "defaultConfiguration": {
+                  "type": "string",
+                  "description": "A default named configuration to use when a target configuration is not provided."
+                },
                 "configurations": {
                   "type": "object",
                   "additionalProperties": { "$ref": "#/definitions/targetOptions/definitions/appShell" }
@@ -527,6 +536,10 @@
               "properties": {
                 "builder": { "const": "@angular-devkit/build-angular:browser" },
                 "options": { "$ref": "#/definitions/targetOptions/definitions/browser" },
+                "defaultConfiguration": {
+                  "type": "string",
+                  "description": "A default named configuration to use when a target configuration is not provided."
+                },
                 "configurations": {
                   "type": "object",
                   "additionalProperties": { "$ref": "#/definitions/targetOptions/definitions/browser" }
@@ -538,6 +551,10 @@
               "properties": {
                 "builder": { "const": "@angular-devkit/build-angular:dev-server" },
                 "options": { "$ref": "#/definitions/targetOptions/definitions/devServer" },
+                "defaultConfiguration": {
+                  "type": "string",
+                  "description": "A default named configuration to use when a target configuration is not provided."
+                },
                 "configurations": {
                   "type": "object",
                   "additionalProperties": { "$ref": "#/definitions/targetOptions/definitions/devServer" }
@@ -549,6 +566,10 @@
               "properties": {
                 "builder": { "const": "@angular-devkit/build-angular:extract-i18n" },
                 "options": { "$ref": "#/definitions/targetOptions/definitions/extracti18n" },
+                "defaultConfiguration": {
+                  "type": "string",
+                  "description": "A default named configuration to use when a target configuration is not provided."
+                },
                 "configurations": {
                   "type": "object",
                   "additionalProperties": { "$ref": "#/definitions/targetOptions/definitions/extracti18n" }
@@ -560,6 +581,10 @@
               "properties": {
                 "builder": { "const": "@angular-devkit/build-angular:karma" },
                 "options": { "$ref": "#/definitions/targetOptions/definitions/karma" },
+                "defaultConfiguration": {
+                  "type": "string",
+                  "description": "A default named configuration to use when a target configuration is not provided."
+                },
                 "configurations": {
                   "type": "object",
                   "additionalProperties": { "$ref": "#/definitions/targetOptions/definitions/karma" }
@@ -571,6 +596,10 @@
               "properties": {
                 "builder": { "const": "@angular-devkit/build-angular:protractor" },
                 "options": { "$ref": "#/definitions/targetOptions/definitions/protractor" },
+                "defaultConfiguration": {
+                  "type": "string",
+                  "description": "A default named configuration to use when a target configuration is not provided."
+                },
                 "configurations": {
                   "type": "object",
                   "additionalProperties": { "$ref": "#/definitions/targetOptions/definitions/protractor" }
@@ -582,6 +611,10 @@
               "properties": {
                 "builder": { "const": "@angular-devkit/build-angular:server" },
                 "options": { "$ref": "#/definitions/targetOptions/definitions/server" },
+                "defaultConfiguration": {
+                  "type": "string",
+                  "description": "A default named configuration to use when a target configuration is not provided."
+                },
                 "configurations": {
                   "type": "object",
                   "additionalProperties": { "$ref": "#/definitions/targetOptions/definitions/server" }
@@ -593,9 +626,24 @@
               "properties": {
                 "builder": { "const": "@angular-devkit/build-angular:tslint" },
                 "options": { "$ref": "#/definitions/targetOptions/definitions/tslint" },
+                "defaultConfiguration": {
+                  "type": "string",
+                  "description": "A default named configuration to use when a target configuration is not provided."
+                },
                 "configurations": {
                   "type": "object",
                   "additionalProperties": { "$ref": "#/definitions/targetOptions/definitions/tslint" }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "properties": {
+                "builder": { "const": "@angular-devkit/build-angular:ng-packagr" },
+                "options": { "$ref": "#/definitions/targetOptions/definitions/ngPackagr" },
+                "configurations": {
+                  "type": "object",
+                  "additionalProperties": { "$ref": "#/definitions/targetOptions/definitions/ngPackagr" }
                 }
               }
             }
@@ -2096,6 +2144,29 @@
             }
           },
           "additionalProperties": false
+        },
+        "ngPackagr": {
+          "description": "ng-packagr target options for Build Architect. Use to build library projects.",
+          "type": "object",
+          "properties": {
+            "project": {
+              "type": "string",
+              "description": "The file path for the ng-packagr configuration file, relative to the current workspace."
+            },
+            "tsConfig": {
+              "type": "string",
+              "description": "The full path for the TypeScript configuration file, relative to the current workspace."
+            },
+            "watch": {
+              "type": "boolean",
+              "description": "Run build when files change.",
+              "default": false
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "project"
+          ]
         }
       }
     },
