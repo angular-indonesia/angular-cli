@@ -132,7 +132,6 @@ ts_library(
         "@npm//@types/postcss-preset-env",
         "@npm//@types/rimraf",
         "@npm//@types/semver",
-        "@npm//@types/speed-measure-webpack-plugin",
         "@npm//@types/text-table",
         "@npm//@types/webpack",
         "@npm//@types/webpack-dev-server",
@@ -182,7 +181,6 @@ ts_library(
         "@npm//source-map",
         "@npm//source-map-loader",
         "@npm//source-map-support",
-        "@npm//speed-measure-webpack-plugin",
         "@npm//style-loader",
         "@npm//stylus",
         "@npm//stylus-loader",
@@ -266,6 +264,7 @@ ts_library(
         "//packages/angular_devkit/architect/testing",
         "//packages/angular_devkit/core",
         "//packages/angular_devkit/core/node",
+        "@npm//@types/node-fetch",
         "@npm//rxjs",
     ],
 )
@@ -391,7 +390,6 @@ LARGE_SPECS = {
         # compete for the resources of other parallel tests slowing everything down.
         # Ask Bazel to allocate multiple CPUs for these tests with "cpu:n" tag.
         tags = ["cpu:2"] + LARGE_SPECS[spec].get("tags", []),
-        templated_args = ["--nobazel_patch_module_resolver"],
         deps = [":build_angular_" + spec + "_test_lib"],
     )
     for spec in LARGE_SPECS
@@ -404,7 +402,6 @@ jasmine_node_test(
     shard_count = 30,
     tags = ["cpu:2"],
     templated_args = [
-        "--nobazel_patch_module_resolver",
         "view_engine",
     ],
     deps = [":build_angular_browser_test_lib"],

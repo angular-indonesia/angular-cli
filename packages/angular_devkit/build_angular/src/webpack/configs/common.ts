@@ -503,8 +503,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
     plugins: [
       // Always replace the context for the System.import in angular/core to prevent warnings.
       // https://github.com/angular/angular/issues/11580
-      // With VE the correct context is added in @ngtools/webpack, but Ivy doesn't need it at all.
-      new ContextReplacementPlugin(/\@angular(\\|\/)core(\\|\/)/),
+      new ContextReplacementPlugin(/\@angular(\\|\/)core(\\|\/)/, path.join(projectRoot, '$_lazy_route_resources'), {}),
       new DedupeModuleResolvePlugin({ verbose: buildOptions.verbose }),
       ...extraPlugins,
     ],
