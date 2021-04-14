@@ -6,9 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import { RawSourceMap } from 'source-map';
-import { SourceMapSource } from 'webpack-sources';
-const loaderUtils = require('loader-utils');
-
+import { sources } from 'webpack';
 import { buildOptimizer } from './build-optimizer';
 
 interface BuildOptimizerLoaderOptions {
@@ -26,6 +24,7 @@ export default function buildOptimizerLoader(
     _module: { factoryMeta: { skipBuildOptimizer?: boolean; sideEffectFree?: boolean } };
     cacheable(): void;
     callback(error?: Error | null, content?: string, sourceMap?: unknown): void;
+    getOptions(): unknown;
   },
   content: string,
   previousSourceMap: RawSourceMap,
@@ -43,7 +42,7 @@ export default function buildOptimizerLoader(
     return;
   }
 
-  const options: BuildOptimizerLoaderOptions = loaderUtils.getOptions(this) || {};
+  const options = (this.getOptions() || {}) as BuildOptimizerLoaderOptions;
 
   const boOutput = buildOptimizer({
     content,
@@ -72,7 +71,7 @@ export default function buildOptimizerLoader(
 
     if (previousSourceMap) {
       // Use http://sokra.github.io/source-map-visualization/ to validate sourcemaps make sense.
-      newSourceMap = new SourceMapSource(
+      newSourceMap = new sources.SourceMapSource(
         newContent,
         this.resourcePath,
         intermediateSourceMap,
