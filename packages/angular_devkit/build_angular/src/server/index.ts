@@ -22,13 +22,13 @@ import { readTsconfig } from '../utils/read-tsconfig';
 import { assertCompatibleAngularVersion } from '../utils/version';
 import { generateI18nBrowserWebpackConfigFromContext } from '../utils/webpack-browser-config';
 import {
-  getAotConfig,
   getCommonConfig,
   getServerConfig,
   getStatsConfig,
   getStylesConfig,
+  getTypeScriptConfig,
 } from '../webpack/configs';
-import { JsonCompilationStats, webpackStatsLogger } from '../webpack/utils/stats';
+import { webpackStatsLogger } from '../webpack/utils/stats';
 import { Schema as ServerBuilderOptions } from './schema';
 
 /**
@@ -119,7 +119,7 @@ export function execute(
             );
           }
 
-          webpackStatsLogger(context.logger, webpackStats as JsonCompilationStats, config);
+          webpackStatsLogger(context.logger, webpackStats, config);
 
           return { ...output, success };
         }),
@@ -166,7 +166,7 @@ async function initialize(
       getServerConfig(wco),
       getStylesConfig(wco),
       getStatsConfig(wco),
-      getAotConfig(wco),
+      getTypeScriptConfig(wco),
     ],
   );
 
