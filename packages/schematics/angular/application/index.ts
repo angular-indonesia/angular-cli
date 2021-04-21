@@ -29,7 +29,6 @@ import {
 } from '@angular-devkit/schematics';
 import { NodePackageInstallTask } from '@angular-devkit/schematics/tasks';
 import { Schema as ComponentOptions } from '../component/schema';
-import { Schema as E2eOptions } from '../e2e/schema';
 import { NodeDependencyType, addPackageJsonDependency } from '../utility/dependencies';
 import { latestVersions } from '../utility/latest-versions';
 import { applyLintFix } from '../utility/lint-fix';
@@ -140,8 +139,7 @@ function addAppToWorkspaceFile(options: ApplicationOptions, appDir: string): Rul
     ];
   }
 
-  const inlineStyleLanguage =
-    options.style && options.style !== Style.Css && options.style !== Style.Styl
+  const inlineStyleLanguage = options?.style !== Style.Css
       ? options.style
       : undefined;
 
@@ -161,7 +159,6 @@ function addAppToWorkspaceFile(options: ApplicationOptions, appDir: string): Rul
           main: `${sourceRoot}/main.ts`,
           polyfills: `${sourceRoot}/polyfills.ts`,
           tsConfig: `${projectRoot}tsconfig.app.json`,
-          aot: true,
           inlineStyleLanguage,
           assets: [
             `${sourceRoot}/favicon.ico`,
@@ -179,16 +176,15 @@ function addAppToWorkspaceFile(options: ApplicationOptions, appDir: string): Rul
               replace: `${sourceRoot}/environments/environment.ts`,
               with: `${sourceRoot}/environments/environment.prod.ts`,
             }],
-            buildOptimizer: true,
-            optimization: true,
             outputHashing: 'all',
-            sourceMap: false,
-            namedChunks: false,
-            extractLicenses: true,
-            vendorChunk: false,
           },
           development: {
+            buildOptimizer: false,
+            optimization: false,
             vendorChunk: true,
+            extractLicenses: false,
+            sourceMap: true,
+            namedChunks: true,
           },
         },
       },
@@ -282,11 +278,6 @@ export default function (options: ApplicationOptions): Rule {
       : join(normalize(newProjectRoot), strings.dasherize(options.name));
     const sourceDir = `${appDir}/src/app`;
 
-    const e2eOptions: E2eOptions = {
-      relatedAppName: options.name,
-      rootSelector: appRootSelector,
-    };
-
     return chain([
       addAppToWorkspaceFile(options, appDir),
       mergeWith(
@@ -338,7 +329,6 @@ export default function (options: ApplicationOptions): Rule {
           }),
           move(sourceDir),
         ]), MergeStrategy.Overwrite),
-      options.minimal ? noop() : schematic('e2e', e2eOptions),
       options.skipPackageJson ? noop() : addDependenciesToPackageJson(options),
       options.lintFix ? applyLintFix(appDir) : noop(),
     ]);

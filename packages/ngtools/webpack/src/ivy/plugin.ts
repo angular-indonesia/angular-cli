@@ -9,7 +9,14 @@ import { CompilerHost, CompilerOptions, readConfiguration } from '@angular/compi
 import { NgtscProgram } from '@angular/compiler-cli/src/ngtsc/program';
 import { createHash } from 'crypto';
 import * as ts from 'typescript';
-import { Compilation, Compiler, Module, NormalModuleReplacementPlugin, util } from 'webpack';
+import {
+  Compilation,
+  Compiler,
+  Module,
+  NormalModule,
+  NormalModuleReplacementPlugin,
+  util,
+} from 'webpack';
 import { NgccProcessor } from '../ngcc_processor';
 import { TypeScriptPathsPlugin } from '../paths-plugin';
 import { WebpackResourceLoader } from '../resource_loader';
@@ -59,7 +66,7 @@ function initializeNgccProcessor(
   tsconfig: string,
 ): { processor: NgccProcessor; errors: string[]; warnings: string[] } {
   const { inputFileSystem, options: webpackOptions } = compiler;
-  const mainFields = ([] as string[]).concat(...(webpackOptions.resolve?.mainFields || []));
+  const mainFields = webpackOptions.resolve?.mainFields?.flat() ?? [];
 
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -88,7 +95,6 @@ export class AngularWebpackPlugin {
   private ngtscNextProgram?: NgtscProgram;
   private builder?: ts.EmitAndSemanticDiagnosticsBuilderProgram;
   private sourceFileCache?: SourceFileCache;
-  private buildTimestamp!: number;
   private readonly fileDependencies = new Map<string, Set<string>>();
   private readonly requiredFilesToEmit = new Set<string>();
   private readonly requiredFilesToEmitCache = new Map<string, EmitFileResult | undefined>();
@@ -111,8 +117,7 @@ export class AngularWebpackPlugin {
     return this.pluginOptions;
   }
 
-  apply(webpackCompiler: Compiler): void {
-    const compiler = webpackCompiler as Compiler & { watchMode?: boolean };
+  apply(compiler: Compiler): void {
     // Setup file replacements with webpack
     for (const [key, value] of Object.entries(this.pluginOptions.fileReplacements)) {
       new NormalModuleReplacementPlugin(
@@ -124,33 +129,26 @@ export class AngularWebpackPlugin {
     // Set resolver options
     const pathsPlugin = new TypeScriptPathsPlugin();
     compiler.hooks.afterResolvers.tap('angular-compiler', (compiler) => {
-      // 'resolverFactory' is not present in the Webpack typings
-      // tslint:disable-next-line: no-any
-      const resolverFactoryHooks = (compiler as any).resolverFactory.hooks;
-
       // When Ivy is enabled we need to add the fields added by NGCC
       // to take precedence over the provided mainFields.
       // NGCC adds fields in package.json suffixed with '_ivy_ngcc'
       // Example: module -> module__ivy_ngcc
-      resolverFactoryHooks.resolveOptions
+      compiler.resolverFactory.hooks.resolveOptions
         .for('normal')
-        .tap(PLUGIN_NAME, (resolveOptions: { mainFields: string[]; plugins: unknown[] }) => {
+        .tap(PLUGIN_NAME, (resolveOptions) => {
           const originalMainFields = resolveOptions.mainFields;
-          const ivyMainFields = originalMainFields.map((f) => `${f}_ivy_ngcc`);
+          const ivyMainFields = originalMainFields?.flat().map((f) => `${f}_ivy_ngcc`) ?? [];
 
-          if (!resolveOptions.plugins) {
-            resolveOptions.plugins = [];
-          }
+          resolveOptions.plugins ??= [];
           resolveOptions.plugins.push(pathsPlugin);
 
           // https://github.com/webpack/webpack/issues/11635#issuecomment-707016779
           return util.cleverMerge(resolveOptions, { mainFields: [...ivyMainFields, '...'] });
-
         });
     });
 
     let ngccProcessor: NgccProcessor | undefined;
-    const resourceLoader = new WebpackResourceLoader();
+    let resourceLoader: WebpackResourceLoader | undefined;
     let previousUnused: Set<string> | undefined;
     compiler.hooks.thisCompilation.tap(PLUGIN_NAME, (thisCompilation) => {
       const compilation = thisCompilation as WebpackCompilation;
@@ -163,6 +161,11 @@ export class AngularWebpackPlugin {
 
       // Store watch mode; assume true if not present (webpack < 4.23.0)
       this.watchMode = compiler.watchMode ?? true;
+
+      // Initialize the resource loader if not already setup
+      if (!resourceLoader) {
+        resourceLoader = new WebpackResourceLoader(this.watchMode);
+      }
 
       // Initialize and process eager ngcc if not already setup
       if (!ngccProcessor) {
@@ -200,12 +203,15 @@ export class AngularWebpackPlugin {
       let cache = this.sourceFileCache;
       let changedFiles;
       if (cache) {
-        // Invalidate existing cache based on compiler file timestamps
-        changedFiles = cache.invalidate(compiler.fileTimestamps, this.buildTimestamp);
+        changedFiles = new Set<string>();
+        for (const changedFile of [...compiler.modifiedFiles, ...compiler.removedFiles]) {
+          const normalizedChangedFile = normalizePath(changedFile);
+          // Invalidate file dependencies
+          this.fileDependencies.delete(normalizedChangedFile);
+          // Invalidate existing cache
+          cache.invalidate(normalizedChangedFile);
 
-        // Invalidate file dependencies of changed files
-        for (const changedFile of changedFiles) {
-          this.fileDependencies.delete(normalizePath(changedFile));
+          changedFiles.add(normalizedChangedFile);
         }
       } else {
         // Initialize a new cache
@@ -215,7 +221,6 @@ export class AngularWebpackPlugin {
           this.sourceFileCache = cache;
         }
       }
-      this.buildTimestamp = Date.now();
       augmentHostWithCaching(host, cache);
 
       const moduleResolutionCache = ts.createModuleResolutionCache(
@@ -264,6 +269,9 @@ export class AngularWebpackPlugin {
       compilation.hooks.finishModules.tapPromise(PLUGIN_NAME, async (modules) => {
         // Rebuild any remaining AOT required modules
         await this.rebuildRequiredFiles(modules, compilation, fileEmitter);
+
+        // Clear out the Webpack compilation to avoid an extra retaining reference
+        resourceLoader?.clearParentCompilation();
 
         // Analyze program for unused files
         if (compilation.errors.length > 0) {
@@ -348,7 +356,7 @@ export class AngularWebpackPlugin {
 
     if (filesToRebuild.size > 0) {
       for (const webpackModule of [...modules]) {
-        const resource = (webpackModule as Module & { resource?: string }).resource;
+        const resource = (webpackModule as NormalModule).resource;
         if (resource && filesToRebuild.has(normalizePath(resource))) {
           await rebuild(webpackModule);
         }
