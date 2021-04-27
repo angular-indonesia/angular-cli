@@ -1,10 +1,11 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
+
 import { Architect, BuilderRun } from '@angular-devkit/architect';
 // tslint:disable: no-implicit-dependencies
 import { Browser } from 'puppeteer/lib/cjs/puppeteer/common/Browser';
@@ -96,13 +97,13 @@ describe('Dev Server Builder HMR', () => {
               expect(logs).toContain(`[HMR] css reload %s ${url}styles.css`);
               expect(logs).toContain('[HMR] App is up to date.');
 
-              const pTag = await page.evaluate(() => {
+              const pTagColor = await page.evaluate(() => {
                 const el = document.querySelector('p');
 
-                return JSON.parse(JSON.stringify(getComputedStyle(el)));
+                return getComputedStyle(el).color;
               });
 
-              expect(pTag.color).toBe('rgb(255, 255, 0)');
+              expect(pTagColor).toBe('rgb(255, 255, 0)');
               break;
           }
 

@@ -1,10 +1,11 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
+
 // tslint:disable-next-line: no-global-tslint-disable
 // tslint:disable: no-implicit-dependencies
 import { JsonObject } from '@angular-devkit/core';
@@ -87,7 +88,7 @@ function loadPackageJson(p: string) {
       // Overwrite engines to a common default.
       case 'engines':
         pkg['engines'] = {
-          'node': '>= 12.13.0',
+          'node': '^12.14.1 || ^14.0.0',
           'npm': '^6.11.0 || ^7.5.6',
           'yarn': '>= 1.13.0',
         };

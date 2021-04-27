@@ -1,10 +1,11 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
+
 import {
   BuildOptimizerWebpackPlugin,
   buildOptimizerLoaderPath,
@@ -220,9 +221,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
 
     extraPlugins.push(new CopyWebpackPlugin({
       patterns: copyWebpackPluginPatterns,
-    // The typings for copy-webpack-plugin use the old @types/webpack package
-    // tslint:disable-next-line: no-any
-    }) as any);
+    }));
   }
 
   if (buildOptions.progress) {
