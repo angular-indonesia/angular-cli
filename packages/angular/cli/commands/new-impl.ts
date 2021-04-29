@@ -8,16 +8,14 @@
 
 import { Arguments } from '../models/interface';
 import { SchematicCommand } from '../models/schematic-command';
-import { ensureCompatibleNpm } from '../utilities/package-manager';
 import { Schema as NewCommandSchema } from './new';
-
 
 export class NewCommand extends SchematicCommand<NewCommandSchema> {
   public readonly allowMissingWorkspace = true;
   schematicName = 'ng-new';
 
   async initialize(options: NewCommandSchema & Arguments) {
-    this.collectionName = options.collection || await this.getDefaultSchematicCollection();
+    this.collectionName = options.collection || (await this.getDefaultSchematicCollection());
 
     return super.initialize(options);
   }
@@ -38,5 +36,4 @@ export class NewCommand extends SchematicCommand<NewCommandSchema> {
       force: !!options.force,
     });
   }
-
 }

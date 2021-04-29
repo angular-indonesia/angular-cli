@@ -37,7 +37,7 @@
     "jsonc-parser": "3.0.0",
     "npm-package-arg": "8.1.2",
     "npm-pick-manifest": "6.1.1",
-    "open": "8.0.6",
+    "open": "8.0.7",
     "ora": "5.4.0",
     "pacote": "11.3.3",
     "resolve": "1.20.0",
@@ -45,6 +45,9 @@
     "semver": "7.3.5",
     "symbol-observable": "4.0.0",
     "uuid": "8.3.2"
+  },
+  "devDependencies": {
+    "rxjs": "6.6.7"
   },
   "ng-update": {
     "migrations": "@schematics/angular/migrations/migration-collection.json",

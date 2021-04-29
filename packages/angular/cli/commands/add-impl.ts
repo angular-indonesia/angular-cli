@@ -131,7 +131,7 @@ export class AddCommand extends SchematicCommand<AddCommandSchema> {
         // 'latest' is invalid so search for most recent matching package
         const versionManifests = Object.values(packageMetadata.versions).filter(
           (value: PackageManifest) => !prerelease(value.version) && !value.deprecated,
-        ) as PackageManifest[];
+        );
 
         versionManifests.sort((a, b) => rcompare(a.version, b.version, true));
 
@@ -170,9 +170,7 @@ export class AddCommand extends SchematicCommand<AddCommandSchema> {
       collectionName = manifest.name;
 
       if (await this.hasMismatchedPeer(manifest)) {
-        spinner.warn(
-          'Package has unmet peer dependencies. Adding the package may not succeed.',
-        );
+        spinner.warn('Package has unmet peer dependencies. Adding the package may not succeed.');
       } else {
         spinner.succeed(`Package information loaded.`);
       }
@@ -215,12 +213,9 @@ export class AddCommand extends SchematicCommand<AddCommandSchema> {
           packageManager,
           options.registry ? [`--registry="${options.registry}"`] : undefined,
         );
-        const resolvedCollectionPath = require.resolve(
-          join(collectionName, 'package.json'),
-          {
-            paths: [tempPath],
-          },
-        );
+        const resolvedCollectionPath = require.resolve(join(collectionName, 'package.json'), {
+          paths: [tempPath],
+        });
 
         collectionName = dirname(resolvedCollectionPath);
       } else {
