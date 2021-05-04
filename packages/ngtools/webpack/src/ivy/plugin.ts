@@ -258,14 +258,23 @@ export class AngularWebpackPlugin {
             resourceLoader,
           );
 
-      const allProgramFiles = builder
-        .getSourceFiles()
-        .filter((sourceFile) => !internalFiles?.has(sourceFile));
+      // Set of files used during the unused TypeScript file analysis
+      const currentUnused = new Set<string>();
 
-      // Ensure all program files are considered part of the compilation and will be watched
-      allProgramFiles.forEach((sourceFile) =>
-        compilation.fileDependencies.add(sourceFile.fileName),
-      );
+      for (const sourceFile of builder.getSourceFiles()) {
+        if (internalFiles?.has(sourceFile)) {
+          continue;
+        }
+
+        // Ensure all program files are considered part of the compilation and will be watched
+        compilation.fileDependencies.add(sourceFile.fileName);
+
+        // Add all non-declaration files to the initial set of unused files. The set will be
+        // analyzed and pruned after all Webpack modules are finished building.
+        if (!sourceFile.isDeclarationFile) {
+          currentUnused.add(normalizePath(sourceFile.fileName));
+        }
+      }
 
       compilation.hooks.finishModules.tapPromise(PLUGIN_NAME, async (modules) => {
         // Rebuild any remaining AOT required modules
@@ -279,16 +288,13 @@ export class AngularWebpackPlugin {
           return;
         }
 
-        const currentUnused = new Set(
-          allProgramFiles
-            .filter((sourceFile) => !sourceFile.isDeclarationFile)
-            .map((sourceFile) => normalizePath(sourceFile.fileName)),
-        );
-        Array.from(modules).forEach(({ resource }: Module & { resource?: string }) => {
+        for (const webpackModule of modules) {
+          const resource = (webpackModule as NormalModule).resource;
           if (resource) {
             this.markResourceUsed(normalizePath(resource), currentUnused);
           }
-        });
+        }
+
         for (const unused of currentUnused) {
           if (previousUnused && previousUnused.has(unused)) {
             continue;
@@ -331,9 +337,6 @@ export class AngularWebpackPlugin {
       return;
     }
 
-    const rebuild = (webpackModule: Module) =>
-      new Promise<void>((resolve) => compilation.rebuildModule(webpackModule, () => resolve()));
-
     const filesToRebuild = new Set<string>();
     for (const requiredFile of this.requiredFilesToEmit) {
       const history = this.fileEmitHistory.get(requiredFile);
@@ -356,12 +359,17 @@ export class AngularWebpackPlugin {
     }
 
     if (filesToRebuild.size > 0) {
-      for (const webpackModule of [...modules]) {
+      const rebuild = (webpackModule: Module) =>
+        new Promise<void>((resolve) => compilation.rebuildModule(webpackModule, () => resolve()));
+
+      const modulesToRebuild = [];
+      for (const webpackModule of modules) {
         const resource = (webpackModule as NormalModule).resource;
         if (resource && filesToRebuild.has(normalizePath(resource))) {
-          await rebuild(webpackModule);
+          modulesToRebuild.push(webpackModule);
         }
       }
+      await Promise.all(modulesToRebuild.map((webpackModule) => rebuild(webpackModule)));
     }
 
     this.requiredFilesToEmit.clear();
@@ -431,6 +439,7 @@ export class AngularWebpackPlugin {
 
     // Update semantic diagnostics cache
     const affectedFiles = new Set<ts.SourceFile>();
+    // eslint-disable-next-line no-constant-condition
     while (true) {
       const result = builder.getSemanticDiagnosticsOfNextAffectedFile(undefined, (sourceFile) => {
         // If the affected file is a TTC shim, add the shim's original source file.
