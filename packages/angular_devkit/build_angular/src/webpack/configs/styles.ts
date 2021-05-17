@@ -10,6 +10,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as webpack from 'webpack';
 import { ExtraEntryPoint } from '../../browser/schema';
+import { SassWorkerImplementation } from '../../sass/sass-service';
 import { BuildBrowserFeatures } from '../../utils/build-browser-features';
 import { WebpackConfigOptions } from '../../utils/build-options';
 import {
@@ -89,11 +90,11 @@ export function getStylesConfig(wco: WebpackConfigOptions): webpack.Configuratio
     buildOptions.stylePreprocessorOptions?.includePaths?.map((p) => path.resolve(root, p)) ?? [];
 
   // Process global styles.
-  const { entryPoints, noInjectNames, paths: globalStylePaths } = resolveGlobalStyles(
-    buildOptions.styles,
-    root,
-    !!buildOptions.preserveSymlinks,
-  );
+  const {
+    entryPoints,
+    noInjectNames,
+    paths: globalStylePaths,
+  } = resolveGlobalStyles(buildOptions.styles, root, !!buildOptions.preserveSymlinks);
   if (noInjectNames.length > 0) {
     // Add plugin to remove hashes from lazy styles.
     extraPlugins.push(new RemoveHashPlugin({ chunkNames: noInjectNames, hashFormat }));
@@ -114,7 +115,7 @@ export function getStylesConfig(wco: WebpackConfigOptions): webpack.Configuratio
         `To opt-out of the deprecated behaviour and start using 'sass' uninstall 'node-sass'.`,
     );
   } catch {
-    sassImplementation = require('sass');
+    sassImplementation = new SassWorkerImplementation();
   }
 
   const assetNameTemplate = assetNameTemplateFactory(hashFormat);
@@ -288,6 +289,8 @@ export function getStylesConfig(wco: WebpackConfigOptions): webpack.Configuratio
             implementation: sassImplementation,
             sourceMap: true,
             sassOptions: {
+              // Prevent use of `fibers` package as it no longer works in newer Node.js versions
+              fiber: false,
               // bootstrap-sass requires a minimum precision of 8
               precision: 8,
               includePaths,
