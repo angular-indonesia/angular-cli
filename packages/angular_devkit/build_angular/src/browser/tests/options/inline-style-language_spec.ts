@@ -6,6 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
+import { concatMap, count, take, timeout } from 'rxjs/operators';
 import { buildWebpackBrowser } from '../../index';
 import { InlineStyleLanguage } from '../../schema';
 import { BASE_OPTIONS, BROWSER_BUILDER_INFO, describeBuilder } from '../setup';
@@ -31,10 +32,7 @@ describeBuilder(buildWebpackBrowser, BROWSER_BUILDER_INFO, (harness) => {
           });
 
           await harness.modifyFile('src/app/app.component.ts', (content) =>
-            content.replace(
-              '__STYLE_MARKER__',
-              '$primary-color: green;\\nh1 { color: $primary-color; }',
-            ),
+            content.replace('__STYLE_MARKER__', '$primary: green;\\nh1 { color: $primary; }'),
           );
 
           const { result } = await harness.executeOnce();
@@ -51,10 +49,7 @@ describeBuilder(buildWebpackBrowser, BROWSER_BUILDER_INFO, (harness) => {
           });
 
           await harness.modifyFile('src/app/app.component.ts', (content) =>
-            content.replace(
-              '__STYLE_MARKER__',
-              '$primary-color: green\\nh1\\n\\tcolor: $primary-color',
-            ),
+            content.replace('__STYLE_MARKER__', '$primary: green\\nh1\\n\\tcolor: $primary'),
           );
 
           const { result } = await harness.executeOnce();
@@ -76,7 +71,7 @@ describeBuilder(buildWebpackBrowser, BROWSER_BUILDER_INFO, (harness) => {
         //   await harness.modifyFile('src/app/app.component.ts', (content) =>
         //     content.replace(
         //       '__STYLE_MARKER__',
-        //       '$primary-color = green;\\nh1 { color: $primary-color; }',
+        //       '$primary = green;\\nh1 { color: $primary; }',
         //     ),
         //   );
 
@@ -94,16 +89,71 @@ describeBuilder(buildWebpackBrowser, BROWSER_BUILDER_INFO, (harness) => {
           });
 
           await harness.modifyFile('src/app/app.component.ts', (content) =>
-            content.replace(
-              '__STYLE_MARKER__',
-              '@primary-color: green;\\nh1 { color: @primary-color; }',
-            ),
+            content.replace('__STYLE_MARKER__', '@primary: green;\\nh1 { color: @primary; }'),
           );
 
           const { result } = await harness.executeOnce();
 
           expect(result?.success).toBe(true);
           harness.expectFile('dist/main.js').content.toContain('color: green');
+        });
+
+        it('updates produced stylesheet in watch mode', async () => {
+          harness.useTarget('build', {
+            ...BASE_OPTIONS,
+            main: 'src/main.ts',
+            inlineStyleLanguage: InlineStyleLanguage.Scss,
+            aot,
+            watch: true,
+          });
+
+          await harness.modifyFile('src/app/app.component.ts', (content) =>
+            content.replace('__STYLE_MARKER__', '$primary: green;\\nh1 { color: $primary; }'),
+          );
+
+          const buildCount = await harness
+            .execute()
+            .pipe(
+              timeout(30000),
+              concatMap(async ({ result }, index) => {
+                expect(result?.success).toBe(true);
+
+                switch (index) {
+                  case 0:
+                    harness.expectFile('dist/main.js').content.toContain('color: green');
+                    harness.expectFile('dist/main.js').content.not.toContain('color: aqua');
+
+                    await harness.modifyFile('src/app/app.component.ts', (content) =>
+                      content.replace(
+                        '$primary: green;\\nh1 { color: $primary; }',
+                        '$primary: aqua;\\nh1 { color: $primary; }',
+                      ),
+                    );
+                    break;
+                  case 1:
+                    harness.expectFile('dist/main.js').content.not.toContain('color: green');
+                    harness.expectFile('dist/main.js').content.toContain('color: aqua');
+
+                    await harness.modifyFile('src/app/app.component.ts', (content) =>
+                      content.replace(
+                        '$primary: aqua;\\nh1 { color: $primary; }',
+                        '$primary: blue;\\nh1 { color: $primary; }',
+                      ),
+                    );
+                    break;
+                  case 2:
+                    harness.expectFile('dist/main.js').content.not.toContain('color: green');
+                    harness.expectFile('dist/main.js').content.not.toContain('color: aqua');
+                    harness.expectFile('dist/main.js').content.toContain('color: blue');
+                    break;
+                }
+              }),
+              take(3),
+              count(),
+            )
+            .toPromise();
+
+          expect(buildCount).toBe(3);
         });
       });
     }

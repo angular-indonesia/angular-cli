@@ -1,6 +1,11 @@
 import { join } from 'path';
+import { getGlobalVariable } from '../../../utils/env';
 import { expectFileToExist, readFile, rimraf } from '../../../utils/fs';
+import { installWorkspacePackages } from '../../../utils/packages';
 import { ng } from '../../../utils/process';
+import { updateJsonFile } from '../../../utils/project';
+
+const snapshots = require('../../../ng-snapshot/package.json');
 
 export default async function () {
   // forcibly remove in case another test doesn't clean itself up
@@ -17,6 +22,25 @@ export default async function () {
   );
   if (hasPWADep) {
     throw new Error(`Expected 'package.json' not to contain a dependency on '@angular/pwa'.`);
+  }
+
+  const isSnapshotBuild = getGlobalVariable('argv')['ng-snapshots'];
+  if (isSnapshotBuild) {
+    let needInstall = false;
+    await updateJsonFile('package.json', (packageJson) => {
+      const dependencies = packageJson['dependencies'];
+      // Iterate over all of the packages to update them to the snapshot version.
+      for (const [name, version] of Object.entries(snapshots.dependencies)) {
+        if (name in dependencies && dependencies[name] !== version) {
+          dependencies[name] = version;
+          needInstall = true;
+        }
+      }
+    });
+
+    if (needInstall) {
+      await installWorkspacePackages();
+    }
   }
 
   // It should generate a SW configuration file (`ngsw.json`).

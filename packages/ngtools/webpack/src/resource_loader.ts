@@ -10,6 +10,10 @@ import { createHash } from 'crypto';
 import * as path from 'path';
 import * as vm from 'vm';
 import { Asset, Compilation, EntryPlugin, NormalModule, library, node, sources } from 'webpack';
+import {
+  CompilationWithInlineAngularResource,
+  InlineAngularResourceSymbol,
+} from './inline-data-loader';
 import { normalizePath } from './ivy/paths';
 
 interface CompilationOutput {
@@ -29,6 +33,8 @@ export class WebpackResourceLoader {
 
   private modifiedResources = new Set<string>();
   private outputPathCounter = 1;
+
+  private readonly inlineDataLoaderPath = require.resolve('./inline-data-loader');
 
   constructor(shouldCache: boolean) {
     if (shouldCache) {
@@ -98,13 +104,22 @@ export class WebpackResourceLoader {
     filePath?: string,
     data?: string,
     mimeType?: string,
+    fileExtension?: string,
+    resourceType?: 'style' | 'template',
+    hash?: string,
+    containingFile?: string,
   ): Promise<CompilationOutput> {
     if (!this._parentCompilation) {
       throw new Error('WebpackResourceLoader cannot be used without parentCompilation');
     }
 
     // Create a special URL for reading the resource from memory
-    const entry = data ? 'angular-resource://' : filePath;
+    const entry =
+      filePath ||
+      (resourceType
+        ? `${containingFile}-${this.outputPathCounter}.${fileExtension}!=!${this.inlineDataLoaderPath}!${containingFile}`
+        : `angular-resource:${resourceType},${hash}`);
+
     if (!entry) {
       throw new Error(`"filePath" or "data" must be specified.`);
     }
@@ -116,7 +131,11 @@ export class WebpackResourceLoader {
       );
     }
 
-    const outputFilePath = filePath || `angular-resource-output-${this.outputPathCounter++}.css`;
+    const outputFilePath =
+      filePath ||
+      `${containingFile}-angular-inline--${this.outputPathCounter++}.${
+        resourceType === 'template' ? 'html' : 'css'
+      }`;
     const outputOptions = {
       filename: outputFilePath,
       library: {
@@ -159,6 +178,8 @@ export class WebpackResourceLoader {
           NormalModule.getCompilationHooks(compilation)
             .readResourceForScheme.for('angular-resource')
             .tap('angular-compiler', () => data);
+
+          (compilation as CompilationWithInlineAngularResource)[InlineAngularResourceSymbol] = data;
         }
 
         compilation.hooks.additionalAssets.tap('angular-compiler', () => {
@@ -215,7 +236,14 @@ export class WebpackResourceLoader {
         if (parent) {
           parent.children = parent.children.filter((child) => child !== childCompilation);
 
-          parent.fileDependencies.addAll(childCompilation.fileDependencies);
+          for (const fileDependency of childCompilation.fileDependencies) {
+            if (data && containingFile && fileDependency.endsWith(entry)) {
+              // use containing file if the resource was inline
+              parent.fileDependencies.add(containingFile);
+            } else {
+              parent.fileDependencies.add(fileDependency);
+            }
+          }
           parent.contextDependencies.addAll(childCompilation.contextDependencies);
           parent.missingDependencies.addAll(childCompilation.missingDependencies);
           parent.buildDependencies.addAll(childCompilation.buildDependencies);
@@ -298,7 +326,13 @@ export class WebpackResourceLoader {
     return compilationResult.content;
   }
 
-  async process(data: string, mimeType: string): Promise<string> {
+  async process(
+    data: string,
+    mimeType: string | undefined,
+    fileExtension: string | undefined,
+    resourceType: 'template' | 'style',
+    containingFile?: string,
+  ): Promise<string> {
     if (data.trim().length === 0) {
       return '';
     }
@@ -307,7 +341,15 @@ export class WebpackResourceLoader {
     let compilationResult = this.inlineCache?.get(cacheKey);
 
     if (compilationResult === undefined) {
-      compilationResult = await this._compile(undefined, data, mimeType);
+      compilationResult = await this._compile(
+        undefined,
+        data,
+        mimeType,
+        fileExtension,
+        resourceType,
+        cacheKey,
+        containingFile,
+      );
 
       if (this.inlineCache && compilationResult.success) {
         this.inlineCache.set(cacheKey, compilationResult);
