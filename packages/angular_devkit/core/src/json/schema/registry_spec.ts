@@ -9,7 +9,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { map, mergeMap } from 'rxjs/operators';
 import { SchemaFormat } from './interface';
-import { CoreSchemaRegistry } from './registry';
+import { CoreSchemaRegistry, SchemaValidationException } from './registry';
 import { addUndefinedDefaults } from './transforms';
 
 describe('CoreSchemaRegistry', () => {
@@ -30,7 +30,7 @@ describe('CoreSchemaRegistry', () => {
             },
           },
           tslint: {
-            $ref: 'https://json.schemastore.org/tslint#',
+            $ref: 'https://json.schemastore.org/npm-link-up#',
           },
         },
       })
@@ -130,7 +130,32 @@ describe('CoreSchemaRegistry', () => {
         map((result) => {
           expect(result.success).toBe(false);
           expect(result.errors && result.errors[0].message).toContain(
-            'should NOT have additional properties',
+            'must NOT have additional properties',
+          );
+        }),
+      )
+      .toPromise()
+      .then(done, done.fail);
+  });
+
+  it('fails on invalid enum value', (done) => {
+    const registry = new CoreSchemaRegistry();
+    registry.addPostTransform(addUndefinedDefaults);
+    const data = { packageManager: 'foo' };
+
+    registry
+      .compile({
+        properties: {
+          packageManager: { type: 'string', enum: ['npm', 'yarn', 'pnpm', 'cnpm'] },
+        },
+        additionalProperties: false,
+      })
+      .pipe(
+        mergeMap((validator) => validator(data)),
+        map((result) => {
+          expect(result.success).toBe(false);
+          expect(new SchemaValidationException(result.errors).message).toContain(
+            `Data path "/packageManager" must be equal to one of the allowed values. Allowed values are: "npm", "yarn", "pnpm", "cnpm".`,
           );
         }),
       )
@@ -155,10 +180,8 @@ describe('CoreSchemaRegistry', () => {
         mergeMap((validator) => validator(data)),
         map((result) => {
           expect(result.success).toBe(false);
-          expect(result.errors && result.errors[0].message).toContain(
-            'should NOT have additional properties',
-          );
-          expect(result.errors && result.errors[0].keyword).toBe('additionalProperties');
+          expect(result.errors?.[0].message).toContain('must NOT have additional properties');
+          expect(result.errors?.[0].keyword).toBe('additionalProperties');
         }),
       )
       .toPromise()
@@ -224,7 +247,7 @@ describe('CoreSchemaRegistry', () => {
       .then(done, done.fail);
   });
 
-  it('shows dataPath and message on error', (done) => {
+  it('shows dataPath and message on error', async () => {
     const registry = new CoreSchemaRegistry();
     const data = { hotdot: 'hotdog', banana: 'banana' };
     const format: SchemaFormat = {
@@ -237,7 +260,7 @@ describe('CoreSchemaRegistry', () => {
 
     registry.addFormat(format);
 
-    registry
+    await registry
       .compile({
         properties: {
           hotdot: { type: 'string', format: 'is-hotdog' },
@@ -250,12 +273,11 @@ describe('CoreSchemaRegistry', () => {
           expect(result.success).toBe(false);
           expect(result.errors && result.errors[0]).toBeTruthy();
           expect(result.errors && result.errors[0].keyword).toBe('format');
-          expect(result.errors && result.errors[0].instancePath).toBe('.banana');
+          expect(result.errors && result.errors[0].instancePath).toBe('/banana');
           expect(result.errors && (result.errors[0].params as any).format).toBe('is-hotdog');
         }),
       )
-      .toPromise()
-      .then(done, done.fail);
+      .toPromise();
   });
 
   it('supports smart defaults', (done) => {

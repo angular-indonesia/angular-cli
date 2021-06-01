@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import Ajv, { ValidateFunction } from 'ajv';
+import Ajv, { SchemaObjCxt, ValidateFunction } from 'ajv';
 import ajvAddFormats from 'ajv-formats';
 import * as http from 'http';
 import * as https from 'https';
@@ -63,8 +63,18 @@ export class SchemaValidationException extends BaseException {
 
     const messages = errors.map((err) => {
       let message = `Data path ${JSON.stringify(err.instancePath)} ${err.message}`;
-      if (err.keyword === 'additionalProperties') {
-        message += `(${err.params.additionalProperty})`;
+      if (err.params) {
+        switch (err.keyword) {
+          case 'additionalProperties':
+            message += `(${err.params.additionalProperty})`;
+            break;
+
+          case 'enum':
+            message += `. Allowed values are: ${(err.params.allowedValues as string[] | undefined)
+              ?.map((v) => `"${v}"`)
+              .join(', ')}`;
+            break;
+        }
       }
 
       return message + '.';
@@ -292,11 +302,18 @@ export class CoreSchemaRegistry implements SchemaRegistry {
     };
 
     this._ajv.removeSchema(schema);
-
     let validator: ValidateFunction;
+
     try {
       this._currentCompilationSchemaInfo = schemaInfo;
       validator = this._ajv.compile(schema);
+    } catch (e) {
+      // This should eventually be refactored so that we we handle race condition where the same schema is validated at the same time.
+      if (!(e instanceof Ajv.MissingRefError)) {
+        throw e;
+      }
+
+      validator = await this._ajv.compileAsync(schema);
     } finally {
       this._currentCompilationSchemaInfo = undefined;
     }
@@ -351,9 +368,18 @@ export class CoreSchemaRegistry implements SchemaRegistry {
       }
 
       // Validate using ajv
-      const success = await validator.call(validationContext, data);
-      if (!success) {
-        return { data, success, errors: validator.errors ?? [] };
+      try {
+        const success = await validator.call(validationContext, data);
+
+        if (!success) {
+          return { data, success, errors: validator.errors ?? [] };
+        }
+      } catch (error) {
+        if (error instanceof Ajv.ValidationError) {
+          return { data, success: false, errors: error.errors };
+        }
+
+        throw error;
       }
 
       // Apply post-validation transforms
@@ -398,10 +424,7 @@ export class CoreSchemaRegistry implements SchemaRegistry {
           }
 
           // We cheat, heavily.
-          const pathArray = it.dataPathArr
-            .slice(1, it.dataLevel + 1)
-            .map((p) => (typeof p === 'number' ? p : p.str.slice(1, -1)));
-
+          const pathArray = this.normalizeDataPathArr(it);
           compilationSchemInfo.smartDefaultRecord.set(JSON.stringify(pathArray), schema);
 
           return () => true;
@@ -441,12 +464,7 @@ export class CoreSchemaRegistry implements SchemaRegistry {
           return () => true;
         }
 
-        const path =
-          '/' +
-          it.dataPathArr
-            .slice(1, it.dataLevel + 1)
-            .map((p) => (typeof p === 'number' ? p : p.str.slice(1, -1)))
-            .join('/');
+        const path = '/' + this.normalizeDataPathArr(it).join('/');
 
         let type: string | undefined;
         let items: Array<string | { label: string; value: string | number | boolean }> | undefined;
@@ -585,11 +603,31 @@ export class CoreSchemaRegistry implements SchemaRegistry {
     data: any,
     fragments: string[],
     value: unknown,
-    parent: Record<string, unknown> | null = null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    parent: any = null,
     parentProperty?: string,
     force?: boolean,
   ): void {
-    for (const fragment of fragments) {
+    for (let index = 0; index < fragments.length; index++) {
+      const fragment = fragments[index];
+      if (/^i\d+$/.test(fragment)) {
+        if (!Array.isArray(data)) {
+          return;
+        }
+
+        for (let dataIndex = 0; dataIndex < data.length; dataIndex++) {
+          CoreSchemaRegistry._set(
+            data[dataIndex],
+            fragments.slice(index + 1),
+            value,
+            data,
+            `${dataIndex}`,
+          );
+        }
+
+        return;
+      }
+
       if (!data && parent !== null && parentProperty) {
         data = parent[parentProperty] = {};
       }
@@ -656,5 +694,11 @@ export class CoreSchemaRegistry implements SchemaRegistry {
         `"${schema.$id}" schema is using the keyword "id" which its support is deprecated. Use "$id" for schema ID.`,
       );
     }
+  }
+
+  private normalizeDataPathArr(it: SchemaObjCxt): (number | string)[] {
+    return it.dataPathArr
+      .slice(1, it.dataLevel + 1)
+      .map((p) => (typeof p === 'number' ? p : p.str.replace(/\"/g, '')));
   }
 }
