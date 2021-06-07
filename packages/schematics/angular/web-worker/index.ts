@@ -125,8 +125,7 @@ export default function (options: WebWorkerOptions): Rule {
     if (!projectTarget) {
       throw new Error(`Target is not defined for this project.`);
     }
-    const projectTargetOptions = ((projectTarget.options ||
-      {}) as unknown) as BrowserBuilderOptions;
+    const projectTargetOptions = (projectTarget.options || {}) as unknown as BrowserBuilderOptions;
 
     if (options.path === undefined) {
       options.path = buildDefaultPath(project);
@@ -140,6 +139,18 @@ export default function (options: WebWorkerOptions): Rule {
     if (needWebWorkerConfig) {
       const workerConfigPath = join(normalize(root), 'tsconfig.worker.json');
       projectTargetOptions.webWorkerTsConfig = workerConfigPath;
+    }
+
+    const projectTestTarget = project.targets.get('test');
+    if (projectTestTarget) {
+      const projectTestTargetOptions = (projectTestTarget.options ||
+        {}) as unknown as BrowserBuilderOptions;
+
+      const needWebWorkerConfig = !projectTestTargetOptions.webWorkerTsConfig;
+      if (needWebWorkerConfig) {
+        const workerConfigPath = join(normalize(root), 'tsconfig.worker.json');
+        projectTestTargetOptions.webWorkerTsConfig = workerConfigPath;
+      }
     }
 
     const templateSource = apply(url('./files/worker'), [
