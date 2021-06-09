@@ -10,14 +10,7 @@ import { CompilerHost, CompilerOptions, readConfiguration } from '@angular/compi
 import { NgtscProgram } from '@angular/compiler-cli/src/ngtsc/program';
 import { createHash } from 'crypto';
 import * as ts from 'typescript';
-import {
-  Compilation,
-  Compiler,
-  Module,
-  NormalModule,
-  NormalModuleReplacementPlugin,
-  util,
-} from 'webpack';
+import type { Compilation, Compiler, Module, NormalModule } from 'webpack';
 import { NgccProcessor } from '../ngcc_processor';
 import { TypeScriptPathsPlugin } from '../paths-plugin';
 import { WebpackResourceLoader } from '../resource_loader';
@@ -72,6 +65,10 @@ function initializeNgccProcessor(
 
   const errors: string[] = [];
   const warnings: string[] = [];
+  const resolver = compiler.resolverFactory.get('normal', {
+    extensions: ['.json'],
+    useSyncFileSystemCalls: true,
+  });
   const processor = new NgccProcessor(
     mainFields,
     warnings,
@@ -79,7 +76,7 @@ function initializeNgccProcessor(
     compiler.context,
     tsconfig,
     inputFileSystem,
-    webpackOptions.resolve?.symlinks,
+    resolver,
   );
 
   return { processor, errors, warnings };
@@ -120,6 +117,8 @@ export class AngularWebpackPlugin {
   }
 
   apply(compiler: Compiler): void {
+    const { NormalModuleReplacementPlugin, util } = compiler.webpack;
+
     // Setup file replacements with webpack
     for (const [key, value] of Object.entries(this.pluginOptions.fileReplacements)) {
       new NormalModuleReplacementPlugin(
