@@ -160,6 +160,12 @@ function generateBuildStats(hash: string, time: number, colors: boolean): string
   return `Build at: ${w(new Date().toISOString())} - Hash: ${w(hash)} - Time: ${w('' + time)}ms`;
 }
 
+// We use this cache because we can have multiple builders running in the same process,
+// where each builder has different output path.
+
+// Ideally, we should create the logging callback as a factory, but that would need a refactoring.
+const runsCache = new Set<string>();
+
 function statsToString(
   json: StatsCompilation,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -176,8 +182,12 @@ function statsToString(
   const changedChunksStats: BundleStats[] = bundleState ?? [];
   let unchangedChunkNumber = 0;
   if (!bundleState?.length) {
+    const isFirstRun = !runsCache.has(json.outputPath || '');
+
     for (const chunk of json.chunks) {
-      if (!chunk.rendered) {
+      // During first build we want to display unchanged chunks
+      // but unchanged cached chunks are always marked as not rendered.
+      if (!isFirstRun && !chunk.rendered) {
         continue;
       }
 
@@ -188,6 +198,8 @@ function statsToString(
       changedChunksStats.push(generateBundleStats({ ...chunk, size: summedSize }));
     }
     unchangedChunkNumber = json.chunks.length - changedChunksStats.length;
+
+    runsCache.add(json.outputPath || '');
   }
 
   // Sort chunks by size in descending order
@@ -239,14 +251,6 @@ function statsToString(
     );
   }
 }
-
-export const IGNORE_WARNINGS = [
-  // Webpack 5+ has no facility to disable this warning.
-  // System.import is used in @angular/core for deprecated string-form lazy routes
-  /System.import\(\) is deprecated and will be removed soon/i,
-  // https://github.com/webpack-contrib/source-map-loader/blob/b2de4249c7431dd8432da607e08f0f65e9d64219/src/index.js#L83
-  /Failed to parse source map from/,
-];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function statsWarningsToString(json: StatsCompilation, statsConfig: any): string {

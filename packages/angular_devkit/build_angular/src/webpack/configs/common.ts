@@ -10,7 +10,13 @@ import {
   BuildOptimizerWebpackPlugin,
   buildOptimizerLoaderPath,
 } from '@angular-devkit/build-optimizer';
+import {
+  GLOBAL_DEFS_FOR_TERSER,
+  GLOBAL_DEFS_FOR_TERSER_WITH_AOT,
+  VERSION as NG_VERSION,
+} from '@angular/compiler-cli';
 import * as CopyWebpackPlugin from 'copy-webpack-plugin';
+import { createHash } from 'crypto';
 import { createWriteStream, existsSync, promises as fsPromises } from 'fs';
 import * as path from 'path';
 import { ScriptTarget } from 'typescript';
@@ -20,6 +26,7 @@ import {
   ContextReplacementPlugin,
   ProgressPlugin,
   RuleSetRule,
+  WebpackOptionsNormalized,
   debug,
 } from 'webpack';
 import { AssetPatternClass } from '../../browser/schema';
@@ -31,6 +38,7 @@ import {
   allowMinify,
   cachingDisabled,
   maxWorkers,
+  persistentBuildCacheEnabled,
   profilingEnabled,
   shouldBeautify,
 } from '../../utils/environment-options';
@@ -44,7 +52,6 @@ import {
   getWatchOptions,
   normalizeExtraEntryPoints,
 } from '../utils/helpers';
-import { IGNORE_WARNINGS } from '../utils/stats';
 
 // eslint-disable-next-line max-lines-per-function
 export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
@@ -310,11 +317,6 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
 
   if (scriptsOptimization) {
     const TerserPlugin = require('terser-webpack-plugin');
-    const {
-      GLOBAL_DEFS_FOR_TERSER,
-      GLOBAL_DEFS_FOR_TERSER_WITH_AOT,
-    } = require('@angular/compiler-cli');
-
     const angularGlobalDefinitions = buildOptions.aot
       ? GLOBAL_DEFS_FOR_TERSER_WITH_AOT
       : GLOBAL_DEFS_FOR_TERSER;
@@ -430,7 +432,15 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
     performance: {
       hints: false,
     },
-    ignoreWarnings: IGNORE_WARNINGS,
+    ignoreWarnings: [
+      // Webpack 5+ has no facility to disable this warning.
+      // System.import is used in @angular/core for deprecated string-form lazy routes
+      /System.import\(\) is deprecated and will be removed soon/i,
+      // https://github.com/webpack-contrib/source-map-loader/blob/b2de4249c7431dd8432da607e08f0f65e9d64219/src/index.js#L83
+      /Failed to parse source map from/,
+      // https://github.com/webpack-contrib/postcss-loader/blob/bd261875fdf9c596af4ffb3a1a73fe3c549befda/src/index.js#L153-L158
+      /Add postcss as project dependency/,
+    ],
     module: {
       // Show an error for missing exports instead of a warning.
       strictExportPresence: true,
@@ -473,11 +483,7 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
       syncWebAssembly: true,
       asyncWebAssembly: true,
     },
-    cache: !!buildOptions.watch &&
-      !cachingDisabled && {
-        type: 'memory',
-        maxGenerations: 1,
-      },
+    cache: getCacheSettings(wco, buildBrowserFeatures.supportedBrowsers),
     optimization: {
       minimizer: extraMinimizers,
       moduleIds: 'deterministic',
@@ -496,4 +502,39 @@ export function getCommonConfig(wco: WebpackConfigOptions): Configuration {
       ...extraPlugins,
     ],
   };
+}
+
+function getCacheSettings(
+  wco: WebpackConfigOptions,
+  supportedBrowsers: string[],
+): WebpackOptionsNormalized['cache'] {
+  if (persistentBuildCacheEnabled) {
+    const packageVersion = require('../../../package.json').version;
+
+    return {
+      type: 'filesystem',
+      cacheDirectory: findCachePath('angular-webpack'),
+      maxMemoryGenerations: 1,
+      // We use the versions and build options as the cache name. The Webpack configurations are too
+      // dynamic and shared among different build types: test, build and serve.
+      // None of which are "named".
+      name: createHash('sha1')
+        .update(NG_VERSION.full)
+        .update(packageVersion)
+        .update(wco.projectRoot)
+        .update(JSON.stringify(wco.tsConfig))
+        .update(JSON.stringify(wco.buildOptions))
+        .update(supportedBrowsers.join(''))
+        .digest('base64'),
+    };
+  }
+
+  if (wco.buildOptions.watch && !cachingDisabled) {
+    return {
+      type: 'memory',
+      maxGenerations: 1,
+    };
+  }
+
+  return false;
 }
