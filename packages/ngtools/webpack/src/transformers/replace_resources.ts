@@ -7,8 +7,8 @@
  */
 
 import * as ts from 'typescript';
-
-const inlineDataLoaderPath = require.resolve('../inline-data-loader');
+import { DirectAngularResourceLoaderPath } from '../loaders/direct-resource';
+import { InlineAngularResourceLoaderPath } from '../loaders/inline-resource';
 
 export function replaceResources(
   shouldTransform: (fileName: string) => boolean,
@@ -168,7 +168,10 @@ function visitComponentMetadata(
       return undefined;
 
     case 'templateUrl':
-      const url = getResourceUrl(node.initializer, directTemplateLoading ? '!raw-loader!' : '');
+      const url = getResourceUrl(
+        node.initializer,
+        directTemplateLoading ? `!${DirectAngularResourceLoaderPath}!` : '',
+      );
       if (!url) {
         return node;
       }
@@ -208,7 +211,7 @@ function visitComponentMetadata(
           } else if (inlineStyleFileExtension) {
             const data = Buffer.from(node.text).toString('base64');
             const containingFile = node.getSourceFile().fileName;
-            url = `${containingFile}.${inlineStyleFileExtension}!=!${inlineDataLoaderPath}?data=${encodeURIComponent(
+            url = `${containingFile}.${inlineStyleFileExtension}!=!${InlineAngularResourceLoaderPath}?data=${encodeURIComponent(
               data,
             )}!${containingFile}`;
           } else {
