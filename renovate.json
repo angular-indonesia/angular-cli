@@ -44,7 +44,21 @@
       "enabled": false
     },
     {
-      "excludePackagePatterns": ["^@angular/.*"],
+      "matchPaths": [
+        "packages/angular_devkit/schematics_cli/blank/project-files/package.json",
+        "packages/angular_devkit/schematics_cli/schematic/files/package.json",
+        "packages/schematics/angular/utility/latest-versions/package.json"
+      ],
+      "matchPackagePatterns": ["*"],
+      "groupName": "schematics dependencies",
+      "groupSlug": "all-schematics-dependencies"
+    },
+    {
+      "matchPaths": [
+        "!packages/angular_devkit/schematics_cli/blank/project-files/package.json",
+        "!packages/angular_devkit/schematics_cli/schematic/files/package.json",
+        "!packages/schematics/angular/utility/latest-versions/package.json"
+      ],
       "matchPackagePatterns": ["*"],
       "matchUpdateTypes": ["minor", "patch"],
       "groupName": "all non-major dependencies",
