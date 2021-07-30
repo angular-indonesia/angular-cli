@@ -7,7 +7,7 @@
  */
 
 import { Architect } from '@angular-devkit/architect';
-import { browserBuild, createArchitect, host } from '../../test-utils';
+import { browserBuild, createArchitect, host } from '../../testing/test-utils';
 
 describe('Browser Builder font optimization', () => {
   const target = { project: 'app', target: 'build' };
@@ -40,22 +40,11 @@ describe('Browser Builder font optimization', () => {
     expect(html).toContain(`font-family: 'Roboto'`);
   });
 
-  it('should not add woff when IE support is not needed', async () => {
+  it('should not add woff', async () => {
     const { files } = await browserBuild(architect, host, target, overrides);
     const html = await files['index.html'];
     expect(html).toContain(`format('woff2');`);
     expect(html).not.toContain(`format('woff');`);
-  });
-
-  it('should add woff when IE support is needed', async () => {
-    host.writeMultipleFiles({
-      '.browserslistrc': 'IE 11',
-    });
-
-    const { files } = await browserBuild(architect, host, target, overrides);
-    const html = await files['index.html'];
-    expect(html).toContain(`format('woff2');`);
-    expect(html).toContain(`format('woff');`);
   });
 
   it('should remove comments and line breaks when styles optimization is true', async () => {

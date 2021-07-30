@@ -24,7 +24,7 @@ import {
 // Default timeout for large specs is 2.5 minutes.
 jasmine.DEFAULT_TIMEOUT_INTERVAL = 150000;
 
-export const workspaceRoot = join(normalize(__dirname), `../test/hello-world-app/`);
+export const workspaceRoot = join(normalize(__dirname), `../../test/hello-world-app/`);
 export const host = new TestProjectHost(workspaceRoot);
 export const outputPath: Path = normalize('dist');
 
