@@ -11,7 +11,7 @@ import { getSystemPath, logging, normalize, resolve } from '@angular-devkit/core
 import * as path from 'path';
 import { Configuration, javascript } from 'webpack';
 import { merge as webpackMerge } from 'webpack-merge';
-import { Schema as BrowserBuilderSchema } from '../browser/schema';
+import { Schema as BrowserBuilderSchema } from '../builders/browser/schema';
 import { NormalizedBrowserBuilderSchema, defaultProgress, normalizeBrowserSchema } from '../utils';
 import { WebpackConfigOptions } from '../utils/build-options';
 import { readTsconfig } from '../utils/read-tsconfig';
@@ -87,14 +87,14 @@ export async function generateI18nBrowserWebpackConfigFromContext(
       }
       if (Array.isArray(config.resolve.alias)) {
         config.resolve.alias.push({
-          alias: '@angular/localize/init',
-          name: require.resolve('./empty.js'),
+          name: '@angular/localize/init',
+          alias: false,
         });
       } else {
         if (!config.resolve.alias) {
           config.resolve.alias = {};
         }
-        config.resolve.alias['@angular/localize/init'] = require.resolve('./empty.js');
+        config.resolve.alias['@angular/localize/init'] = false;
       }
     }
 
@@ -154,9 +154,11 @@ export async function generateBrowserWebpackConfigFromContext(
 
   // If builder watch support is present in the context, add watch plugin
   // This is internal only and currently only used for testing
-  const watcherFactory = (context as {
-    watcherFactory?: BuilderWatcherFactory;
-  }).watcherFactory;
+  const watcherFactory = (
+    context as {
+      watcherFactory?: BuilderWatcherFactory;
+    }
+  ).watcherFactory;
   if (watcherFactory) {
     if (!config.plugins) {
       config.plugins = [];
