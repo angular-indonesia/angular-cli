@@ -7,11 +7,13 @@
  */
 
 import { Path, getSystemPath, normalize } from '@angular-devkit/core';
-import { Config, Filesystem, Generator } from '@angular/service-worker/config';
+import type { Config, Filesystem } from '@angular/service-worker/config';
 import * as crypto from 'crypto';
 import { createReadStream, promises as fs, constants as fsConstants } from 'fs';
 import * as path from 'path';
 import { pipeline } from 'stream';
+import { pathToFileURL } from 'url';
+import { loadEsmModule } from './load-esm';
 
 class CliFilesystem implements Filesystem {
   constructor(private base: string) {}
@@ -74,9 +76,13 @@ export async function augmentAppWithServiceWorker(
   const workerPath = require.resolve('@angular/service-worker/ngsw-worker.js', {
     paths: [systemProjectRoot],
   });
-  const swConfigPath = require.resolve('@angular/service-worker/config', {
-    paths: [systemProjectRoot],
-  });
+  // Absolute paths on Windows must be `file://` URLs when using ESM. Otherwise,
+  // `c:` would be interpreted as a protocol instead of a drive letter.
+  const swConfigPath = pathToFileURL(
+    require.resolve('@angular/service-worker/config', {
+      paths: [systemProjectRoot],
+    }),
+  );
 
   // Determine the configuration file path
   let configPath;
@@ -103,8 +109,14 @@ export async function augmentAppWithServiceWorker(
     }
   }
 
+  // Load ESM `@angular/service-worker/config` using the TypeScript dynamic import workaround.
+  // Once TypeScript provides support for keeping the dynamic import this workaround can be
+  // changed to a direct dynamic import.
+  const GeneratorConstructor = (
+    await loadEsmModule<typeof import('@angular/service-worker/config')>(swConfigPath)
+  ).Generator;
+
   // Generate the manifest
-  const GeneratorConstructor = require(swConfigPath).Generator as typeof Generator;
   const generator = new GeneratorConstructor(new CliFilesystem(distPath), baseHref);
   const output = await generator.process(config);
 
