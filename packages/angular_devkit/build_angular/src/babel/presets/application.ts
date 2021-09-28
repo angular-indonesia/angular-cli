@@ -6,15 +6,33 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
+import { strict as assert } from 'assert';
 import * as fs from 'fs';
 import * as path from 'path';
 
 export type DiagnosticReporter = (type: 'error' | 'warning' | 'info', message: string) => void;
+
+/**
+ * An interface representing the factory functions for the `@angular/localize` translation Babel plugins.
+ * This must be provided for the ESM imports since dynamic imports are required to be asynchronous and
+ * Babel presets currently can only be synchronous.
+ *
+ * TODO_ESM: Remove all deep imports once `@angular/localize` is published with the `tools` entry point
+ */
+export interface I18nPluginCreators {
+  /* eslint-disable max-len */
+  makeEs2015TranslatePlugin: typeof import('@angular/localize/src/tools/src/translate/source_files/es2015_translate_plugin').makeEs2015TranslatePlugin;
+  makeEs5TranslatePlugin: typeof import('@angular/localize/src/tools/src/translate/source_files/es5_translate_plugin').makeEs5TranslatePlugin;
+  makeLocalePlugin: typeof import('@angular/localize/src/tools/src/translate/source_files/locale_plugin').makeLocalePlugin;
+  /* eslint-enable max-len */
+}
+
 export interface ApplicationPresetOptions {
   i18n?: {
     locale: string;
     missingTranslationBehavior?: 'error' | 'warning' | 'ignore';
     translation?: unknown;
+    pluginCreators?: I18nPluginCreators;
   };
 
   angularLinker?: {
@@ -35,42 +53,43 @@ type NgtscLogger = Parameters<
 >[0]['logger'];
 
 type I18nDiagnostics = import('@angular/localize/src/tools/src/diagnostics').Diagnostics;
+type I18nDiagnosticsHandlingStrategy =
+  import('@angular/localize/src/tools/src/diagnostics').DiagnosticHandlingStrategy;
 function createI18nDiagnostics(reporter: DiagnosticReporter | undefined): I18nDiagnostics {
-  // Babel currently is synchronous so import cannot be used
-  const diagnostics: I18nDiagnostics =
-    new (require('@angular/localize/src/tools/src/diagnostics').Diagnostics)();
+  const diagnostics: I18nDiagnostics = new (class {
+    readonly messages: I18nDiagnostics['messages'] = [];
+    hasErrors = false;
 
-  if (!reporter) {
-    return diagnostics;
-  }
+    add(type: I18nDiagnosticsHandlingStrategy, message: string): void {
+      if (type === 'ignore') {
+        return;
+      }
 
-  const baseAdd = diagnostics.add;
-  diagnostics.add = function (type, message, ...args) {
-    if (type !== 'ignore') {
-      baseAdd.call(diagnostics, type, message, ...args);
-      reporter(type, message);
+      this.messages.push({ type, message });
+      this.hasErrors ||= type === 'error';
+      reporter?.(type, message);
     }
-  };
 
-  const baseError = diagnostics.error;
-  diagnostics.error = function (message, ...args) {
-    baseError.call(diagnostics, message, ...args);
-    reporter('error', message);
-  };
-
-  const baseWarn = diagnostics.warn;
-  diagnostics.warn = function (message, ...args) {
-    baseWarn.call(diagnostics, message, ...args);
-    reporter('warning', message);
-  };
-
-  const baseMerge = diagnostics.merge;
-  diagnostics.merge = function (other, ...args) {
-    baseMerge.call(diagnostics, other, ...args);
-    for (const diagnostic of other.messages) {
-      reporter(diagnostic.type, diagnostic.message);
+    error(message: string): void {
+      this.add('error', message);
     }
-  };
+
+    warn(message: string): void {
+      this.add('warning', message);
+    }
+
+    merge(other: I18nDiagnostics): void {
+      for (const diagnostic of other.messages) {
+        this.add(diagnostic.type, diagnostic.message);
+      }
+    }
+
+    formatDiagnostics(): never {
+      assert.fail(
+        '@angular/localize Diagnostics formatDiagnostics should not be called from within babel.',
+      );
+    }
+  })();
 
   return diagnostics;
 }
@@ -80,6 +99,8 @@ function createI18nPlugins(
   translation: unknown | undefined,
   missingTranslationBehavior: 'error' | 'warning' | 'ignore',
   diagnosticReporter: DiagnosticReporter | undefined,
+  // TODO_ESM: Make `pluginCreators` required once `@angular/localize` is published with the `tools` entry point
+  pluginCreators: I18nPluginCreators | undefined,
 ) {
   const diagnostics = createI18nDiagnostics(diagnosticReporter);
   const plugins = [];
@@ -87,7 +108,10 @@ function createI18nPlugins(
   if (translation) {
     const {
       makeEs2015TranslatePlugin,
-    } = require('@angular/localize/src/tools/src/translate/source_files/es2015_translate_plugin');
+      // TODO_ESM: Remove all deep imports once `@angular/localize` is published with the `tools` entry point
+    } =
+      pluginCreators ??
+      require('@angular/localize/src/tools/src/translate/source_files/es2015_translate_plugin');
     plugins.push(
       makeEs2015TranslatePlugin(diagnostics, translation, {
         missingTranslation: missingTranslationBehavior,
@@ -96,7 +120,10 @@ function createI18nPlugins(
 
     const {
       makeEs5TranslatePlugin,
-    } = require('@angular/localize/src/tools/src/translate/source_files/es5_translate_plugin');
+      // TODO_ESM: Remove all deep imports once `@angular/localize` is published with the `tools` entry point
+    } =
+      pluginCreators ??
+      require('@angular/localize/src/tools/src/translate/source_files/es5_translate_plugin');
     plugins.push(
       makeEs5TranslatePlugin(diagnostics, translation, {
         missingTranslation: missingTranslationBehavior,
@@ -106,7 +133,10 @@ function createI18nPlugins(
 
   const {
     makeLocalePlugin,
-  } = require('@angular/localize/src/tools/src/translate/source_files/locale_plugin');
+    // TODO_ESM: Remove all deep imports once `@angular/localize` is published with the `tools` entry point
+  } =
+    pluginCreators ??
+    require('@angular/localize/src/tools/src/translate/source_files/locale_plugin');
   plugins.push(makeLocalePlugin(locale));
 
   return plugins;
@@ -168,12 +198,13 @@ export default function (api: unknown, options: ApplicationPresetOptions) {
   }
 
   if (options.i18n) {
-    const { locale, missingTranslationBehavior, translation } = options.i18n;
+    const { locale, missingTranslationBehavior, pluginCreators, translation } = options.i18n;
     const i18nPlugins = createI18nPlugins(
       locale,
       translation,
       missingTranslationBehavior || 'ignore',
       options.diagnosticReporter,
+      pluginCreators,
     );
 
     plugins.push(...i18nPlugins);
