@@ -23,13 +23,7 @@ import {
 import { AssetPatternClass } from '../../builders/browser/schema';
 import { BuildBrowserFeatures } from '../../utils';
 import { WebpackConfigOptions } from '../../utils/build-options';
-import { findCachePath } from '../../utils/cache-path';
-import {
-  allowMangle,
-  cachingDisabled,
-  persistentBuildCacheEnabled,
-  profilingEnabled,
-} from '../../utils/environment-options';
+import { allowMangle, profilingEnabled } from '../../utils/environment-options';
 import { loadEsmModule } from '../../utils/load-esm';
 import { Spinner } from '../../utils/spinner';
 import { addError } from '../../utils/webpack-diagnostics';
@@ -41,6 +35,7 @@ import { getOutputHashFormat, getWatchOptions, normalizeExtraEntryPoints } from 
 export async function getCommonConfig(wco: WebpackConfigOptions): Promise<Configuration> {
   const { root, projectRoot, buildOptions, tsConfig } = wco;
   const {
+    cache,
     platform = 'browser',
     sourceMap: { styles: stylesSourceMap, scripts: scriptsSourceMap, vendor: vendorSourceMap },
     optimization: { styles: stylesOptimization, scripts: scriptsOptimization },
@@ -355,9 +350,6 @@ export async function getCommonConfig(wco: WebpackConfigOptions): Promise<Config
       hints: false,
     },
     ignoreWarnings: [
-      // Webpack 5+ has no facility to disable this warning.
-      // System.import is used in @angular/core for deprecated string-form lazy routes
-      /System.import\(\) is deprecated and will be removed soon/i,
       // https://github.com/webpack-contrib/source-map-loader/blob/b2de4249c7431dd8432da607e08f0f65e9d64219/src/index.js#L83
       /Failed to parse source map from/,
       // https://github.com/webpack-contrib/postcss-loader/blob/bd261875fdf9c596af4ffb3a1a73fe3c549befda/src/index.js#L153-L158
@@ -367,12 +359,6 @@ export async function getCommonConfig(wco: WebpackConfigOptions): Promise<Config
       // Show an error for missing exports instead of a warning.
       strictExportPresence: true,
       rules: [
-        {
-          // Mark files inside `@angular/core` as using SystemJS style dynamic imports.
-          // Removing this will cause deprecation warnings to appear.
-          test: /[/\\]@angular[/\\]core[/\\].+\.js$/,
-          parser: { system: true },
-        },
         {
           // Mark files inside `rxjs/add` as containing side effects.
           // If this is fixed upstream and the fixed version becomes the minimum
@@ -389,7 +375,7 @@ export async function getCommonConfig(wco: WebpackConfigOptions): Promise<Config
             {
               loader: require.resolve('../../babel/webpack-loader'),
               options: {
-                cacheDirectory: findCachePath('babel-webpack'),
+                cacheDirectory: (cache.enabled && path.join(cache.path, 'babel-webpack')) || false,
                 scriptTarget: wco.scriptTarget,
                 aot: buildOptions.aot,
                 optimize: buildOptions.buildOptimizer,
@@ -414,17 +400,7 @@ export async function getCommonConfig(wco: WebpackConfigOptions): Promise<Config
       chunkIds: buildOptions.namedChunks ? 'named' : 'deterministic',
       emitOnErrors: false,
     },
-    plugins: [
-      // Always replace the context for the System.import in angular/core to prevent warnings.
-      // https://github.com/angular/angular/issues/11580
-      new ContextReplacementPlugin(
-        /@angular[\\/]core[\\/]/,
-        path.join(projectRoot, '$_lazy_route_resources'),
-        {},
-      ),
-      new DedupeModuleResolvePlugin({ verbose: buildOptions.verbose }),
-      ...extraPlugins,
-    ],
+    plugins: [new DedupeModuleResolvePlugin({ verbose: buildOptions.verbose }), ...extraPlugins],
   };
 }
 
@@ -433,12 +409,13 @@ function getCacheSettings(
   supportedBrowsers: string[],
   angularVersion: string,
 ): WebpackOptionsNormalized['cache'] {
-  if (persistentBuildCacheEnabled) {
+  const { enabled, path: cacheDirectory } = wco.buildOptions.cache;
+  if (enabled) {
     const packageVersion = require('../../../package.json').version;
 
     return {
       type: 'filesystem',
-      cacheDirectory: findCachePath('angular-webpack'),
+      cacheDirectory: path.join(cacheDirectory, 'angular-webpack'),
       maxMemoryGenerations: 1,
       // We use the versions and build options as the cache name. The Webpack configurations are too
       // dynamic and shared among different build types: test, build and serve.
@@ -461,7 +438,7 @@ function getCacheSettings(
     };
   }
 
-  if (wco.buildOptions.watch && !cachingDisabled) {
+  if (wco.buildOptions.watch) {
     return {
       type: 'memory',
       maxGenerations: 1,
