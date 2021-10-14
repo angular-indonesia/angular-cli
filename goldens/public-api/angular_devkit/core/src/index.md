@@ -354,7 +354,7 @@ function dasherize(str: string): string;
 function decamelize(str: string): string;
 
 // @public (undocumented)
-export function deepCopy<T extends any>(value: T): T;
+export function deepCopy<T>(value: T): T;
 
 // @public (undocumented)
 export type DeepReadonly<T> = T extends (infer R)[] ? DeepReadonlyArray<R> : T extends Function ? T : T extends object ? DeepReadonlyObject<T> : T;
@@ -1074,6 +1074,8 @@ class MultiAnalytics implements Analytics {
 // @public
 enum NgCliAnalyticsDimensions {
     // (undocumented)
+    AotEnabled = 8,
+    // (undocumented)
     BuildErrors = 20,
     // (undocumented)
     CpuCount = 1,
@@ -1081,8 +1083,6 @@ enum NgCliAnalyticsDimensions {
     CpuSpeed = 2,
     // (undocumented)
     NgAddCollection = 6,
-    // (undocumented)
-    NgIvyEnabled = 8,
     // (undocumented)
     NodeVersion = 4,
     // (undocumented)
