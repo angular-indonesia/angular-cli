@@ -1,3 +1,56 @@
+<a name="13.0.0-rc.1"></a>
+
+# 13.0.0-rc.1 (2021-10-20)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                              |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------- |
+| [1b98a52f4](https://github.com/angular/angular-cli/commit/1b98a52f4d88d4fa7c3d0bb86fe61e3e9d54b5e8) | fix  | correct grammar error in Analytics consent prompt        |
+| [1e2efbc98](https://github.com/angular/angular-cli/commit/1e2efbc987f0c1b8084d58f9d81e9a213feb7920) | fix  | run stable migrations when package version is prerelease |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                      |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------ |
+| [448c020be](https://github.com/angular/angular-cli/commit/448c020be8178dc9a5687a311d61554f6112d388) | fix  | add "Failed to compile" message                  |
+| [7934becb5](https://github.com/angular/angular-cli/commit/7934becb581d07c8e1f74898ddd4c20f050be659) | fix  | generate unique webpack runtimes                 |
+| [ff486861d](https://github.com/angular/angular-cli/commit/ff486861dc9af1e54f72f544d4f2f1de788671ec) | fix  | transform remapped sourcemap into a plain object |
+
+## Special Thanks
+
+Alan Agius, Extacy and Sushrit_Lawliet
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="12.2.11"></a>
+
+# 12.2.11 (2021-10-20)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                              |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------- |
+| [e0112603c](https://github.com/angular/angular-cli/commit/e0112603c139847c649413ba95faef93d9b74bf0) | fix  | add engine field support for npm 8 and higher            |
+| [b93e63ff6](https://github.com/angular/angular-cli/commit/b93e63ff6b99ecdf4d5861feea3dd5b5adf86061) | fix  | correct grammar error in Analytics consent prompt        |
+| [008094bd1](https://github.com/angular/angular-cli/commit/008094bd1690aa73fdfd18852fd7b8b274c22e7f) | fix  | run stable migrations when package version is prerelease |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                      |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------ |
+| [227bf2e86](https://github.com/angular/angular-cli/commit/227bf2e86b8a6e6fe41fdbc0f77365d96d79d831) | fix  | add "Failed to compile" message                  |
+| [6173609c5](https://github.com/angular/angular-cli/commit/6173609c5b1fd27c75cee8dd9b67de9ef332ef98) | fix  | transform remapped sourcemap into a plain object |
+| [349047523](https://github.com/angular/angular-cli/commit/349047523ad0110a25d7f730cd0160b76dcfc265) | fix  | update `esbuild` to 0.13.8                       |
+| [892eeadd1](https://github.com/angular/angular-cli/commit/892eeadd11f8b702094640addc8a6f16236e5e08) | fix  | update `mini-css-extract-plugin` to 2.4.2        |
+| [8d52d9b7f](https://github.com/angular/angular-cli/commit/8d52d9b7faa44be5063905ed54b3c0d12d506af4) | fix  | use a separate worker pool for i18n inlining     |
+
+## Special Thanks
+
+Alan Agius, Charles Lyding, Extacy and Sushrit_Lawliet
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="13.0.0-rc.0"></a>
 
 # 13.0.0-rc.0 (2021-10-13)
