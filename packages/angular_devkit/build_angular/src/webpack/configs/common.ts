@@ -6,6 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
+import { AngularWebpackLoaderPath } from '@ngtools/webpack';
 import CopyWebpackPlugin from 'copy-webpack-plugin';
 import * as path from 'path';
 import { ScriptTarget } from 'typescript';
@@ -31,6 +32,7 @@ import {
   ScriptsWebpackPlugin,
 } from '../plugins';
 import { ProgressPlugin } from '../plugins/progress-plugin';
+import { createIvyPlugin } from '../plugins/typescript';
 import {
   assetPatterns,
   externalizePackages,
@@ -43,13 +45,16 @@ import {
 
 // eslint-disable-next-line max-lines-per-function
 export async function getCommonConfig(wco: WebpackConfigOptions): Promise<Configuration> {
-  const { root, projectRoot, buildOptions, tsConfig, projectName, sourceRoot } = wco;
+  const { root, projectRoot, buildOptions, tsConfig, projectName, sourceRoot, tsConfigPath } = wco;
   const {
     cache,
     codeCoverage,
     crossOrigin = 'none',
     platform = 'browser',
+    aot = true,
     codeCoverageExclude = [],
+    main,
+    polyfills,
     sourceMap: {
       styles: stylesSourceMap,
       scripts: scriptsSourceMap,
@@ -258,6 +263,18 @@ export async function getCommonConfig(wco: WebpackConfigOptions): Promise<Config
     });
   }
 
+  if (main || polyfills) {
+    extraRules.push({
+      test: /\.[cm]?[tj]sx?$/,
+      loader: AngularWebpackLoaderPath,
+    });
+    extraPlugins.push(createIvyPlugin(wco, aot, tsConfigPath));
+  }
+
+  if (webWorkerTsConfig) {
+    extraPlugins.push(createIvyPlugin(wco, false, path.resolve(wco.root, webWorkerTsConfig)));
+  }
+
   const extraMinimizers = [];
   if (scriptsOptimization) {
     extraMinimizers.push(
@@ -300,9 +317,9 @@ export async function getCommonConfig(wco: WebpackConfigOptions): Promise<Config
       symlinks: !buildOptions.preserveSymlinks,
       modules: [tsConfig.options.baseUrl || projectRoot, 'node_modules'],
       mainFields: isPlatformServer
-        ? ['es2020', 'es2015', 'module', 'main']
+        ? ['es2015', 'module', 'main']
         : ['es2020', 'es2015', 'browser', 'module', 'main'],
-      conditionNames: ['es2020', 'es2015', '...'],
+      conditionNames: isPlatformServer ? ['es2015', '...'] : ['es2020', 'es2015', '...'],
     },
     resolveLoader: {
       symlinks: !buildOptions.preserveSymlinks,
@@ -340,7 +357,6 @@ export async function getCommonConfig(wco: WebpackConfigOptions): Promise<Config
     module: {
       // Show an error for missing exports instead of a warning.
       strictExportPresence: true,
-
       parser:
         webWorkerTsConfig === undefined
           ? {
