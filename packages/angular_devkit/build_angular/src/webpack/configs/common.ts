@@ -31,6 +31,7 @@ import {
   ScriptsWebpackPlugin,
 } from '../plugins';
 import { ProgressPlugin } from '../plugins/progress-plugin';
+import { TransferSizePlugin } from '../plugins/transfer-size-plugin';
 import { createIvyPlugin } from '../plugins/typescript';
 import {
   assetPatterns,
@@ -287,6 +288,10 @@ export async function getCommonConfig(wco: WebpackConfigOptions): Promise<Config
     );
   }
 
+  if (platform === 'browser' && (scriptsOptimization || stylesOptimization.minify)) {
+    extraMinimizers.push(new TransferSizePlugin());
+  }
+
   const externals: Configuration['externals'] = [...externalDependencies];
   if (isPlatformServer && !bundleDependencies) {
     externals.push(({ context, request }, callback) =>
@@ -403,6 +408,7 @@ export async function getCommonConfig(wco: WebpackConfigOptions): Promise<Config
       ],
     },
     experiments: {
+      backCompat: false,
       syncWebAssembly: true,
       asyncWebAssembly: true,
     },

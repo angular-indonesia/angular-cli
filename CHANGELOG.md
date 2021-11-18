@@ -1,3 +1,43 @@
+<a name="13.1.0-next.2"></a>
+
+# 13.1.0-next.2 (2021-11-17)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                       |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------- |
+| [ecd9fb5c7](https://github.com/angular/angular-cli/commit/ecd9fb5c774b6301348c4514da04d58ae8903d06) | feat | provide more detailed error for not found builder |
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                    |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------ |
+| [21809e14c](https://github.com/angular/angular-cli/commit/21809e14cd5c666c82fdaebc9e601341dfb76d0a) | feat | loosen project name validation |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                  |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ |
+| [bc8563760](https://github.com/angular/angular-cli/commit/bc856376039287cf5fb6135ca5da65a9000f5664) | feat | add estimated transfer size to build output report           |
+| [6d0f99a2d](https://github.com/angular/angular-cli/commit/6d0f99a2deef957c15836c172b9f68f716f836a4) | feat | support JSON comments in dev-server proxy configuration file |
+| [789ddfaeb](https://github.com/angular/angular-cli/commit/789ddfaeb0fcbc9aab1581384b88c3618e606c4b) | perf | disable webpack backwards compatible APIs                    |
+
+## Special Thanks
+
+Alan Agius, Charles Lyding, Doug Parker, Joey Perrott and Krzysztof Platis
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="13.0.3"></a>
+
+# 13.0.3 (2021-11-17)
+
+## Special Thanks
+
+Alan Agius, Joey Perrott and Krzysztof Platis
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="13.1.0-next.1"></a>
 
 # 13.1.0-next.1 (2021-11-10)
@@ -170,6 +210,14 @@ npm install classlist.js web-animations-js --save
   ...
 }
 ```
+
+- Calling `BuilderContext.scheduleBuilder()` with a builder from `@angular-devkit/build-angular` now requires passing the `target` property in the 3rd argument, like in the following example:
+
+  ```typescript
+  context.scheduleBuilder('@angular-devkit/build-angular:ng-packagr', options, {
+    target: context.target,
+  });
+  ```
 
 - The automatic inclusion of Angular-required ES2015 polyfills to support ES5 browsers has been removed. Previously when targetting ES5 within the application's TypeScript configuration or listing an ES5 requiring browser in the browserslist file, Angular-required polyfills were included in the built application. However, with Angular no longer supporting IE11, there are now no browsers officially supported by Angular that would require these polyfills. As a result, the automatic inclusion of these ES2015 polyfills has been removed. Any polyfills manually added to an application's code are not affected by this change.
 
