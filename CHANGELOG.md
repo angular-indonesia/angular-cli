@@ -1,3 +1,84 @@
+<a name="13.1.0-next.3"></a>
+
+# 13.1.0-next.3 (2021-12-01)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                                                               |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------------------- |
+| [56f802b7d](https://github.com/angular/angular-cli/commit/56f802b7dd26bfc774b6b00982a1dbbe0bafddd0) | feat | ask to install angular-eslint when running ng lint in new projects                        |
+| [b9cd68f69](https://github.com/angular/angular-cli/commit/b9cd68f691e529708859a0bedb3db0a563943a72) | fix  | exit with a non-zero error code when migration fails during `ng update`                   |
+| [1e9e890bb](https://github.com/angular/angular-cli/commit/1e9e890bb08ef2eea1ae9578c711922d4c3ac190) | fix  | logic which determines which temp version of the CLI is to be download during `ng update` |
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                                |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------- |
+| [d5d9f042f](https://github.com/angular/angular-cli/commit/d5d9f042f2ea42573b7ff4fab90cab85d0c5ec0b) | feat | add VS Code configurations when generating a new workspace |
+| [37a723945](https://github.com/angular/angular-cli/commit/37a723945879a2c8884ec73276681ee49a6e36a8) | fix  | address eslint linting failures in `test.ts`               |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                                                                      |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------- |
+| [bc17cf0cd](https://github.com/angular/angular-cli/commit/bc17cf0cdd02bf50758e510756a26e6e6ca32d14) | feat | colorize file raw sizes based on failing budgets                                                                 |
+| [3c681b68d](https://github.com/angular/angular-cli/commit/3c681b68d7a32f1cfaf3feee6b2e02cc6e0f0568) | feat | set `dir` attribute when using localization                                                                      |
+| [9300545e6](https://github.com/angular/angular-cli/commit/9300545e6148b4548cc02bb6a311a2f0e2bb79c5) | feat | watch i18n translation files with dev server                                                                     |
+| [52c6c3df3](https://github.com/angular/angular-cli/commit/52c6c3df33929d79c233282f6851e2be2f04c343) | fix  | correctly extract messages when using cached build ([#22266](https://github.com/angular/angular-cli/pull/22266)) |
+| [7408511da](https://github.com/angular/angular-cli/commit/7408511da555f37560ca7e3b536e15dfc8f6a1e5) | fix  | display cleaner errors                                                                                           |
+| [6bdc26c60](https://github.com/angular/angular-cli/commit/6bdc26c6091c604f6139e349e30db25a8768c646) | fix  | don't watch nested `node_modules` when polling is enabled                                                        |
+| [4c288b8bd](https://github.com/angular/angular-cli/commit/4c288b8bd28e7215887aa52025c4fa41fcf7bc01) | fix  | lazy modules bundle budgets                                                                                      |
+| [5805c7859](https://github.com/angular/angular-cli/commit/5805c7859981212619ced49694374a2c812f2148) | fix  | transform remapped sourcemap into a plain object                                                                 |
+
+### @ngtools/webpack
+
+| Commit                                                                                              | Type | Description                                               |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------- |
+| [b3f71c51b](https://github.com/angular/angular-cli/commit/b3f71c51bffba35373259ab1283c8de3b7c1788e) | fix  | JIT mode CommonJS accessing inexistent `default` property |
+
+## Special Thanks
+
+Alan Agius, Billy Lando, Charles Lyding, David-Emmanuel DIVERNOIS, Derek Cormier and Doug Parker
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="13.0.4"></a>
+
+# 13.0.4 (2021-12-01)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                                                               |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------------------- |
+| [ded7b5c06](https://github.com/angular/angular-cli/commit/ded7b5c069a145d1b3e264538d7c4302919ad030) | fix  | exit with a non-zero error code when migration fails during `ng update`                   |
+| [250a58b48](https://github.com/angular/angular-cli/commit/250a58b4820a738aba7609627fa7fce0a24f10db) | fix  | logic which determines which temp version of the CLI is to be download during `ng update` |
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                  |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------- |
+| [372e2e633](https://github.com/angular/angular-cli/commit/372e2e633f4bd9bf29c35d02890e1c6a70da3169) | fix  | address eslint linting failures in `test.ts` |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                                                                      |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------- |
+| [b835389c8](https://github.com/angular/angular-cli/commit/b835389c8a60749151039ed0baf0be025ce0932b) | fix  | correctly extract messages when using cached build ([#22266](https://github.com/angular/angular-cli/pull/22266)) |
+| [647a5f0b1](https://github.com/angular/angular-cli/commit/647a5f0b18e49b2ece3f43c0a06bfb75d7caef49) | fix  | don't watch nested `node_modules` when polling is enabled                                                        |
+| [4d01d4f72](https://github.com/angular/angular-cli/commit/4d01d4f72344c42f650f5495b21e6bd94069969a) | fix  | transform remapped sourcemap into a plain object                                                                 |
+
+### @ngtools/webpack
+
+| Commit                                                                                              | Type | Description                                               |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------- |
+| [4d918ef99](https://github.com/angular/angular-cli/commit/4d918ef9912d53a09d73fb19fa41b121dceed37c) | fix  | JIT mode CommonJS accessing inexistent `default` property |
+
+## Special Thanks
+
+Alan Agius, Billy Lando, David-Emmanuel DIVERNOIS and Derek Cormier
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="13.1.0-next.2"></a>
 
 # 13.1.0-next.2 (2021-11-17)
