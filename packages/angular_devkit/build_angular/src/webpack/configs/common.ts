@@ -16,12 +16,11 @@ import {
   ContextReplacementPlugin,
   RuleSetRule,
   SourceMapDevToolPlugin,
-  debug,
 } from 'webpack';
 import { SubresourceIntegrityPlugin } from 'webpack-subresource-integrity';
 import { AngularBabelLoaderOptions } from '../../babel/webpack-loader';
 import { WebpackConfigOptions } from '../../utils/build-options';
-import { allowMangle, profilingEnabled } from '../../utils/environment-options';
+import { allowMangle } from '../../utils/environment-options';
 import { loadEsmModule } from '../../utils/load-esm';
 import {
   CommonJsUsageWarnPlugin,
@@ -82,19 +81,11 @@ export async function getCommonConfig(wco: WebpackConfigOptions): Promise<Config
   // Load ESM `@angular/compiler-cli` using the TypeScript dynamic import workaround.
   // Once TypeScript provides support for keeping the dynamic import this workaround can be
   // changed to a direct dynamic import.
-  const compilerCliModule = await loadEsmModule<{
-    GLOBAL_DEFS_FOR_TERSER: unknown;
-    default: unknown;
-  }>('@angular/compiler-cli');
-  // If it is not ESM then the values needed will be stored in the `default` property.
-  // TODO_ESM: This can be removed once `@angular/compiler-cli` is ESM only.
   const {
     GLOBAL_DEFS_FOR_TERSER,
     GLOBAL_DEFS_FOR_TERSER_WITH_AOT,
     VERSION: NG_VERSION,
-  } = (
-    compilerCliModule.GLOBAL_DEFS_FOR_TERSER ? compilerCliModule : compilerCliModule.default
-  ) as typeof import('@angular/compiler-cli');
+  } = await loadEsmModule<typeof import('@angular/compiler-cli')>('@angular/compiler-cli');
 
   // determine hashing format
   const hashFormat = getOutputHashFormat(buildOptions.outputHashing || 'none');
@@ -131,14 +122,6 @@ export async function getCommonConfig(wco: WebpackConfigOptions): Promise<Config
         entryPoints['polyfills'] = [jitPolyfills];
       }
     }
-  }
-
-  if (profilingEnabled) {
-    extraPlugins.push(
-      new debug.ProfilingPlugin({
-        outputPath: path.resolve(root, 'chrome-profiler-events.json'),
-      }),
-    );
   }
 
   if (allowedCommonJsDependencies) {
