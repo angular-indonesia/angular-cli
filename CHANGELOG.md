@@ -1,3 +1,115 @@
+<a name="13.2.0-next.1"></a>
+
+# 13.2.0-next.1 (2021-12-15)
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                           |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------- |
+| [41a828e20](https://github.com/angular/angular-cli/commit/41a828e2068b881f744846c3f0edbff8c62cb9ce) | fix  | updated Angular new project version to v13.2.0-next.0 |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                   |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------- |
+| [0323a35b4](https://github.com/angular/angular-cli/commit/0323a35b47a4a2fd3870b09d46e3655714e50abd) | fix  | add `tailwindcss` support for version 3                       |
+| [471930007](https://github.com/angular/angular-cli/commit/471930007cb9cd26264eab483fdfd1f5b4db6641) | fix  | display FS cache information when `verbose` option is used    |
+| [f1d2873ca](https://github.com/angular/angular-cli/commit/f1d2873ca7ee337748366d04878514c2c27a72a2) | fix  | only extract CSS styles when are specified in `styles` option |
+
+### @ngtools/webpack
+
+| Commit                                                                                              | Type | Description                                            |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------ |
+| [b03b9eefe](https://github.com/angular/angular-cli/commit/b03b9eefeac77b93931803de208118e3a6c5a928) | perf | reduce redudant module rebuilds when cache is restored |
+
+## Special Thanks
+
+Alan Agius, Cédric Exbrayat, Derek Cormier and Doug Parker
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="13.1.2"></a>
+
+# 13.1.2 (2021-12-15)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                   |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------- |
+| [1ddbd75ae](https://github.com/angular/angular-cli/commit/1ddbd75ae200c14b5f33556bd6d5ae6b7722d14e) | fix  | add `tailwindcss` support for version 3                       |
+| [adf925c07](https://github.com/angular/angular-cli/commit/adf925c0755b6e78a57932becdb7b7a764afb9e6) | fix  | display FS cache information when `verbose` option is used    |
+| [09c3826c9](https://github.com/angular/angular-cli/commit/09c3826c9d9128a6b520d0fe8da3cb466d18cddc) | fix  | only extract CSS styles when are specified in `styles` option |
+
+### @ngtools/webpack
+
+| Commit                                                                                              | Type | Description                                            |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------ |
+| [f31d7f79d](https://github.com/angular/angular-cli/commit/f31d7f79dfa8f997fecdcfec1ebc6cfbe657f3fb) | perf | reduce redudant module rebuilds when cache is restored |
+
+## Special Thanks
+
+Alan Agius, Derek Cormier and Doug Parker
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="11.2.17"></a>
+
+# 11.2.17 (2021-12-16)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                                    |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------- |
+| [1efff8f82](https://github.com/angular/angular-cli/commit/1efff8f82df38b7485f8a8dcdd5bfea5a457c6a1) | fix  | exclude deprecated packages with removal migration from update |
+
+## Special Thanks
+
+Alan Agius and Doug Parker
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="11.2.16"></a>
+
+# 11.2.16 (2021-12-15)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                                                               |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------------------- |
+| [f456b0962](https://github.com/angular/angular-cli/commit/f456b0962b9f339759bc86c092256f68d68d9ecf) | fix  | error when updating Angular packages across multi-major migrations                        |
+| [886d2511e](https://github.com/angular/angular-cli/commit/886d2511e292b687acce1ac4c6924f992494d14f) | fix  | logic which determines which temp version of the CLI is to be download during `ng update` |
+| [776d1210a](https://github.com/angular/angular-cli/commit/776d1210a9e62bf2531d977138f49f93820a8b87) | fix  | update `ng update` output for Angular packages                                            |
+
+## Special Thanks
+
+Alan Agius and Doug Parker
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="10.2.4"></a>
+
+# 10.2.4 (2021-12-15)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                                                               |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------------------- |
+| [745d77728](https://github.com/angular/angular-cli/commit/745d777288a5ae0e79b4ecdf7b8483f242ba8e66) | fix  | error when updating Angular packages across multi-major migrations                        |
+| [460ea21b5](https://github.com/angular/angular-cli/commit/460ea21b5d4b8759a3f7457b885110022dd21dfc) | fix  | logic which determines which temp version of the CLI is to be download during `ng update` |
+| [03da12899](https://github.com/angular/angular-cli/commit/03da1289996790ae574a49bb46123c74417a97c2) | fix  | update `ng update` output for Angular packages                                            |
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                                  |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ |
+| [d6582d489](https://github.com/angular/angular-cli/commit/d6582d48944f7bf169f3902e4c19186a6751f473) | fix  | change `karma-jasmine-html-reporter` dependency to use tilde |
+
+## Special Thanks
+
+Alan Agius, Charles Lyding, Doug Parker and Joey Perrott
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="13.1.1"></a>
 
 # 13.1.1 (2021-12-10)
