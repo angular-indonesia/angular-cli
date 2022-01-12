@@ -39,6 +39,7 @@ import {
 import { normalizeCacheOptions } from '../../utils/normalize-cache';
 import { ensureOutputPaths } from '../../utils/output-paths';
 import { generateEntryPoints } from '../../utils/package-chunk-sort';
+import { purgeStaleBuildCache } from '../../utils/purge-cache';
 import { augmentAppWithServiceWorker } from '../../utils/service-worker';
 import { Spinner } from '../../utils/spinner';
 import { getSupportedBrowsers } from '../../utils/supported-browsers';
@@ -72,6 +73,12 @@ export type BrowserBuilderOutput = json.JsonObject &
      */
     outputPath: string;
   };
+
+/**
+ * Maximum time in milliseconds for single build/rebuild
+ * This accounts for CI variability.
+ */
+export const BUILD_TIMEOUT = 30_000;
 
 async function initialize(
   options: BrowserBuilderSchema,
@@ -156,6 +163,9 @@ export function buildWebpackBrowser(
           normalize((projectMetadata.root as string) ?? ''),
         ),
       );
+
+      // Purge old build disk cache.
+      await purgeStaleBuildCache(context);
 
       checkInternetExplorerSupport(sysProjectRoot, context.logger);
 

@@ -1,6 +1,6 @@
 {
   "name": "@angular-devkit/build-optimizer",
-  "version": "0.0.0",
+  "version": "0.0.0-PLACEHOLDER",
   "description": "Angular Build Optimizer",
   "experimental": true,
   "main": "src/index.js",
@@ -22,6 +22,6 @@
     }
   },
   "devDependencies": {
-    "webpack": "5.65.0"
+    "webpack": "5.66.0"
   }
 }
