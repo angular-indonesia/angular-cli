@@ -12,12 +12,13 @@ import {
   AssetPatternClass,
   Budget,
   CrossOrigin,
-  ExtraEntryPoint,
   I18NTranslation,
   IndexUnion,
   InlineStyleLanguage,
   Localize,
+  ScriptElement,
   SourceMapClass,
+  StyleElement,
 } from '../builders/browser/schema';
 import { Schema as DevServerSchema } from '../builders/dev-server/schema';
 import { NormalizedCachedOptions } from './normalize-cache';
@@ -48,7 +49,6 @@ export interface BuildOptions {
   deleteOutputPath?: boolean;
   preserveSymlinks?: boolean;
   extractLicenses?: boolean;
-  showCircularDependencies?: boolean;
   buildOptimizer?: boolean;
   namedChunks?: boolean;
   crossOrigin?: CrossOrigin;
@@ -61,8 +61,8 @@ export interface BuildOptions {
   polyfills?: string;
   budgets: Budget[];
   assets: AssetPatternClass[];
-  scripts: ExtraEntryPoint[];
-  styles: ExtraEntryPoint[];
+  scripts: ScriptElement[];
+  styles: StyleElement[];
   stylePreprocessorOptions?: { includePaths: string[] };
   platform?: 'browser' | 'server';
   fileReplacements: NormalizedFileReplacement[];
