@@ -98,7 +98,7 @@ export async function getCommonConfig(wco: WebpackConfigOptions): Promise<Config
   } = await loadEsmModule<typeof import('@angular/compiler-cli')>('@angular/compiler-cli');
 
   // determine hashing format
-  const hashFormat = getOutputHashFormat(buildOptions.outputHashing || 'none');
+  const hashFormat = getOutputHashFormat(buildOptions.outputHashing);
 
   if (buildOptions.progress) {
     extraPlugins.push(new ProgressPlugin(platform));
@@ -374,7 +374,9 @@ export async function getCommonConfig(wco: WebpackConfigOptions): Promise<Config
           test: /\.[cm]?[tj]sx?$/,
           // The below is needed due to a bug in `@babel/runtime`. See: https://github.com/babel/babel/issues/12824
           resolve: { fullySpecified: false },
-          exclude: [/[/\\](?:core-js|@babel|tslib|web-animations-js|web-streams-polyfill)[/\\]/],
+          exclude: [
+            /[/\\](?:core-js|@babel|tslib|web-animations-js|web-streams-polyfill|whatwg-url)[/\\]/,
+          ],
           use: [
             {
               loader: require.resolve('../../babel/webpack-loader'),
