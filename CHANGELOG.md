@@ -1,3 +1,48 @@
+<a name="14.0.0-next.2"></a>
+
+# 14.0.0-next.2 (2022-02-17)
+
+## Breaking Changes
+
+### @angular/cli
+
+- Deprecated `ng x18n` and `ng i18n-extract` commands have been removed in favor of `ng extract-i18n`.
+
+### @angular/cli
+
+| Commit                                                                                              | Type     | Description                                           |
+| --------------------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------- |
+| [b69ca3a7d](https://github.com/angular/angular-cli/commit/b69ca3a7d22b54fc06fbc1cfb559b2fd915f5609) | refactor | remove deprecated command aliases for `extract-i18n`. |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                            |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------- |
+| [fafbbeab6](https://github.com/angular/angular-cli/commit/fafbbeab6d9ab5e8797e373f869f365729e569c5) | fix  | update license-webpack-plugin to 4.0.2 |
+
+## Special Thanks
+
+Alan Agius, Anner Visser, Charles Lyding and Joey Perrott
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="13.2.4"></a>
+
+# 13.2.4 (2022-02-17)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                            |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------- |
+| [48c655ac9](https://github.com/angular/angular-cli/commit/48c655ac98e1d69622dd832c6a915c48e703cd8f) | fix  | update `esbuild` to `0.14.22`          |
+| [c0736ea0b](https://github.com/angular/angular-cli/commit/c0736ea0b173861bb5ceb9315d27038eb28535e1) | fix  | update license-webpack-plugin to 4.0.2 |
+
+## Special Thanks
+
+Alan Agius, Anner Visser and Charles Lyding
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="14.0.0-next.1"></a>
 
 # 14.0.0-next.1 (2022-02-09)
