@@ -1,3 +1,36 @@
+<a name="14.0.0-next.3"></a>
+
+# 14.0.0-next.3 (2022-02-23)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                           |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------- |
+| [de1429308](https://github.com/angular/angular-cli/commit/de14293083826ee4a1b69b94d06a57603d3d76f9) | fix  | don't rename blocks which have a name |
+
+## Special Thanks
+
+Alan Agius, Charles Lyding, Doug Parker and Paul Gschwendtner
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="13.2.5"></a>
+
+# 13.2.5 (2022-02-23)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                           |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------- |
+| [acf1e5e4a](https://github.com/angular/angular-cli/commit/acf1e5e4a5b359be125272f7e4055208116a13d8) | fix  | don't rename blocks which have a name |
+| [7a493979c](https://github.com/angular/angular-cli/commit/7a493979ccb71e974d668fca67d75e1b194f8608) | fix  | update `terser` to `5.11.0`           |
+
+## Special Thanks
+
+Alan Agius and Paul Gschwendtner
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="14.0.0-next.2"></a>
 
 # 14.0.0-next.2 (2022-02-17)
