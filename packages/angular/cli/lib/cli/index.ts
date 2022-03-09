@@ -8,13 +8,14 @@
 
 import { createConsoleLogger } from '@angular-devkit/core/node';
 import { format } from 'util';
-import { runCommand } from '../../models/command-runner';
-import { colors, removeColor } from '../../utilities/color';
-import { AngularWorkspace, getWorkspaceRaw } from '../../utilities/config';
-import { writeErrorToLogFile } from '../../utilities/log-file';
-import { findWorkspaceFile } from '../../utilities/project';
+import { CommandModuleError } from '../../src/command-builder/command-module';
+import { runCommand } from '../../src/command-builder/command-runner';
+import { colors, removeColor } from '../../src/utilities/color';
+import { AngularWorkspace, getWorkspaceRaw } from '../../src/utilities/config';
+import { writeErrorToLogFile } from '../../src/utilities/log-file';
+import { findWorkspaceFile } from '../../src/utilities/project';
 
-export { VERSION, Version } from '../../models/version';
+export { VERSION } from '../../src/utilities/version';
 
 const debugEnv = process.env['NG_DEBUG'];
 const isDebug = debugEnv !== undefined && debugEnv !== '0' && debugEnv.toLowerCase() !== 'false';
@@ -75,16 +76,11 @@ export default async function (options: { testing?: boolean; cliArgs: string[] }
   }
 
   try {
-    const maybeExitCode = await runCommand(options.cliArgs, logger, workspace);
-    if (typeof maybeExitCode === 'number') {
-      console.assert(Number.isInteger(maybeExitCode));
-
-      return maybeExitCode;
-    }
-
-    return 0;
+    return await runCommand(options.cliArgs, logger, workspace);
   } catch (err) {
-    if (err instanceof Error) {
+    if (err instanceof CommandModuleError) {
+      logger.fatal(`Error: ${err.message}`);
+    } else if (err instanceof Error) {
       try {
         const logPath = writeErrorToLogFile(err);
         logger.fatal(

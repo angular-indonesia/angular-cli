@@ -11,9 +11,9 @@ import 'symbol-observable';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { SemVer } from 'semver';
-import { VERSION } from '../models/version';
-import { colors } from '../utilities/color';
-import { isWarningEnabled } from '../utilities/config';
+import { colors } from '../src/utilities/color';
+import { isWarningEnabled } from '../src/utilities/config';
+import { VERSION } from '../src/utilities/version';
 
 (async () => {
   /**
