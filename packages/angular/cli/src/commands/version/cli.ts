@@ -12,7 +12,6 @@ import { resolve } from 'path';
 import { Argv } from 'yargs';
 import { CommandModule, CommandModuleImplementation } from '../../command-builder/command-module';
 import { colors } from '../../utilities/color';
-import { getPackageManager } from '../../utilities/package-manager';
 
 interface PartialPackageInfo {
   name: string;
@@ -64,24 +63,21 @@ export class VersionCommandModule extends CommandModule implements CommandModule
     const [nodeMajor] = process.versions.node.split('.').map((part) => Number(part));
     const unsupportedNodeVersion = !SUPPORTED_NODE_MAJORS.includes(nodeMajor);
 
-    const packageNames = [
-      ...Object.keys(cliPackage.dependencies || {}),
-      ...Object.keys(cliPackage.devDependencies || {}),
-      ...Object.keys(workspacePackage?.dependencies || {}),
-      ...Object.keys(workspacePackage?.devDependencies || {}),
-    ];
+    const packageNames = new Set(
+      Object.keys({
+        ...cliPackage.dependencies,
+        ...cliPackage.devDependencies,
+        ...workspacePackage?.dependencies,
+        ...workspacePackage?.devDependencies,
+      }),
+    );
 
-    const versions = packageNames
-      .filter((x) => PACKAGE_PATTERNS.some((p) => p.test(x)))
-      .reduce((acc, name) => {
-        if (name in acc) {
-          return acc;
-        }
-
-        acc[name] = this.getVersion(name, workspaceRequire, localRequire);
-
-        return acc;
-      }, {} as { [module: string]: string });
+    const versions: Record<string, string> = {};
+    for (const name of packageNames) {
+      if (PACKAGE_PATTERNS.some((p) => p.test(name))) {
+        versions[name] = this.getVersion(name, workspaceRequire, localRequire);
+      }
+    }
 
     const ngCliVersion = cliPackage.version;
     let angularCoreVersion = '';
@@ -91,13 +87,10 @@ export class VersionCommandModule extends CommandModule implements CommandModule
       // Filter all angular versions that are the same as core.
       angularCoreVersion = versions['@angular/core'];
       if (angularCoreVersion) {
-        for (const angularPackage of Object.keys(versions)) {
-          if (
-            versions[angularPackage] == angularCoreVersion &&
-            angularPackage.startsWith('@angular/')
-          ) {
-            angularSameAsCore.push(angularPackage.replace(/^@angular\//, ''));
-            delete versions[angularPackage];
+        for (const [name, version] of Object.entries(versions)) {
+          if (version === angularCoreVersion && name.startsWith('@angular/')) {
+            angularSameAsCore.push(name.replace(/^@angular\//, ''));
+            delete versions[name];
           }
         }
 
@@ -126,7 +119,7 @@ export class VersionCommandModule extends CommandModule implements CommandModule
       `
       Angular CLI: ${ngCliVersion}
       Node: ${process.versions.node}${unsupportedNodeVersion ? ' (Unsupported)' : ''}
-      Package Manager: ${await this.getPackageManagerVersion()}
+      Package Manager: ${this.getPackageManagerVersion()}
       OS: ${process.platform} ${process.arch}
 
       Angular: ${angularCoreVersion}
@@ -194,9 +187,9 @@ export class VersionCommandModule extends CommandModule implements CommandModule
     return '<error>';
   }
 
-  private async getPackageManagerVersion(): Promise<string> {
+  private getPackageManagerVersion(): string {
     try {
-      const manager = await getPackageManager(this.context.root);
+      const manager = this.context.packageManager;
       const version = execSync(`${manager} --version`, {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
