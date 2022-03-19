@@ -67,8 +67,17 @@ export class GenerateCommandModule
     }
 
     for (const schematicName of schematicNames) {
+      if (schematicsInCollection[schematicName].private) {
+        continue;
+      }
+
       const {
-        description: { schemaJson, aliases: schematicAliases, hidden: schematicHidden },
+        description: {
+          schemaJson,
+          aliases: schematicAliases,
+          hidden: schematicHidden,
+          description: schematicDescription,
+        },
       } = collection.createSchematic(schematicName, true);
 
       if (!schemaJson) {
@@ -76,8 +85,8 @@ export class GenerateCommandModule
       }
 
       const {
-        description,
         'x-deprecated': xDeprecated,
+        description = schematicDescription,
         aliases = schematicAliases,
         hidden = schematicHidden,
       } = schemaJson;
