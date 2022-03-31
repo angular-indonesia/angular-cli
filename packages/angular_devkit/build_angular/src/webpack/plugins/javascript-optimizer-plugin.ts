@@ -123,9 +123,10 @@ export class JavaScriptOptimizerPlugin {
               >();
 
               if (cachedOutput) {
-                compilation.updateAsset(name, cachedOutput.source, {
+                compilation.updateAsset(name, cachedOutput.source, (assetInfo) => ({
+                  ...assetInfo,
                   minimized: true,
-                });
+                }));
                 continue;
               }
             }
@@ -177,7 +178,7 @@ export class JavaScriptOptimizerPlugin {
             // Perform a single native esbuild support check.
             // This removes the need for each worker to perform the check which would
             // otherwise require spawning a separate process per worker.
-            alwaysUseWasm: !EsbuildExecutor.hasNativeSupport(),
+            alwaysUseWasm: !(await EsbuildExecutor.hasNativeSupport()),
           };
 
           // Sort scripts so larger scripts start first - worker pool uses a FIFO queue
@@ -209,7 +210,10 @@ export class JavaScriptOptimizerPlugin {
                       const optimizedAsset = map
                         ? new SourceMapSource(code, name, map)
                         : new OriginalSource(code, name);
-                      compilation.updateAsset(name, optimizedAsset, { minimized: true });
+                      compilation.updateAsset(name, optimizedAsset, (assetInfo) => ({
+                        ...assetInfo,
+                        minimized: true,
+                      }));
 
                       return cacheItem?.storePromise({
                         source: optimizedAsset,

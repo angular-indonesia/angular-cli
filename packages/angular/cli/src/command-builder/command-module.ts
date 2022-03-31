@@ -18,9 +18,9 @@ import {
   Options as YargsOptions,
 } from 'yargs';
 import { Parser as yargsParser } from 'yargs/helpers';
-import { PackageManager } from '../../lib/config/workspace-schema';
 import { createAnalytics } from '../analytics/analytics';
 import { AngularWorkspace } from '../utilities/config';
+import { PackageManagerUtils } from '../utilities/package-manager';
 import { Option } from './utilities/json-schema';
 
 export type Options<T> = { [key in keyof T as CamelCaseKey<key>]: T[key] };
@@ -38,8 +38,9 @@ export interface CommandContext {
   currentDirectory: string;
   root: string;
   workspace?: AngularWorkspace;
+  globalConfiguration?: AngularWorkspace;
   logger: logging.Logger;
-  packageManager: PackageManager;
+  packageManager: PackageManagerUtils;
   /** Arguments parsed in free-from without parser configuration. */
   args: {
     positional: string[];

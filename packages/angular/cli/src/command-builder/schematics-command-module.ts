@@ -15,12 +15,7 @@ import {
 } from '@angular-devkit/schematics/tools';
 import type { CheckboxQuestion, Question } from 'inquirer';
 import { Argv } from 'yargs';
-import {
-  getProjectByCwd,
-  getProjectsByPath,
-  getSchematicDefaults,
-  getWorkspace,
-} from '../utilities/config';
+import { getProjectByCwd, getSchematicDefaults } from '../utilities/config';
 import { isTTY } from '../utilities/tty';
 import {
   CommandModule,
@@ -127,7 +122,7 @@ export abstract class SchematicsCommandModule
     const workflow = new NodeWorkflow(root, {
       force,
       dryRun,
-      packageManager,
+      packageManager: packageManager.name,
       // A schema registry is required to allow customizing addUndefinedDefaults
       registry: new schema.CoreSchemaRegistry(formats.standardFormats),
       packageRegistry,
@@ -272,11 +267,11 @@ export abstract class SchematicsCommandModule
       return undefined;
     };
 
-    const localWorkspace = await getWorkspace('local');
-    if (localWorkspace) {
-      const project = getProjectByCwd(localWorkspace);
+    const { workspace, globalConfiguration } = this.context;
+    if (workspace) {
+      const project = getProjectByCwd(workspace);
       if (project) {
-        const value = getSchematicCollections(localWorkspace.getProjectCli(project));
+        const value = getSchematicCollections(workspace.getProjectCli(project));
         if (value) {
           this._schematicCollections = value;
 
@@ -285,10 +280,9 @@ export abstract class SchematicsCommandModule
       }
     }
 
-    const globalWorkspace = await getWorkspace('global');
     const value =
-      getSchematicCollections(localWorkspace?.getCli()) ??
-      getSchematicCollections(globalWorkspace?.getCli());
+      getSchematicCollections(workspace?.getCli()) ??
+      getSchematicCollections(globalConfiguration?.getCli());
     if (value) {
       this._schematicCollections = value;
 
@@ -370,32 +364,23 @@ export abstract class SchematicsCommandModule
       return undefined;
     }
 
-    const projectNames = getProjectsByPath(workspace, process.cwd(), workspace.basePath);
+    const projectName = getProjectByCwd(workspace);
+    if (projectName) {
+      return projectName;
+    }
 
-    if (projectNames.length === 1) {
-      return projectNames[0];
-    } else {
-      if (projectNames.length > 1) {
+    const defaultProjectName = workspace.extensions['defaultProject'];
+    if (typeof defaultProjectName === 'string' && defaultProjectName) {
+      if (!this.defaultProjectDeprecationWarningShown) {
         logger.warn(tags.oneLine`
-            Two or more projects are using identical roots.
-            Unable to determine project using current working directory.
-            Using default workspace project instead.
-          `);
-      }
-
-      const defaultProjectName = workspace.extensions['defaultProject'];
-      if (typeof defaultProjectName === 'string' && defaultProjectName) {
-        if (!this.defaultProjectDeprecationWarningShown) {
-          logger.warn(tags.oneLine`
             DEPRECATED: The 'defaultProject' workspace option has been deprecated.
             The project to use will be determined from the current working directory.
           `);
 
-          this.defaultProjectDeprecationWarningShown = true;
-        }
-
-        return defaultProjectName;
+        this.defaultProjectDeprecationWarningShown = true;
       }
+
+      return defaultProjectName;
     }
 
     return undefined;
