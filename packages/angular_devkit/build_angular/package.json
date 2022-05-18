@@ -21,7 +21,7 @@
     "@babel/template": "7.16.7",
     "@discoveryjs/json-ext": "0.5.7",
     "@ngtools/webpack": "0.0.0-PLACEHOLDER",
-    "ansi-colors": "4.1.1",
+    "ansi-colors": "4.1.2",
     "babel-loader": "8.2.5",
     "babel-plugin-istanbul": "6.1.1",
     "browserslist": "^4.9.1",
@@ -30,7 +30,7 @@
     "critters": "0.0.16",
     "css-loader": "6.7.1",
     "esbuild-wasm": "0.14.39",
-    "glob": "8.0.1",
+    "glob": "8.0.3",
     "https-proxy-agent": "5.0.1",
     "inquirer": "8.2.4",
     "jsonc-parser": "3.0.0",
@@ -73,11 +73,11 @@
     "esbuild": "0.14.39"
   },
   "peerDependencies": {
-    "@angular/compiler-cli": "^14.0.0 || ^14.0.0-next",
-    "@angular/localize": "^14.0.0 || ^14.0.0-next",
-    "@angular/service-worker": "^14.0.0 || ^14.0.0-next",
+    "@angular/compiler-cli": "^14.0.0 || ^14.0.0-next || ^14.1.0-next",
+    "@angular/localize": "^14.0.0 || ^14.0.0-next || ^14.1.0-next",
+    "@angular/service-worker": "^14.0.0 || ^14.0.0-next || ^14.1.0-next",
     "karma": "^6.3.0",
-    "ng-packagr": "^14.0.0 || ^14.0.0-next",
+    "ng-packagr": "^14.0.0 || ^14.0.0-next || ^14.1.0-next",
     "protractor": "^7.0.0",
     "tailwindcss": "^2.0.0 || ^3.0.0",
     "typescript": ">=4.6.2 <4.8"
