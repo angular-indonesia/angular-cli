@@ -8,7 +8,7 @@
 
 import { isJsonObject, json } from '@angular-devkit/core';
 import { execSync, spawn } from 'child_process';
-import { existsSync, promises as fs, realpathSync, rmdirSync } from 'fs';
+import { existsSync, promises as fs, realpathSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { satisfies, valid } from 'semver';
@@ -26,7 +26,7 @@ interface PackageManagerOptions {
 }
 
 export interface PackageManagerUtilsContext {
-  globalConfiguration?: AngularWorkspace;
+  globalConfiguration: AngularWorkspace;
   workspace?: AngularWorkspace;
   root: string;
 }
@@ -111,7 +111,7 @@ export class PackageManagerUtils {
     // clean up temp directory on process exit
     process.on('exit', () => {
       try {
-        rmdirSync(tempPath, { recursive: true, maxRetries: 3 });
+        rmSync(tempPath, { recursive: true, maxRetries: 3 });
       } catch {}
     });
 
@@ -326,7 +326,7 @@ export class PackageManagerUtils {
     }
 
     if (!result) {
-      result = getPackageManager(globalWorkspace?.extensions['cli']);
+      result = getPackageManager(globalWorkspace.extensions['cli']);
     }
 
     return result;
