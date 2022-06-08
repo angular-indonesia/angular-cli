@@ -3,9 +3,10 @@ import { SpawnOptions } from 'child_process';
 import * as child_process from 'child_process';
 import { concat, defer, EMPTY, from } from 'rxjs';
 import { repeat, takeLast } from 'rxjs/operators';
-import { getGlobalVariable } from './env';
+import { getGlobalVariable, getGlobalVariablesEnv } from './env';
 import { catchError } from 'rxjs/operators';
 import treeKill from 'tree-kill';
+import { delimiter, join, resolve } from 'path';
 
 interface ExecOptions {
   silent?: boolean;
@@ -61,7 +62,6 @@ function _exec(options: ExecOptions, cmd: string, args: string[]): Promise<Proce
   }
 
   const childProcess = child_process.spawn(cmd, args, spawnOptions);
-  // @ts-ignore
   childProcess.stdout!.on('data', (data: Buffer) => {
     stdout += data.toString('utf-8');
     if (options.silent) {
@@ -73,7 +73,7 @@ function _exec(options: ExecOptions, cmd: string, args: string[]): Promise<Proce
       .filter((line) => line !== '')
       .forEach((line) => console.log('  ' + line));
   });
-  // @ts-ignore
+
   childProcess.stderr!.on('data', (data: Buffer) => {
     stderr += data.toString('utf-8');
     if (options.silent) {
@@ -120,14 +120,14 @@ function _exec(options: ExecOptions, cmd: string, args: string[]): Promise<Proce
 
     if (options.waitForMatch) {
       const match = options.waitForMatch;
-      // @ts-ignore
+
       childProcess.stdout!.on('data', (data: Buffer) => {
         if (data.toString().match(match)) {
           resolve({ stdout, stderr });
           matched = true;
         }
       });
-      // @ts-ignore
+
       childProcess.stderr!.on('data', (data: Buffer) => {
         if (data.toString().match(match)) {
           resolve({ stdout, stderr });
@@ -175,14 +175,14 @@ export function waitForAnyProcessOutputToMatch(
       new Promise((resolve) => {
         let stdout = '';
         let stderr = '';
-        // @ts-ignore
+
         childProcess.stdout!.on('data', (data: Buffer) => {
           stdout += data.toString();
           if (data.toString().match(match)) {
             resolve({ stdout, stderr });
           }
         });
-        // @ts-ignore
+
         childProcess.stderr!.on('data', (data: Buffer) => {
           stderr += data.toString();
           if (data.toString().match(match)) {
@@ -196,22 +196,31 @@ export function waitForAnyProcessOutputToMatch(
 }
 
 export async function killAllProcesses(signal = 'SIGTERM'): Promise<void> {
-  await Promise.all(
-    _processes.map(
-      ({ pid }) =>
-        new Promise<void>((resolve, reject) => {
-          treeKill(pid, signal, (err) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve();
-            }
-          });
-        }),
-    ),
-  );
+  const processesToKill: Promise<void>[] = [];
 
-  _processes = [];
+  while (_processes.length) {
+    const childProc = _processes.pop();
+    if (!childProc) {
+      continue;
+    }
+
+    processesToKill.push(
+      new Promise<void>((resolve, reject) => {
+        treeKill(childProc.pid, signal, (err) => {
+          if (err && !err.message.includes('not found')) {
+            // Ignore process not found errors.
+            // This is due to a race condition with the `waitForMatch` logic.
+            // where promises are resolved on matches and not when the process terminates.
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      }),
+    );
+  }
+
+  await Promise.all(processesToKill);
 }
 
 export function exec(cmd: string, ...args: string[]) {
@@ -300,22 +309,21 @@ export function silentNpm(
       {
         silent: true,
         cwd: (options as { cwd?: string } | undefined)?.cwd,
-        env: extractNpmEnv(),
       },
       'npm',
       params,
     );
   } else {
-    return _exec({ silent: true, env: extractNpmEnv() }, 'npm', args as string[]);
+    return _exec({ silent: true }, 'npm', args as string[]);
   }
 }
 
 export function silentYarn(...args: string[]) {
-  return _exec({ silent: true, env: extractNpmEnv() }, 'yarn', args);
+  return _exec({ silent: true }, 'yarn', args);
 }
 
 export function npm(...args: string[]) {
-  return _exec({ env: extractNpmEnv() }, 'npm', args);
+  return _exec({}, 'npm', args);
 }
 
 export function node(...args: string[]) {
@@ -328,4 +336,40 @@ export function git(...args: string[]) {
 
 export function silentGit(...args: string[]) {
   return _exec({ silent: true }, 'git', args);
+}
+
+/**
+ * Launch the given entry in an child process isolated to the test environment.
+ *
+ * The test environment includes the local NPM registry, isolated NPM globals,
+ * the PATH variable only referencing the local node_modules and local NPM
+ * registry (not the test runner or standard global node_modules).
+ */
+export async function launchTestProcess(entry: string, ...args: any[]) {
+  const tempRoot: string = getGlobalVariable('tmp-root');
+
+  // Extract explicit environment variables for the test process.
+  const env: NodeJS.ProcessEnv = {
+    ...extractNpmEnv(),
+    ...getGlobalVariablesEnv(),
+  };
+
+  // Modify the PATH environment variable...
+  let paths = process.env.PATH!.split(delimiter);
+
+  // Only include paths within the sandboxed test environment or external
+  // non angular-cli paths such as /usr/bin for generic commands.
+  paths = paths.filter((p) => p.startsWith(tempRoot) || !p.includes('angular-cli'));
+
+  // Ensure the custom npm global bin is on the PATH
+  // https://docs.npmjs.com/cli/v8/configuring-npm/folders#executables
+  if (process.platform.startsWith('win')) {
+    paths.unshift(env.NPM_CONFIG_PREFIX!);
+  } else {
+    paths.unshift(join(env.NPM_CONFIG_PREFIX!, 'bin'));
+  }
+
+  env.PATH = paths.join(delimiter);
+
+  return _exec({ env }, process.execPath, [resolve(__dirname, 'run_test_process'), entry, ...args]);
 }

@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from 'fs/promises';
-import { delimiter, join } from 'path';
+import { join } from 'path';
 import { getGlobalVariable } from '../utils/env';
 
 /**
@@ -8,23 +8,24 @@ import { getGlobalVariable } from '../utils/env';
 export default async function () {
   const tempRoot: string = getGlobalVariable('tmp-root');
   const npmModulesPrefix = join(tempRoot, 'npm-global');
+  const npmRegistry: string = getGlobalVariable('package-registry');
   const npmrc = join(tempRoot, '.npmrc');
 
   // Configure npm to use the sandboxed npm globals and rc file
+  // From this point onward all npm transactions use the "global" npm cache
+  // isolated within this e2e test invocation.
   process.env.NPM_CONFIG_USERCONFIG = npmrc;
   process.env.NPM_CONFIG_PREFIX = npmModulesPrefix;
 
-  // Ensure the custom npm global bin is first on the PATH
-  // https://docs.npmjs.com/cli/v8/configuring-npm/folders#executables
-  if (process.platform.startsWith('win')) {
-    process.env.PATH = npmModulesPrefix + delimiter + process.env.PATH;
-  } else {
-    process.env.PATH = join(npmModulesPrefix, 'bin') + delimiter + process.env.PATH;
+  // Snapshot builds may contain versions that are not yet released (e.g., RC phase main branch).
+  // In this case peer dependency ranges may not resolve causing npm 7+ to fail during tests.
+  // To support this case, legacy peer dependency mode is enabled for snapshot builds.
+  if (getGlobalVariable('argv')['ng-snapshots']) {
+    process.env['NPM_CONFIG_legacy_peer_deps'] = 'true';
   }
 
-  // Ensure the globals directory and npmrc file exist.
-  // Configure the registry in the npmrc in addition to the environment variable.
-  await writeFile(npmrc, 'registry=' + getGlobalVariable('package-registry'));
+  // Configure the registry and prefix used within the test sandbox
+  await writeFile(npmrc, `registry=${npmRegistry}\nprefix=${npmModulesPrefix}`);
   await mkdir(npmModulesPrefix);
 
   console.log(`  Using "${npmModulesPrefix}" as e2e test global npm cache.`);

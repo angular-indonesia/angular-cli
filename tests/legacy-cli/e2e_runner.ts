@@ -4,10 +4,12 @@ import * as colors from 'ansi-colors';
 import glob from 'glob';
 import yargsParser from 'yargs-parser';
 import * as path from 'path';
-import { setGlobalVariable } from './e2e/utils/env';
+import { getGlobalVariable, setGlobalVariable } from './e2e/utils/env';
 import { gitClean } from './e2e/utils/git';
 import { createNpmRegistry } from './e2e/utils/registry';
-import { AddressInfo, createServer, Server } from 'net';
+import { AddressInfo, createServer } from 'net';
+import { launchTestProcess } from './e2e/utils/process';
+import { join } from 'path';
 
 Error.stackTraceLimit = Infinity;
 
@@ -70,10 +72,10 @@ function lastLogger() {
 }
 
 const testGlob = argv.glob || 'tests/**/*.ts';
-let currentFileName = '';
 
 const e2eRoot = path.join(__dirname, 'e2e');
 const allSetups = glob.sync('setup/**/*.ts', { nodir: true, cwd: e2eRoot }).sort();
+const allInitializers = glob.sync('initialize/**/*.ts', { nodir: true, cwd: e2eRoot }).sort();
 const allTests = glob
   .sync(testGlob, { nodir: true, cwd: e2eRoot, ignore: argv.ignore })
   // Replace windows slashes.
@@ -99,10 +101,9 @@ const tests = allTests.filter((name) => {
 });
 
 // Remove tests that are not part of this shard.
-const shardedTests = tests.filter((name, i) => shardId === null || i % nbShards == shardId);
-const testsToRun = allSetups.concat(shardedTests);
+const testsToRun = tests.filter((name, i) => shardId === null || i % nbShards == shardId);
 
-if (shardedTests.length === 0) {
+if (testsToRun.length === 0) {
   console.log(`No tests would be ran, aborting.`);
   process.exit(1);
 }
@@ -115,152 +116,142 @@ console.log(testsToRun.join('\n'));
 if (testsToRun.length == allTests.length) {
   console.log(`Running ${testsToRun.length} tests`);
 } else {
-  console.log(`Running ${testsToRun.length} tests (${allTests.length + allSetups.length} total)`);
+  console.log(`Running ${testsToRun.length} tests (${allTests.length} total)`);
 }
 
 setGlobalVariable('argv', argv);
 setGlobalVariable('ci', process.env['CI']?.toLowerCase() === 'true' || process.env['CI'] === '1');
 setGlobalVariable('package-manager', argv.yarn ? 'yarn' : 'npm');
 
-Promise.all([findFreePort(), findFreePort()]).then(async ([httpPort, httpsPort]) => {
-  setGlobalVariable('package-registry', 'http://localhost:' + httpPort);
-  setGlobalVariable('package-secure-registry', 'http://localhost:' + httpsPort);
+Promise.all([findFreePort(), findFreePort()])
+  .then(async ([httpPort, httpsPort]) => {
+    setGlobalVariable('package-registry', 'http://localhost:' + httpPort);
+    setGlobalVariable('package-secure-registry', 'http://localhost:' + httpsPort);
 
-  const registryProcess = await createNpmRegistry(httpPort, httpPort);
-  const secureRegistryProcess = await createNpmRegistry(httpPort, httpsPort, true);
+    // NPM registries for the lifetime of the test execution
+    const registryProcess = await createNpmRegistry(httpPort, httpPort);
+    const secureRegistryProcess = await createNpmRegistry(httpPort, httpsPort, true);
 
-  return (
-    testsToRun
-      .reduce((previous, relativeName, testIndex) => {
-        // Make sure this is a windows compatible path.
-        let absoluteName = path.join(e2eRoot, relativeName);
-        if (/^win/.test(process.platform)) {
-          absoluteName = absoluteName.replace(/\\/g, path.posix.sep);
+    try {
+      await runSteps(runSetup, allSetups, 'setup');
+      await runSteps(runInitializer, allInitializers, 'initializer');
+      await runSteps(runTest, testsToRun, 'test');
+
+      console.log(colors.green('Done.'));
+    } catch (err) {
+      console.log('\n');
+      console.error(colors.red(err.message));
+      console.error(colors.red(err.stack));
+
+      if (argv.debug) {
+        console.log(`Current Directory: ${process.cwd()}`);
+        console.log('Will loop forever while you debug... CTRL-C to quit.');
+
+        /* eslint-disable no-constant-condition */
+        while (1) {
+          // That's right!
         }
+      }
 
-        return previous.then(() => {
-          currentFileName = relativeName.replace(/\.ts$/, '');
-          const start = +new Date();
-
-          const module = require(absoluteName);
-          const originalEnvVariables = {
-            ...process.env,
-          };
-
-          const fn: (skipClean?: () => void) => Promise<void> | void =
-            typeof module == 'function'
-              ? module
-              : typeof module.default == 'function'
-              ? module.default
-              : () => {
-                  throw new Error('Invalid test module.');
-                };
-
-          let clean = true;
-          let previousDir: string | null = null;
-
-          return Promise.resolve()
-            .then(() => printHeader(currentFileName, testIndex))
-            .then(() => (previousDir = process.cwd()))
-            .then(() => logStack.push(lastLogger().createChild(currentFileName)))
-            .then(() => fn(() => (clean = false)))
-            .then(
-              () => logStack.pop(),
-              (err) => {
-                logStack.pop();
-                throw err;
-              },
-            )
-            .then(() => console.log('----'))
-            .then(() => {
-              // If we're not in a setup, change the directory back to where it was before the test.
-              // This allows tests to chdir without worrying about keeping the original directory.
-              if (!allSetups.includes(relativeName) && previousDir) {
-                process.chdir(previousDir);
-
-                // Restore env variables before each test.
-                console.log('  Restoring original environment variables...');
-                process.env = originalEnvVariables;
-              }
-            })
-            .then(() => {
-              // Only clean after a real test, not a setup step. Also skip cleaning if the test
-              // requested an exception.
-              if (!allSetups.includes(relativeName) && clean) {
-                logStack.push(new logging.NullLogger());
-                return gitClean().then(
-                  () => logStack.pop(),
-                  (err) => {
-                    logStack.pop();
-                    throw err;
-                  },
-                );
-              }
-            })
-            .then(
-              () => printFooter(currentFileName, start),
-              (err) => {
-                printFooter(currentFileName, start);
-                console.error(err);
-                throw err;
-              },
-            );
-        });
-      }, Promise.resolve())
-      // Output success vs failure information.
-      .then(
-        () => console.log(colors.green('Done.')),
-        (err) => {
-          console.log('\n');
-          console.error(colors.red(`Test "${currentFileName}" failed...`));
-          console.error(colors.red(err.message));
-          console.error(colors.red(err.stack));
-
-          if (argv.debug) {
-            console.log(`Current Directory: ${process.cwd()}`);
-            console.log('Will loop forever while you debug... CTRL-C to quit.');
-
-            /* eslint-disable no-constant-condition */
-            while (1) {
-              // That's right!
-            }
-          }
-
-          return Promise.reject(err);
-        },
-      )
-      // Kill the registry processes before exiting.
-      .finally(() => {
-        registryProcess.kill();
-        secureRegistryProcess.kill();
-      })
-      .then(
-        () => process.exit(0),
-        () => process.exit(1),
-      )
+      throw err;
+    } finally {
+      registryProcess.kill();
+      secureRegistryProcess.kill();
+    }
+  })
+  .then(
+    () => process.exit(0),
+    () => process.exit(1),
   );
-});
 
-function printHeader(testName: string, testIndex: number) {
-  const text = `${testIndex + 1} of ${testsToRun.length}`;
-  const fullIndex =
-    (testIndex < allSetups.length
-      ? testIndex
-      : (testIndex - allSetups.length) * nbShards + shardId + allSetups.length) + 1;
-  const length = tests.length + allSetups.length;
+async function runSteps(
+  run: (name: string) => Promise<void> | void,
+  steps: string[],
+  type: 'setup' | 'test' | 'initializer',
+) {
+  for (const [stepIndex, relativeName] of steps.entries()) {
+    // Make sure this is a windows compatible path.
+    let absoluteName = path.join(e2eRoot, relativeName).replace(/\.ts$/, '');
+    if (/^win/.test(process.platform)) {
+      absoluteName = absoluteName.replace(/\\/g, path.posix.sep);
+    }
+
+    const name = relativeName.replace(/\.ts$/, '');
+    const start = Date.now();
+
+    printHeader(relativeName, stepIndex, steps.length, type);
+
+    // Run the test function with the current file on the logStack.
+    logStack.push(lastLogger().createChild(absoluteName));
+    try {
+      await run(absoluteName);
+    } catch (e) {
+      console.log('\n');
+      console.error(colors.red(`Step "${absoluteName}" failed...`));
+      throw e;
+    } finally {
+      logStack.pop();
+    }
+
+    console.log('----');
+    printFooter(name, type, start);
+  }
+}
+
+async function runSetup(absoluteName: string) {
+  const module = require(absoluteName);
+
+  await (typeof module === 'function' ? module : module.default)();
+}
+
+/**
+ * Run a file from the projects root directory in a subprocess via launchTestProcess().
+ */
+async function runInitializer(absoluteName: string) {
+  process.chdir(getGlobalVariable('projects-root'));
+
+  await launchTestProcess(absoluteName);
+}
+
+/**
+ * Run a file from the main 'test-project' directory in a subprocess via launchTestProcess().
+ */
+async function runTest(absoluteName: string) {
+  process.chdir(join(getGlobalVariable('projects-root'), 'test-project'));
+
+  await launchTestProcess(absoluteName);
+
+  logStack.push(new logging.NullLogger());
+  try {
+    await gitClean();
+  } finally {
+    logStack.pop();
+  }
+}
+
+function printHeader(
+  testName: string,
+  testIndex: number,
+  count: number,
+  type: 'setup' | 'initializer' | 'test',
+) {
+  const text = `${testIndex + 1} of ${count}`;
+  const fullIndex = testIndex * nbShards + shardId + 1;
   const shard =
-    shardId === null
+    shardId === null || type !== 'test'
       ? ''
-      : colors.yellow(` [${shardId}:${nbShards}]` + colors.bold(` (${fullIndex}/${length})`));
+      : colors.yellow(` [${shardId}:${nbShards}]` + colors.bold(` (${fullIndex}/${tests.length})`));
   console.log(
-    colors.green(`Running "${colors.bold.blue(testName)}" (${colors.bold.white(text)}${shard})...`),
+    colors.green(
+      `Running ${type} "${colors.bold.blue(testName)}" (${colors.bold.white(text)}${shard})...`,
+    ),
   );
 }
 
-function printFooter(testName: string, startTime: number) {
+function printFooter(testName: string, type: 'setup' | 'initializer' | 'test', startTime: number) {
   // Round to hundredth of a second.
   const t = Math.round((Date.now() - startTime) / 10) / 100;
-  console.log(colors.green('Last step took ') + colors.bold.blue('' + t) + colors.green('s...'));
+  console.log(colors.green(`Last ${type} took `) + colors.bold.blue('' + t) + colors.green('s...'));
   console.log('');
 }
 
