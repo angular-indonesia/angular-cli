@@ -49,7 +49,7 @@ function _exec(options: ExecOptions, cmd: string, args: string[]): Promise<Proce
 
   console.log(colors.blue(`Running \`${cmd} ${args.map((x) => `"${x}"`).join(' ')}\`${flags}...`));
   console.log(colors.blue(`CWD: ${cwd}`));
-  console.log(colors.blue(`ENV: ${JSON.stringify(env)}`));
+
   const spawnOptions: SpawnOptions = {
     cwd,
     ...(env ? { env } : {}),
@@ -242,7 +242,10 @@ export async function execAndCaptureError(
     await _exec({ env, stdin }, cmd, args);
     throw new Error('Tried to capture subprocess exception, but it completed successfully.');
   } catch (err) {
-    return err;
+    if (err instanceof Error) {
+      return err;
+    }
+    throw new Error('Subprocess exception was not an Error instance');
   }
 }
 
