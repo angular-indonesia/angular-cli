@@ -1,3 +1,76 @@
+<a name="14.1.0-next.1"></a>
+
+# 14.1.0-next.1 (2022-06-15)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                                   |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------- |
+| [82ec1af4e](https://github.com/angular/angular-cli/commit/82ec1af4e1e34fe5b18db328b4bce6405a03c7b8) | fix  | show more actionable error when command is ran in wrong scope |
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                                   |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------- |
+| [7cbbf2f2b](https://github.com/angular/angular-cli/commit/7cbbf2f2ba83d27812e9b83859524937dad31fb1) | fix  | remove vscode testing configurations for `minimal` workspaces |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------- |
+| [b06ae5514](https://github.com/angular/angular-cli/commit/b06ae55140c01f8b5107527fd0af1da3b04a721f) | feat | add service worker support to experimental esbuild builder |
+| [1f66edebc](https://github.com/angular/angular-cli/commit/1f66edebcc968ed01acd06506226f5cd60c71afe) | fix  | replace fallback locale for `en-US`                        |
+
+## Special Thanks
+
+Alan Agius, Charles Lyding, Jason Bedard and Julien Marcou
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="14.0.2"></a>
+
+# 14.0.2 (2022-06-15)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                                   |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------- |
+| [23095e9c3](https://github.com/angular/angular-cli/commit/23095e9c3fc514c7e9a892833d8a18270da5bd95) | fix  | show more actionable error when command is ran in wrong scope |
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                                   |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------- |
+| [5a486cb64](https://github.com/angular/angular-cli/commit/5a486cb64253ba2829160a6f1fa3bf0e381d45ea) | fix  | remove vscode testing configurations for `minimal` workspaces |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                         |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------- |
+| [9d88c96d8](https://github.com/angular/angular-cli/commit/9d88c96d898c5c46575a910a7230d239f4fe7a77) | fix  | replace fallback locale for `en-US` |
+
+## Special Thanks
+
+Alan Agius and Julien Marcou
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="13.3.8"></a>
+
+# 13.3.8 (2022-06-15)
+
+### @angular/pwa
+
+| Commit                                                                                              | Type | Description                        |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------- |
+| [c7f994f88](https://github.com/angular/angular-cli/commit/c7f994f88a396be96c01da1017a15083d5f544fb) | fix  | add peer dependency on Angular CLI |
+
+## Special Thanks
+
+Alan Agius
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="14.1.0-next.0"></a>
 
 # 14.1.0-next.0 (2022-06-08)
