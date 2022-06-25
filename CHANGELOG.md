@@ -1,3 +1,69 @@
+<a name="14.1.0-next.2"></a>
+
+# 14.1.0-next.2 (2022-06-23)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                                            |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------- |
+| [3884b8652](https://github.com/angular/angular-cli/commit/3884b865262c1ffa5652ac0f4d67bbf59087f453) | fix  | add esbuild browser builder to workspace schema                        |
+| [4f31b57df](https://github.com/angular/angular-cli/commit/4f31b57df36da5230dd247791d0875d60b929035) | fix  | disable version check when running `ng completion` commands            |
+| [fd92eaa86](https://github.com/angular/angular-cli/commit/fd92eaa86521f6cfd8b90884ce6b2443e9ed571d) | fix  | provide an actionable error when using `--configuration` with `ng run` |
+| [ba3f67193](https://github.com/angular/angular-cli/commit/ba3f671936496571337bfb4e18d2ca5d0e56f515) | fix  | temporarily handle boolean options in schema prefixed with `no`        |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                   |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------- |
+| [a7709b718](https://github.com/angular/angular-cli/commit/a7709b718c953d83f3bde00fa3bf896501359946) | feat | add `externalDependencies` to the esbuild browser builder     |
+| [667799423](https://github.com/angular/angular-cli/commit/66779942358e6faf43f6311e5c59fced3e793e46) | fix  | fix incorrect glob cwd in karma when using `--include` option |
+| [0f02b0011](https://github.com/angular/angular-cli/commit/0f02b0011bea5bb7fff935d46768b32455ebb05e) | fix  | handle `codeCoverageExclude` correctly in Windows             |
+| [1fc7d4f56](https://github.com/angular/angular-cli/commit/1fc7d4f56b00f6aa6f2ebb4db7675e84c94062a2) | fix  | ignore supported browsers during i18n extraction              |
+
+### @angular-devkit/core
+
+| Commit                                                                                              | Type | Description                                            |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------ |
+| [1af3f71aa](https://github.com/angular/angular-cli/commit/1af3f71aa26047a6baac815c0495b1a676c2c861) | fix  | workspace writer skip creating empty projects property |
+
+## Special Thanks
+
+Alan Agius, Charles Lyding, Doug Parker, Paul Gschwendtner and renovate[bot]
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="14.0.3"></a>
+
+# 14.0.3 (2022-06-23)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                                            |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------- |
+| [b3db91baf](https://github.com/angular/angular-cli/commit/b3db91baf50c92589549a66ffef437f7890d3de7) | fix  | disable version check when running `ng completion` commands            |
+| [cdab9fa74](https://github.com/angular/angular-cli/commit/cdab9fa7431db7e2a75e04e776555b8e5e15fc94) | fix  | provide an actionable error when using `--configuration` with `ng run` |
+| [5521648e3](https://github.com/angular/angular-cli/commit/5521648e33af634285f6352b43a324a1ee023e27) | fix  | temporarily handle boolean options in schema prefixed with `no`        |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                   |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------- |
+| [5e960ce24](https://github.com/angular/angular-cli/commit/5e960ce246e7090f57ce22723911a743aa8fcb0c) | fix  | fix incorrect glob cwd in karma when using `--include` option |
+| [1b5e92075](https://github.com/angular/angular-cli/commit/1b5e92075e64563459942d4de785f1a8bef46ec7) | fix  | handle `codeCoverageExclude` correctly in Windows             |
+| [ff6d81a45](https://github.com/angular/angular-cli/commit/ff6d81a4539657446c8f5770cefe688d2d578450) | fix  | ignore supported browsers during i18n extraction              |
+
+### @angular-devkit/core
+
+| Commit                                                                                              | Type | Description                                            |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------ |
+| [170c16f2e](https://github.com/angular/angular-cli/commit/170c16f2ea769e76a48f1ac215ee88ba47ff511d) | fix  | workspace writer skip creating empty projects property |
+
+## Special Thanks
+
+Alan Agius, Charles Lyding and Paul Gschwendtner
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="14.1.0-next.1"></a>
 
 # 14.1.0-next.1 (2022-06-15)
