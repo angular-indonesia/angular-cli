@@ -22,8 +22,8 @@ http_archive(
 
 http_archive(
     name = "build_bazel_rules_nodejs",
-    sha256 = "0fad45a9bda7dc1990c47b002fd64f55041ea751fafc00cd34efb96107675778",
-    urls = ["https://github.com/bazelbuild/rules_nodejs/releases/download/5.5.0/rules_nodejs-5.5.0.tar.gz"],
+    sha256 = "ee3280a7f58aa5c1caa45cb9e08cbb8f4d74300848c508374daf37314d5390d6",
+    urls = ["https://github.com/bazelbuild/rules_nodejs/releases/download/5.5.1/rules_nodejs-5.5.1.tar.gz"],
 )
 
 load("@build_bazel_rules_nodejs//:repositories.bzl", "build_bazel_rules_nodejs_dependencies")
@@ -78,9 +78,9 @@ yarn_install(
 
 http_archive(
     name = "aspect_bazel_lib",
-    sha256 = "b381ac4dca544ecc5515916f38066e9793628477e2577edb7b2ab04e8c210738",
-    strip_prefix = "bazel-lib-1.0.0",
-    url = "https://github.com/aspect-build/bazel-lib/archive/v1.0.0.tar.gz",
+    sha256 = "8cf53f6c33bce4550cbd1ad41796f044fbaaa422b96218bcc71b69e6595205bf",
+    strip_prefix = "bazel-lib-1.4.0",
+    url = "https://github.com/aspect-build/bazel-lib/archive/v1.4.0.tar.gz",
 )
 
 load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies", "register_jq_toolchains")
