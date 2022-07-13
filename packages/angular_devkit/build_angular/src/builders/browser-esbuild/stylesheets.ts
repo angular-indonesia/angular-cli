@@ -8,14 +8,16 @@
 
 import type { BuildOptions, OutputFile } from 'esbuild';
 import * as path from 'path';
-import { DEFAULT_OUTDIR, bundle } from './esbuild';
+import { bundle } from './esbuild';
+import { createSassPlugin } from './sass-plugin';
 
 export interface BundleStylesheetOptions {
-  workspaceRoot?: string;
+  workspaceRoot: string;
   optimization: boolean;
   preserveSymlinks?: boolean;
   sourcemap: boolean | 'external' | 'inline';
   outputNames?: { bundles?: string; media?: string };
+  includePaths?: string[];
 }
 
 async function bundleStylesheet(
@@ -32,14 +34,14 @@ async function bundleStylesheet(
     logLevel: 'silent',
     minify: options.optimization,
     sourcemap: options.sourcemap,
-    outdir: DEFAULT_OUTDIR,
+    outdir: options.workspaceRoot,
     write: false,
     platform: 'browser',
     preserveSymlinks: options.preserveSymlinks,
     conditions: ['style'],
     mainFields: ['style'],
     plugins: [
-      // TODO: preprocessor plugins
+      createSassPlugin({ sourcemap: !!options.sourcemap, includePaths: options.includePaths }),
     ],
   });
 
@@ -50,7 +52,7 @@ async function bundleStylesheet(
   const resourceFiles: OutputFile[] = [];
   if (result.outputFiles) {
     for (const outputFile of result.outputFiles) {
-      outputFile.path = path.relative(DEFAULT_OUTDIR, outputFile.path);
+      outputFile.path = path.relative(options.workspaceRoot, outputFile.path);
       const filename = path.basename(outputFile.path);
       if (filename.endsWith('.css')) {
         outputPath = outputFile.path;

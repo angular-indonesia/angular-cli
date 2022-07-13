@@ -21,7 +21,7 @@ import { augmentAppWithServiceWorker } from '../../utils/service-worker';
 import { getIndexInputFile, getIndexOutputFile } from '../../utils/webpack-browser-config';
 import { resolveGlobalStyles } from '../../webpack/configs';
 import { createCompilerPlugin } from './compiler-plugin';
-import { DEFAULT_OUTDIR, bundle, logMessages } from './esbuild';
+import { bundle, logMessages } from './esbuild';
 import { logExperimentalWarnings } from './experimental-warnings';
 import { normalizeOptions } from './options';
 import { Schema as BrowserBuilderOptions, SourceMapClass } from './schema';
@@ -120,7 +120,7 @@ export async function buildEsbuildBrowser(
     const relativeFilePath = path.relative(workspaceRoot, outputFile.path);
     const entryPoint = result.metafile?.outputs[relativeFilePath]?.entryPoint;
 
-    outputFile.path = path.relative(DEFAULT_OUTDIR, outputFile.path);
+    outputFile.path = relativeFilePath;
 
     if (entryPoint) {
       // An entryPoint value indicates an initial file
@@ -159,9 +159,11 @@ export async function buildEsbuildBrowser(
         virtualEntryData,
         { virtualName: `angular:style/global;${name}`, resolvePath: workspaceRoot },
         {
+          workspaceRoot,
           optimization: !!optimizationOptions.styles.minify,
-          sourcemap: !!sourcemapOptions.styles,
+          sourcemap: !!sourcemapOptions.styles && (sourcemapOptions.hidden ? 'external' : true),
           outputNames: noInjectNames.includes(name) ? { media: outputNames.media } : outputNames,
+          includePaths: options.stylePreprocessorOptions?.includePaths,
         },
       );
 
@@ -308,7 +310,7 @@ async function bundleCode(
     metafile: true,
     minify: optimizationOptions.scripts,
     pure: ['forwardRef'],
-    outdir: DEFAULT_OUTDIR,
+    outdir: workspaceRoot,
     sourcemap: sourcemapOptions.scripts && (sourcemapOptions.hidden ? 'external' : true),
     splitting: true,
     tsconfig,
@@ -321,6 +323,7 @@ async function bundleCode(
         // JS/TS options
         {
           sourcemap: !!sourcemapOptions.scripts,
+          thirdPartySourcemaps: sourcemapOptions.vendor,
           tsconfig,
           advancedOptimizations: options.buildOptimizer,
         },
@@ -334,6 +337,7 @@ async function bundleCode(
             // of sourcemap processing.
             !!sourcemapOptions.styles && (sourcemapOptions.hidden ? false : 'inline'),
           outputNames,
+          includePaths: options.stylePreprocessorOptions?.includePaths,
         },
       ),
     ],
