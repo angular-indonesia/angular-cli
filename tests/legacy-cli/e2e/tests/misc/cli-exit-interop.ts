@@ -2,7 +2,7 @@ import { createProjectFromAsset } from '../../utils/assets';
 import { moveFile, replaceInFile } from '../../utils/fs';
 import { setRegistry } from '../../utils/packages';
 import { noSilentNg } from '../../utils/process';
-import { useCIChrome } from '../../utils/project';
+import { useCIChrome, useCIDefaults } from '../../utils/project';
 import { expectToFail } from '../../utils/utils';
 
 /**
@@ -16,9 +16,9 @@ export default async function () {
     // We need to use the public registry because in the local NPM server we don't have
     // older versions @angular/cli packages which would cause `npm install` during `ng update` to fail.
     await setRegistry(false);
-    await createProjectFromAsset('12.0-project', true);
+    await createProjectFromAsset('13.0-project', true);
 
-    // A missing stylesheet error will trigger the stuck process issue with v12 when building
+    // A missing stylesheet error will trigger the stuck process issue with v13 when building
     await moveFile('src/styles.css', 'src/styles.scss');
     await expectToFail(() => noSilentNg('build'));
 
@@ -27,6 +27,7 @@ export default async function () {
     await replaceInFile('angular.json', /styles\.css/g, 'styles.scss');
 
     await useCIChrome();
+    await useCIDefaults('thirteen-project');
     await noSilentNg('test', '--watch=false');
   } finally {
     await setRegistry(true);
