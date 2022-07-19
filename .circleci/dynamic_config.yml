@@ -77,9 +77,32 @@ commands:
     steps:
       - run:
           name: 'Cancel workflow on fail'
+          shell: bash
           when: on_fail
           command: |
             curl -X POST --header "Content-Type: application/json" "https://circleci.com/api/v2/workflow/${CIRCLE_WORKFLOW_ID}/cancel?circle-token=${CIRCLE_TOKEN}"
+
+  initialize_env:
+    steps:
+      - run:
+          name: Initialize Environment
+          command: ./.circleci/env.sh
+
+  rebase_pr:
+    steps:
+      - run:
+          name: Rebase PR on target branch
+          shell: bash
+          command: >
+            if [[ -n "${CIRCLE_PR_NUMBER}" ]]; then
+              # User is required for rebase.
+              git config user.name "angular-ci"
+              git config user.email "angular-ci"
+              # Rebase PR on top of target branch.
+              node tools/rebase-pr.js angular/angular-cli ${CIRCLE_PR_NUMBER}
+            else
+              echo "This build is not over a PR, nothing to do."
+            fi
 
   custom_attach_workspace:
     description: Attach workspace at a predefined location
@@ -88,6 +111,7 @@ commands:
           at: *workspace_location
   setup_windows:
     steps:
+      - initialize_env
       - run: nvm install 16.10
       - run: nvm use 16.10
       - run: npm install -g yarn@1.22.10
@@ -138,18 +162,8 @@ jobs:
     resource_class: medium
     steps:
       - checkout
-      - run:
-          name: Rebase PR on target branch
-          command: >
-            if [[ -n "${CIRCLE_PR_NUMBER}" ]]; then
-              # User is required for rebase.
-              git config user.name "angular-ci"
-              git config user.email "angular-ci"
-              # Rebase PR on top of target branch.
-              node tools/rebase-pr.js angular/angular-cli ${CIRCLE_PR_NUMBER}
-            else
-              echo "This build is not over a PR, nothing to do."
-            fi
+      - rebase_pr
+      - initialize_env
       - restore_cache:
           keys:
             - *cache_key
@@ -208,10 +222,7 @@ jobs:
     steps:
       - custom_attach_workspace
       - browser-tools/install-chrome
-      - run:
-          name: Initialize Environment
-          command: |
-            ./.circleci/env.sh
+      - initialize_env
       - run:
           name: Execute CLI E2E Tests
           command: |
@@ -237,9 +248,7 @@ jobs:
     resource_class: medium
     steps:
       - custom_attach_workspace
-      - run:
-          name: Initialize Environment
-          command: ./.circleci/env.sh
+      - initialize_env
       - run:
           name: Initialize Saucelabs
           command: setSecretVar SAUCE_ACCESS_KEY $(echo $SAUCE_ACCESS_KEY | rev)
@@ -306,18 +315,7 @@ jobs:
     parallelism: 8
     steps:
       - checkout
-      - run:
-          name: Rebase PR on target branch
-          command: |
-            if (Test-Path env:CIRCLE_PR_NUMBER) {
-              # User is required for rebase.
-              git config user.name "angular-ci"
-              git config user.email "angular-ci"
-              # Rebase PR on top of target branch.
-              node tools/rebase-pr.js angular/angular-cli $env:CIRCLE_PR_NUMBER
-            } else {
-              echo "This build is not over a PR, nothing to do."
-            }
+      - rebase_pr
       - setup_windows
       - restore_cache:
           keys:
@@ -382,12 +380,15 @@ workflows:
           nodeversion: '16.10'
           snapshots: true
           pre-steps:
-            - run:
-                name: Check if e2e snapshots should be executed.
-                command: >
-                  if [[ "<<pipeline.parameters.snapshot_changed>>" != "true" ]] && [[ -n "{$CIRCLE_PULL_REQUEST}" ]]; then
-                    circleci-agent step halt
-                  fi
+            - when:
+                condition:
+                  and:
+                    - not:
+                        equal: [main, << pipeline.git.branch >>]
+                    - not: << pipeline.parameters.snapshot_changed >>
+                steps:
+                  # Don't run snapshot E2E's unless it's on the main branch or the snapshots file has been updated.
+                  - run: circleci-agent step halt
           requires:
             - build
           filters:
