@@ -83,7 +83,7 @@ describe('Class Schematic', () => {
     const tree = await schematicRunner.runSchematicAsync('class', options, appTree).toPromise();
     const classPath = '/projects/bar/src/app/foo.model.ts';
     const content = tree.readContent(classPath);
-    expect(content).toMatch(/export class Foo/);
+    expect(content).toMatch(/export class FooModel/);
   });
 
   it('should respect the path option', async () => {
@@ -108,5 +108,13 @@ describe('Class Schematic', () => {
     const tree = await schematicRunner.runSchematicAsync('class', options, appTree).toPromise();
     expect(tree.files).toContain('/projects/bar/src/app/foo.ts');
     expect(tree.files).not.toContain('/projects/bar/src/app/foo.spec.ts');
+  });
+
+  it('should error when class name contains invalid characters', async () => {
+    const options = { ...defaultOptions, name: '1Clazz' };
+
+    await expectAsync(
+      schematicRunner.runSchematicAsync('class', options, appTree).toPromise(),
+    ).toBeRejectedWithError('Class name "1Clazz" is invalid.');
   });
 });
