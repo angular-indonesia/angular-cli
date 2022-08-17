@@ -25,11 +25,11 @@
     "babel-loader": "8.2.5",
     "babel-plugin-istanbul": "6.1.1",
     "browserslist": "^4.9.1",
-    "cacache": "16.1.1",
+    "cacache": "16.1.2",
     "copy-webpack-plugin": "11.0.0",
     "critters": "0.0.16",
     "css-loader": "6.7.1",
-    "esbuild-wasm": "0.15.1",
+    "esbuild-wasm": "0.15.5",
     "glob": "8.0.3",
     "https-proxy-agent": "5.0.1",
     "inquirer": "8.2.4",
@@ -48,7 +48,7 @@
     "postcss": "8.4.16",
     "postcss-import": "14.1.0",
     "postcss-loader": "7.0.1",
-    "postcss-preset-env": "7.7.2",
+    "postcss-preset-env": "7.8.0",
     "regenerator-runtime": "0.13.9",
     "resolve-url-loader": "5.0.0",
     "rxjs": "6.6.7",
@@ -57,7 +57,7 @@
     "semver": "7.3.7",
     "source-map-loader": "4.0.0",
     "source-map-support": "0.5.21",
-    "stylus": "0.58.1",
+    "stylus": "0.59.0",
     "stylus-loader": "7.0.0",
     "terser": "5.14.2",
     "text-table": "0.2.0",
@@ -70,7 +70,7 @@
     "webpack-subresource-integrity": "5.1.0"
   },
   "optionalDependencies": {
-    "esbuild": "0.15.1"
+    "esbuild": "0.15.5"
   },
   "peerDependencies": {
     "@angular/compiler-cli": "^14.0.0 || ^14.0.0-next || ^14.1.0-next",
