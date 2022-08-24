@@ -8,7 +8,7 @@
 
 import { BuilderContext, BuilderOutput, createBuilder } from '@angular-devkit/architect';
 import * as assert from 'assert';
-import type { OutputFile } from 'esbuild';
+import type { Message, OutputFile } from 'esbuild';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { NormalizedOptimizationOptions, deleteOutputDir } from '../../utils';
@@ -93,32 +93,45 @@ export async function buildEsbuildBrowser(
     ),
   );
 
-  // Execute esbuild
-  const result = await bundleCode(
-    workspaceRoot,
-    entryPoints,
-    outputNames,
-    options,
-    optimizationOptions,
-    sourcemapOptions,
-    tsconfig,
-  );
+  const [codeResults, styleResults] = await Promise.all([
+    // Execute esbuild to bundle the application code
+    bundleCode(
+      workspaceRoot,
+      entryPoints,
+      outputNames,
+      options,
+      optimizationOptions,
+      sourcemapOptions,
+      tsconfig,
+    ),
+    // Execute esbuild to bundle the global stylesheets
+    bundleGlobalStylesheets(
+      workspaceRoot,
+      outputNames,
+      options,
+      optimizationOptions,
+      sourcemapOptions,
+    ),
+  ]);
 
   // Log all warnings and errors generated during bundling
-  await logMessages(context, result);
+  await logMessages(context, {
+    errors: [...codeResults.errors, ...styleResults.errors],
+    warnings: [...codeResults.warnings, ...styleResults.warnings],
+  });
 
   // Return if the bundling failed to generate output files or there are errors
-  if (!result.outputFiles || result.errors.length) {
+  if (!codeResults.outputFiles || codeResults.errors.length) {
     return { success: false };
   }
 
-  // Structure the bundling output files
+  // Structure the code bundling output files
   const initialFiles: FileInfo[] = [];
   const outputFiles: OutputFile[] = [];
-  for (const outputFile of result.outputFiles) {
+  for (const outputFile of codeResults.outputFiles) {
     // Entries in the metafile are relative to the `absWorkingDir` option which is set to the workspaceRoot
     const relativeFilePath = path.relative(workspaceRoot, outputFile.path);
-    const entryPoint = result.metafile?.outputs[relativeFilePath]?.entryPoint;
+    const entryPoint = codeResults.metafile?.outputs[relativeFilePath]?.entryPoint;
 
     outputFile.path = relativeFilePath;
 
@@ -133,6 +146,15 @@ export async function buildEsbuildBrowser(
     outputFiles.push(outputFile);
   }
 
+  // Add global stylesheets output files
+  outputFiles.push(...styleResults.outputFiles);
+  initialFiles.push(...styleResults.initialFiles);
+
+  // Return if the global stylesheet bundling has errors
+  if (styleResults.errors.length) {
+    return { success: false };
+  }
+
   // Create output directory if needed
   try {
     await fs.mkdir(outputPath, { recursive: true });
@@ -141,65 +163,6 @@ export async function buildEsbuildBrowser(
     context.logger.error('Unable to create output directory: ' + e.message);
 
     return { success: false };
-  }
-
-  // Process global stylesheets
-  if (options.styles) {
-    // resolveGlobalStyles is temporarily reused from the Webpack builder code
-    const { entryPoints: stylesheetEntrypoints, noInjectNames } = resolveGlobalStyles(
-      options.styles,
-      workspaceRoot,
-      // preserveSymlinks is always true here to allow the bundler to handle the option
-      true,
-      // skipResolution to leverage the bundler's more comprehensive resolution
-      true,
-    );
-    for (const [name, files] of Object.entries(stylesheetEntrypoints)) {
-      const virtualEntryData = files
-        .map((file) => `@import '${file.replace(/\\/g, '/')}';`)
-        .join('\n');
-      const sheetResult = await bundleStylesheetText(
-        virtualEntryData,
-        { virtualName: `angular:style/global;${name}`, resolvePath: workspaceRoot },
-        {
-          workspaceRoot,
-          optimization: !!optimizationOptions.styles.minify,
-          sourcemap: !!sourcemapOptions.styles && (sourcemapOptions.hidden ? 'external' : true),
-          outputNames: noInjectNames.includes(name) ? { media: outputNames.media } : outputNames,
-          includePaths: options.stylePreprocessorOptions?.includePaths,
-          preserveSymlinks: options.preserveSymlinks,
-          externalDependencies: options.externalDependencies,
-        },
-      );
-
-      await logMessages(context, sheetResult);
-      if (!sheetResult.path) {
-        // Failed to process the stylesheet
-        assert.ok(
-          sheetResult.errors.length,
-          `Global stylesheet processing for '${name}' failed with no errors.`,
-        );
-
-        return { success: false };
-      }
-
-      // The virtual stylesheets will be named `stdin` by esbuild. This must be replaced
-      // with the actual name of the global style and the leading directory separator must
-      // also be removed to make the path relative.
-      const sheetPath = sheetResult.path.replace('stdin', name);
-      outputFiles.push(createOutputFileFromText(sheetPath, sheetResult.contents));
-      if (sheetResult.map) {
-        outputFiles.push(createOutputFileFromText(sheetPath + '.map', sheetResult.map));
-      }
-      if (!noInjectNames.includes(name)) {
-        initialFiles.push({
-          file: sheetPath,
-          name,
-          extension: '.css',
-        });
-      }
-      outputFiles.push(...sheetResult.resourceFiles);
-    }
   }
 
   // Generate index HTML file
@@ -364,6 +327,81 @@ async function bundleCode(
       'ngJitMode': 'false',
     },
   });
+}
+
+async function bundleGlobalStylesheets(
+  workspaceRoot: string,
+  outputNames: { bundles: string; media: string },
+  options: BrowserBuilderOptions,
+  optimizationOptions: NormalizedOptimizationOptions,
+  sourcemapOptions: SourceMapClass,
+) {
+  const outputFiles: OutputFile[] = [];
+  const initialFiles: FileInfo[] = [];
+  const errors: Message[] = [];
+  const warnings: Message[] = [];
+
+  // resolveGlobalStyles is temporarily reused from the Webpack builder code
+  const { entryPoints: stylesheetEntrypoints, noInjectNames } = resolveGlobalStyles(
+    options.styles || [],
+    workspaceRoot,
+    // preserveSymlinks is always true here to allow the bundler to handle the option
+    true,
+    // skipResolution to leverage the bundler's more comprehensive resolution
+    true,
+  );
+
+  for (const [name, files] of Object.entries(stylesheetEntrypoints)) {
+    const virtualEntryData = files
+      .map((file) => `@import '${file.replace(/\\/g, '/')}';`)
+      .join('\n');
+    const sheetResult = await bundleStylesheetText(
+      virtualEntryData,
+      { virtualName: `angular:style/global;${name}`, resolvePath: workspaceRoot },
+      {
+        workspaceRoot,
+        optimization: !!optimizationOptions.styles.minify,
+        sourcemap: !!sourcemapOptions.styles && (sourcemapOptions.hidden ? 'external' : true),
+        outputNames: noInjectNames.includes(name) ? { media: outputNames.media } : outputNames,
+        includePaths: options.stylePreprocessorOptions?.includePaths,
+        preserveSymlinks: options.preserveSymlinks,
+        externalDependencies: options.externalDependencies,
+      },
+    );
+
+    errors.push(...sheetResult.errors);
+    warnings.push(...sheetResult.warnings);
+
+    if (!sheetResult.path) {
+      // Failed to process the stylesheet
+      assert.ok(
+        sheetResult.errors.length,
+        `Global stylesheet processing for '${name}' failed with no errors.`,
+      );
+
+      continue;
+    }
+
+    // The virtual stylesheets will be named `stdin` by esbuild. This must be replaced
+    // with the actual name of the global style and the leading directory separator must
+    // also be removed to make the path relative.
+    const sheetPath = sheetResult.path.replace('stdin', name);
+    outputFiles.push(createOutputFileFromText(sheetPath, sheetResult.contents));
+    if (sheetResult.map) {
+      outputFiles.push(createOutputFileFromText(sheetPath + '.map', sheetResult.map));
+    }
+
+    if (!noInjectNames.includes(name)) {
+      initialFiles.push({
+        file: sheetPath,
+        name,
+        extension: '.css',
+      });
+    }
+    outputFiles.push(...sheetResult.resourceFiles);
+  }
+
+  return { outputFiles, initialFiles, errors, warnings };
 }
 
 export default createBuilder(buildEsbuildBrowser);
