@@ -127,10 +127,10 @@
     "@angular/core" "^13.0.0 || ^14.0.0-0"
     reflect-metadata "^0.1.13"
 
-"@angular/build-tooling@https://github.com/angular/dev-infra-private-build-tooling-builds.git#3a406e5626a3d2edb46ea6bb6533fb4a99b34889":
-  version "0.0.0-457a350ebc50ec803abecb07c8995c1ec0f111ff"
-  uid "3a406e5626a3d2edb46ea6bb6533fb4a99b34889"
-  resolved "https://github.com/angular/dev-infra-private-build-tooling-builds.git#3a406e5626a3d2edb46ea6bb6533fb4a99b34889"
+"@angular/build-tooling@https://github.com/angular/dev-infra-private-build-tooling-builds.git#1ef843fcf4880c4881a2db7f925c10fa860002ae":
+  version "0.0.0-3238f034456be0ac0fbc94a3333b4ba82a8cbacf"
+  uid "1ef843fcf4880c4881a2db7f925c10fa860002ae"
+  resolved "https://github.com/angular/dev-infra-private-build-tooling-builds.git#1ef843fcf4880c4881a2db7f925c10fa860002ae"
   dependencies:
     "@angular-devkit/build-angular" "14.2.0-rc.0"
     "@angular/benchpress" "0.3.0"
@@ -241,10 +241,10 @@
   dependencies:
     tslib "^2.3.0"
 
-"@angular/ng-dev@https://github.com/angular/dev-infra-private-ng-dev-builds.git#ea920a8f84ab636a49c2dc08c494120569ae63cf":
-  version "0.0.0-457a350ebc50ec803abecb07c8995c1ec0f111ff"
-  uid ea920a8f84ab636a49c2dc08c494120569ae63cf
-  resolved "https://github.com/angular/dev-infra-private-ng-dev-builds.git#ea920a8f84ab636a49c2dc08c494120569ae63cf"
+"@angular/ng-dev@https://github.com/angular/dev-infra-private-ng-dev-builds.git#bc4f1f64acf0ff18f7eab7748e1844260c6530fc":
+  version "0.0.0-3238f034456be0ac0fbc94a3333b4ba82a8cbacf"
+  uid bc4f1f64acf0ff18f7eab7748e1844260c6530fc
+  resolved "https://github.com/angular/dev-infra-private-ng-dev-builds.git#bc4f1f64acf0ff18f7eab7748e1844260c6530fc"
   dependencies:
     "@yarnpkg/lockfile" "^1.1.0"
     typescript "~4.8.0"
@@ -2133,10 +2133,10 @@
     "@types/qs" "*"
     "@types/serve-static" "*"
 
-"@types/glob@^7.1.1":
-  version "7.2.0"
-  resolved "https://registry.yarnpkg.com/@types/glob/-/glob-7.2.0.tgz#bc1b5bf3aa92f25bd5dd39f35c57361bdce5b2eb"
-  integrity sha512-ZUxbzKl0IfJILTS6t7ip5fQQM/J3TJYubDm3nMbgubNNYS62eXeUpoLUC8/7fJNiFYHTrGPQn7hspDUzIHX3UA==
+"@types/glob@^8.0.0":
+  version "8.0.0"
+  resolved "https://registry.yarnpkg.com/@types/glob/-/glob-8.0.0.tgz#321607e9cbaec54f687a0792b2d1d370739455d2"
+  integrity sha512-l6NQsDDyQUVeoTynNpC9uRvCUint/gSUXQA2euwmTuWGvPY5LSDUu6tkCtJB2SvGQlJQzLaKqcGZP4//7EDveA==
   dependencies:
     "@types/minimatch" "*"
     "@types/node" "*"
@@ -8666,6 +8666,15 @@ postcss-import@14.1.0:
   version "14.1.0"
   resolved "https://registry.yarnpkg.com/postcss-import/-/postcss-import-14.1.0.tgz#a7333ffe32f0b8795303ee9e40215dac922781f0"
   integrity sha512-flwI+Vgm4SElObFVPpTIT7SU7R3qk2L7PyduMcokiaVKuWv9d/U+Gm/QAd8NDLuykTWTkcrjOeD2Pp1rMeBTGw==
+  dependencies:
+    postcss-value-parser "^4.0.0"
+    read-cache "^1.0.0"
+    resolve "^1.1.7"
+
+postcss-import@15.0.0:
+  version "15.0.0"
+  resolved "https://registry.yarnpkg.com/postcss-import/-/postcss-import-15.0.0.tgz#0b66c25fdd9c0d19576e63c803cf39e4bad08822"
+  integrity sha512-Y20shPQ07RitgBGv2zvkEAu9bqvrD77C9axhj/aA1BQj4czape2MdClCExvB27EwYEJdGgKZBpKanb0t1rK2Kg==
   dependencies:
     postcss-value-parser "^4.0.0"
     read-cache "^1.0.0"
