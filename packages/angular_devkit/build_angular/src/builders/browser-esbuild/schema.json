@@ -72,7 +72,7 @@
               "input": {
                 "type": "string",
                 "description": "The file to include.",
-                "pattern": "\\.(?:css|scss|sass|less|styl)$"
+                "pattern": "\\.(?:css|scss|sass|less)$"
               },
               "bundleName": {
                 "type": "string",
@@ -91,7 +91,7 @@
           {
             "type": "string",
             "description": "The file to include.",
-            "pattern": "\\.(?:css|scss|sass|less|styl)$"
+            "pattern": "\\.(?:css|scss|sass|less)$"
           }
         ]
       }
@@ -461,38 +461,19 @@
       ]
     },
     "fileReplacement": {
-      "oneOf": [
-        {
-          "type": "object",
-          "properties": {
-            "src": {
-              "type": "string",
-              "pattern": "\\.(([cm]?j|t)sx?|json)$"
-            },
-            "replaceWith": {
-              "type": "string",
-              "pattern": "\\.(([cm]?j|t)sx?|json)$"
-            }
-          },
-          "additionalProperties": false,
-          "required": ["src", "replaceWith"]
+      "type": "object",
+      "properties": {
+        "replace": {
+          "type": "string",
+          "pattern": "\\.(([cm]?j|t)sx?|json)$"
         },
-        {
-          "type": "object",
-          "properties": {
-            "replace": {
-              "type": "string",
-              "pattern": "\\.(([cm]?j|t)sx?|json)$"
-            },
-            "with": {
-              "type": "string",
-              "pattern": "\\.(([cm]?j|t)sx?|json)$"
-            }
-          },
-          "additionalProperties": false,
-          "required": ["replace", "with"]
+        "with": {
+          "type": "string",
+          "pattern": "\\.(([cm]?j|t)sx?|json)$"
         }
-      ]
+      },
+      "additionalProperties": false,
+      "required": ["replace", "with"]
     },
     "budget": {
       "type": "object",
