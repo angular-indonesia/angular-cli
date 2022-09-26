@@ -77,7 +77,7 @@ export async function getCommonConfig(wco: WebpackConfigOptions): Promise<Config
   const isPlatformServer = buildOptions.platform === 'server';
   const extraPlugins: { apply(compiler: Compiler): void }[] = [];
   const extraRules: RuleSetRule[] = [];
-  const entryPoints: { [key: string]: [string, ...string[]] } = {};
+  const entryPoints: Configuration['entry'] = {};
 
   // Load ESM `@angular/compiler-cli` using the TypeScript dynamic import workaround.
   // Once TypeScript provides support for keeping the dynamic import this workaround can be
@@ -105,13 +105,32 @@ export async function getCommonConfig(wco: WebpackConfigOptions): Promise<Config
     extraPlugins.push(new ContextReplacementPlugin(/@?hapi|express[\\/]/));
   }
 
-  if (!isPlatformServer) {
-    if (buildOptions.polyfills) {
-      const projectPolyfills = path.resolve(root, buildOptions.polyfills);
-      if (entryPoints['polyfills']) {
-        entryPoints['polyfills'].push(projectPolyfills);
+  if (polyfills?.length) {
+    // `zone.js/testing` is a **special** polyfill because when not imported in the main it fails with the below errors:
+    // `Error: Expected to be running in 'ProxyZone', but it was not found.`
+    // This was also the reason why previously it was imported in `test.ts` as the first module.
+    // From Jia li:
+    // This is because the jasmine functions such as beforeEach/it will not be patched by zone.js since
+    // jasmine will not be loaded yet, so the ProxyZone will not be there. We have to load zone-testing.js after
+    // jasmine is ready.
+    // We could force loading 'zone.js/testing' prior to jasmine by changing the order of scripts in 'karma-context.html'.
+    // But this has it's own problems as zone.js needs to be loaded prior to jasmine due to patching of timing functions
+    // See: https://github.com/jasmine/jasmine/issues/1944
+    // Thus the correct order is zone.js -> jasmine -> zone.js/testing.
+    const zoneTestingEntryPoint = 'zone.js/testing';
+    const polyfillsExludingZoneTesting = polyfills.filter((p) => p !== zoneTestingEntryPoint);
+
+    if (Array.isArray(entryPoints['polyfills'])) {
+      entryPoints['polyfills'].push(...polyfillsExludingZoneTesting);
+    } else {
+      entryPoints['polyfills'] = polyfillsExludingZoneTesting;
+    }
+
+    if (polyfillsExludingZoneTesting.length !== polyfills.length) {
+      if (Array.isArray(entryPoints['main'])) {
+        entryPoints['main'].unshift(zoneTestingEntryPoint);
       } else {
-        entryPoints['polyfills'] = [projectPolyfills];
+        entryPoints['main'] = [zoneTestingEntryPoint, entryPoints['main'] as string];
       }
     }
   }
@@ -342,8 +361,7 @@ export async function getCommonConfig(wco: WebpackConfigOptions): Promise<Config
       strictExportPresence: true,
       parser: {
         javascript: {
-          // TODO(alanagius): disable the below once we have a migration to remove `require.context` from test.ts file in users projects.
-          requireContext: true,
+          requireContext: false,
           // Disable auto URL asset module creation. This doesn't effect `new Worker(new URL(...))`
           // https://webpack.js.org/guides/asset-modules/#url-assets
           url: false,
