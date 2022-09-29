@@ -9,7 +9,6 @@
 import { SchematicTestRunner, UnitTestTree } from '@angular-devkit/schematics/testing';
 import { parse as parseJson } from 'jsonc-parser';
 import { latestVersions } from '../utility/latest-versions';
-import { getFileContent } from '../utility/test';
 import { Schema as WorkspaceOptions } from '../workspace/schema';
 import { Schema as ApplicationOptions, Style, ViewEncapsulation } from './schema';
 
@@ -52,16 +51,12 @@ describe('Application Schematic', () => {
     const files = tree.files;
     expect(files).toEqual(
       jasmine.arrayContaining([
-        '/projects/foo/karma.conf.js',
         '/projects/foo/tsconfig.app.json',
         '/projects/foo/tsconfig.spec.json',
-        '/projects/foo/src/environments/environment.ts',
-        '/projects/foo/src/environments/environment.prod.ts',
         '/projects/foo/src/favicon.ico',
         '/projects/foo/src/index.html',
         '/projects/foo/src/main.ts',
         '/projects/foo/src/styles.css',
-        '/projects/foo/src/test.ts',
         '/projects/foo/src/app/app.module.ts',
         '/projects/foo/src/app/app.component.css',
         '/projects/foo/src/app/app.component.html',
@@ -148,7 +143,7 @@ describe('Application Schematic', () => {
     const path = '/projects/foo/src/main.ts';
     const content = tree.readContent(path);
     expect(content).toContain('defaultEncapsulation: ViewEncapsulation.ShadowDom');
-    expect(content).toContain(`import { enableProdMode, ViewEncapsulation } from '@angular/core'`);
+    expect(content).toContain(`import { ViewEncapsulation } from '@angular/core'`);
   });
 
   it('should set the right paths in the tsconfig.app.json', async () => {
@@ -164,17 +159,8 @@ describe('Application Schematic', () => {
     const tree = await schematicRunner
       .runSchematicAsync('application', defaultOptions, workspaceTree)
       .toPromise();
-    const { files, extends: _extends } = readJsonFile(tree, '/projects/foo/tsconfig.spec.json');
-    expect(files).toEqual(['src/test.ts']);
+    const { extends: _extends } = readJsonFile(tree, '/projects/foo/tsconfig.spec.json');
     expect(_extends).toBe('../../tsconfig.json');
-  });
-
-  it('should set the right coverage folder in the karma.json file', async () => {
-    const tree = await schematicRunner
-      .runSchematicAsync('application', defaultOptions, workspaceTree)
-      .toPromise();
-    const karmaConf = getFileContent(tree, '/projects/foo/karma.conf.js');
-    expect(karmaConf).toContain(`dir: require('path').join(__dirname, '../../coverage/foo')`);
   });
 
   it('should set the skipTests flag for other schematics when using --skipTests=true', async () => {
@@ -254,8 +240,6 @@ describe('Application Schematic', () => {
     const files = tree.files;
     [
       '/projects/foo/tsconfig.spec.json',
-      '/projects/foo/karma.conf.js',
-      '/projects/foo/src/test.ts',
       '/projects/foo/src/app/app.component.css',
       '/projects/foo/src/app/app.component.html',
       '/projects/foo/src/app/app.component.spec.ts',
@@ -264,8 +248,6 @@ describe('Application Schematic', () => {
     expect(files).toEqual(
       jasmine.arrayContaining([
         '/projects/foo/tsconfig.app.json',
-        '/projects/foo/src/environments/environment.ts',
-        '/projects/foo/src/environments/environment.prod.ts',
         '/projects/foo/src/favicon.ico',
         '/projects/foo/src/index.html',
         '/projects/foo/src/main.ts',
@@ -293,8 +275,6 @@ describe('Application Schematic', () => {
     expect(files).toEqual(
       jasmine.arrayContaining([
         '/projects/foo/tsconfig.app.json',
-        '/projects/foo/src/environments/environment.ts',
-        '/projects/foo/src/environments/environment.prod.ts',
         '/projects/foo/src/favicon.ico',
         '/projects/foo/src/index.html',
         '/projects/foo/src/main.ts',
@@ -323,8 +303,6 @@ describe('Application Schematic', () => {
     expect(files).toEqual(
       jasmine.arrayContaining([
         '/projects/foo/tsconfig.app.json',
-        '/projects/foo/src/environments/environment.ts',
-        '/projects/foo/src/environments/environment.prod.ts',
         '/projects/foo/src/favicon.ico',
         '/projects/foo/src/index.html',
         '/projects/foo/src/main.ts',
@@ -401,16 +379,12 @@ describe('Application Schematic', () => {
       const files = tree.files;
       expect(files).toEqual(
         jasmine.arrayContaining([
-          '/karma.conf.js',
           '/tsconfig.app.json',
           '/tsconfig.spec.json',
-          '/src/environments/environment.ts',
-          '/src/environments/environment.prod.ts',
           '/src/favicon.ico',
           '/src/index.html',
           '/src/main.ts',
           '/src/styles.css',
-          '/src/test.ts',
           '/src/app/app.module.ts',
           '/src/app/app.component.css',
           '/src/app/app.component.html',
@@ -436,9 +410,8 @@ describe('Application Schematic', () => {
       expect(buildOpt.tsConfig).toEqual('tsconfig.app.json');
 
       const testOpt = prj.architect.test.options;
-      expect(testOpt.main).toEqual('src/test.ts');
       expect(testOpt.tsConfig).toEqual('tsconfig.spec.json');
-      expect(testOpt.karmaConfig).toEqual('karma.conf.js');
+      expect(testOpt.karmaConfig).toBeUndefined();
       expect(testOpt.styles).toEqual(['src/styles.css']);
     });
 
@@ -510,13 +483,13 @@ describe('Application Schematic', () => {
       expect(appTsConfig.extends).toEqual('./tsconfig.json');
       const specTsConfig = readJsonFile(tree, '/tsconfig.spec.json');
       expect(specTsConfig.extends).toEqual('./tsconfig.json');
-      expect(specTsConfig.files).toEqual(['src/test.ts']);
     });
 
     it(`should create correct paths when 'newProjectRoot' is blank`, async () => {
       const workspaceTree = await schematicRunner
         .runSchematicAsync('workspace', { ...workspaceOptions, newProjectRoot: '' })
         .toPromise();
+
       const options = { ...defaultOptions, projectRoot: undefined };
       const tree = await schematicRunner
         .runSchematicAsync('application', options, workspaceTree)
@@ -591,10 +564,5 @@ describe('Application Schematic', () => {
 
     const cfg = JSON.parse(tree.readContent('/angular.json'));
     expect(cfg.projects['@myscope/myapp']).toBeDefined();
-
-    const karmaConf = getFileContent(tree, '/projects/myscope/myapp/karma.conf.js');
-    expect(karmaConf).toContain(
-      `dir: require('path').join(__dirname, '../../../coverage/myscope/myapp')`,
-    );
   });
 });

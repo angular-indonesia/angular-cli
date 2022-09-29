@@ -177,8 +177,8 @@ export interface KarmaBuilderOptions {
     fileReplacements?: FileReplacement_2[];
     include?: string[];
     inlineStyleLanguage?: InlineStyleLanguage_2;
-    karmaConfig: string;
-    main: string;
+    karmaConfig?: string;
+    main?: string;
     poll?: number;
     polyfills?: Polyfills_2;
     preserveSymlinks?: boolean;
