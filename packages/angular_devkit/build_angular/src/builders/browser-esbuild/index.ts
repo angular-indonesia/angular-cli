@@ -9,30 +9,26 @@
 import { BuilderContext, BuilderOutput, createBuilder } from '@angular-devkit/architect';
 import * as assert from 'assert';
 import type { Message, OutputFile } from 'esbuild';
-import { promises as fs } from 'fs';
+import * as fs from 'fs/promises';
 import * as path from 'path';
-import { NormalizedOptimizationOptions, deleteOutputDir } from '../../utils';
+import { deleteOutputDir } from '../../utils';
 import { copyAssets } from '../../utils/copy-assets';
 import { assertIsError } from '../../utils/error';
 import { transformSupportedBrowsersToTargets } from '../../utils/esbuild-targets';
 import { FileInfo } from '../../utils/index-file/augment-index-html';
 import { IndexHtmlGenerator } from '../../utils/index-file/index-html-generator';
-import { generateEntryPoints } from '../../utils/package-chunk-sort';
-import { augmentAppWithServiceWorker } from '../../utils/service-worker';
+import { augmentAppWithServiceWorkerEsbuild } from '../../utils/service-worker';
 import { getSupportedBrowsers } from '../../utils/supported-browsers';
-import { getIndexInputFile, getIndexOutputFile } from '../../utils/webpack-browser-config';
-import { normalizeGlobalStyles } from '../../webpack/utils/helpers';
 import { createCompilerPlugin } from './compiler-plugin';
 import { bundle, logMessages } from './esbuild';
 import { logExperimentalWarnings } from './experimental-warnings';
-import { normalizeOptions } from './options';
-import { Schema as BrowserBuilderOptions, SourceMapClass } from './schema';
+import { NormalizedBrowserOptions, normalizeOptions } from './options';
+import { Schema as BrowserBuilderOptions } from './schema';
 import { bundleStylesheetText } from './stylesheets';
 import { createWatcher } from './watcher';
 
 async function execute(
-  options: BrowserBuilderOptions,
-  normalizedOptions: Awaited<ReturnType<typeof normalizeOptions>>,
+  options: NormalizedBrowserOptions,
   context: BuilderContext,
 ): Promise<BuilderOutput> {
   const startTime = Date.now();
@@ -40,15 +36,12 @@ async function execute(
   const {
     projectRoot,
     workspaceRoot,
-    entryPoints,
-    entryPointNameLookup,
     optimizationOptions,
     outputPath,
-    sourcemapOptions,
-    tsconfig,
     assets,
-    outputNames,
-  } = normalizedOptions;
+    serviceWorkerOptions,
+    indexHtmlOptions,
+  } = options;
 
   const target = transformSupportedBrowsersToTargets(
     getSupportedBrowsers(projectRoot, context.logger),
@@ -56,25 +49,9 @@ async function execute(
 
   const [codeResults, styleResults] = await Promise.all([
     // Execute esbuild to bundle the application code
-    bundleCode(
-      workspaceRoot,
-      entryPoints,
-      outputNames,
-      options,
-      optimizationOptions,
-      sourcemapOptions,
-      tsconfig,
-      target,
-    ),
+    bundleCode(options, target),
     // Execute esbuild to bundle the global stylesheets
-    bundleGlobalStylesheets(
-      workspaceRoot,
-      outputNames,
-      options,
-      optimizationOptions,
-      sourcemapOptions,
-      target,
-    ),
+    bundleGlobalStylesheets(options, target),
   ]);
 
   // Log all warnings and errors generated during bundling
@@ -102,7 +79,8 @@ async function execute(
       // An entryPoint value indicates an initial file
       initialFiles.push({
         file: outputFile.path,
-        name: entryPointNameLookup.get(entryPoint) ?? '',
+        // The first part of the filename is the name of file (e.g., "polyfills" for "polyfills.7S5G3MDY.js")
+        name: path.basename(outputFile.path).split('.')[0],
         extension: path.extname(outputFile.path),
       });
     }
@@ -119,16 +97,11 @@ async function execute(
   }
 
   // Generate index HTML file
-  if (options.index) {
-    const entrypoints = generateEntryPoints({
-      scripts: options.scripts ?? [],
-      styles: options.styles ?? [],
-    });
-
+  if (indexHtmlOptions) {
     // Create an index HTML generator that reads from the in-memory output files
     const indexHtmlGenerator = new IndexHtmlGenerator({
-      indexPath: path.join(context.workspaceRoot, getIndexInputFile(options.index)),
-      entrypoints,
+      indexPath: indexHtmlOptions.input,
+      entrypoints: indexHtmlOptions.insertionOrder,
       sri: options.subresourceIntegrity,
       optimization: optimizationOptions,
       crossOrigin: options.crossOrigin,
@@ -161,7 +134,7 @@ async function execute(
       context.logger.warn(warning);
     }
 
-    outputFiles.push(createOutputFileFromText(getIndexOutputFile(options.index), content));
+    outputFiles.push(createOutputFileFromText(indexHtmlOptions.output, content));
   }
 
   // Copy assets
@@ -176,14 +149,13 @@ async function execute(
 
   // Augment the application with service worker support
   // TODO: This should eventually operate on the in-memory files prior to writing the output files
-  if (options.serviceWorker) {
+  if (serviceWorkerOptions) {
     try {
-      await augmentAppWithServiceWorker(
-        projectRoot,
+      await augmentAppWithServiceWorkerEsbuild(
         workspaceRoot,
+        serviceWorkerOptions,
         outputPath,
         options.baseHref || '/',
-        options.ngswConfigPath,
       );
     } catch (error) {
       context.logger.error(error instanceof Error ? error.message : `${error}`);
@@ -207,26 +179,20 @@ function createOutputFileFromText(path: string, text: string): OutputFile {
   };
 }
 
-async function bundleCode(
-  workspaceRoot: string,
-  entryPoints: Record<string, string>,
-  outputNames: { bundles: string; media: string },
-  options: BrowserBuilderOptions,
-  optimizationOptions: NormalizedOptimizationOptions,
-  sourcemapOptions: SourceMapClass,
-  tsconfig: string,
-  target: string[],
-) {
-  let fileReplacements: Record<string, string> | undefined;
-  if (options.fileReplacements) {
-    for (const replacement of options.fileReplacements) {
-      fileReplacements ??= {};
-      fileReplacements[path.join(workspaceRoot, replacement.replace)] = path.join(
-        workspaceRoot,
-        replacement.with,
-      );
-    }
-  }
+async function bundleCode(options: NormalizedBrowserOptions, target: string[]) {
+  const {
+    workspaceRoot,
+    entryPoints,
+    optimizationOptions,
+    sourcemapOptions,
+    tsconfig,
+    outputNames,
+    fileReplacements,
+    externalDependencies,
+    preserveSymlinks,
+    stylePreprocessorOptions,
+    advancedOptimizations,
+  } = options;
 
   return bundle({
     absWorkingDir: workspaceRoot,
@@ -255,10 +221,10 @@ async function bundleCode(
     sourcemap: sourcemapOptions.scripts && (sourcemapOptions.hidden ? 'external' : true),
     splitting: true,
     tsconfig,
-    external: options.externalDependencies,
+    external: externalDependencies,
     write: false,
     platform: 'browser',
-    preserveSymlinks: options.preserveSymlinks,
+    preserveSymlinks,
     plugins: [
       createCompilerPlugin(
         // JS/TS options
@@ -266,7 +232,7 @@ async function bundleCode(
           sourcemap: !!sourcemapOptions.scripts,
           thirdPartySourcemaps: sourcemapOptions.vendor,
           tsconfig,
-          advancedOptimizations: options.buildOptimizer,
+          advancedOptimizations,
           fileReplacements,
         },
         // Component stylesheet options
@@ -279,8 +245,8 @@ async function bundleCode(
             // of sourcemap processing.
             !!sourcemapOptions.styles && (sourcemapOptions.hidden ? false : 'inline'),
           outputNames,
-          includePaths: options.stylePreprocessorOptions?.includePaths,
-          externalDependencies: options.externalDependencies,
+          includePaths: stylePreprocessorOptions?.includePaths,
+          externalDependencies,
           target,
         },
       ),
@@ -292,25 +258,24 @@ async function bundleCode(
   });
 }
 
-async function bundleGlobalStylesheets(
-  workspaceRoot: string,
-  outputNames: { bundles: string; media: string },
-  options: BrowserBuilderOptions,
-  optimizationOptions: NormalizedOptimizationOptions,
-  sourcemapOptions: SourceMapClass,
-  target: string[],
-) {
+async function bundleGlobalStylesheets(options: NormalizedBrowserOptions, target: string[]) {
+  const {
+    workspaceRoot,
+    optimizationOptions,
+    sourcemapOptions,
+    outputNames,
+    globalStyles,
+    preserveSymlinks,
+    externalDependencies,
+    stylePreprocessorOptions,
+  } = options;
+
   const outputFiles: OutputFile[] = [];
   const initialFiles: FileInfo[] = [];
   const errors: Message[] = [];
   const warnings: Message[] = [];
 
-  // resolveGlobalStyles is temporarily reused from the Webpack builder code
-  const { entryPoints: stylesheetEntrypoints, noInjectNames } = normalizeGlobalStyles(
-    options.styles || [],
-  );
-
-  for (const [name, files] of Object.entries(stylesheetEntrypoints)) {
+  for (const { name, files, initial } of globalStyles) {
     const virtualEntryData = files
       .map((file) => `@import '${file.replace(/\\/g, '/')}';`)
       .join('\n');
@@ -321,10 +286,10 @@ async function bundleGlobalStylesheets(
         workspaceRoot,
         optimization: !!optimizationOptions.styles.minify,
         sourcemap: !!sourcemapOptions.styles && (sourcemapOptions.hidden ? 'external' : true),
-        outputNames: noInjectNames.includes(name) ? { media: outputNames.media } : outputNames,
-        includePaths: options.stylePreprocessorOptions?.includePaths,
-        preserveSymlinks: options.preserveSymlinks,
-        externalDependencies: options.externalDependencies,
+        outputNames: initial ? outputNames : { media: outputNames.media },
+        includePaths: stylePreprocessorOptions?.includePaths,
+        preserveSymlinks,
+        externalDependencies,
         target,
       },
     );
@@ -356,7 +321,7 @@ async function bundleGlobalStylesheets(
     }
     outputFiles.push(createOutputFileFromText(sheetPath, sheetContents));
 
-    if (!noInjectNames.includes(name)) {
+    if (initial) {
       initialFiles.push({
         file: sheetPath,
         name,
@@ -418,7 +383,7 @@ export async function* buildEsbuildBrowser(
   }
 
   // Initial build
-  yield await execute(initialOptions, normalizedOptions, context);
+  yield await execute(normalizedOptions, context);
 
   // Finish if watch mode is not enabled
   if (!initialOptions.watch) {
@@ -451,7 +416,7 @@ export async function* buildEsbuildBrowser(
         context.logger.info(changes.toDebugString());
       }
 
-      yield await execute(initialOptions, normalizedOptions, context);
+      yield await execute(normalizedOptions, context);
     }
   } finally {
     await watcher.close();

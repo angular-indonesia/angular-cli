@@ -41,7 +41,7 @@
     "url": "https://github.com/angular/angular-cli.git"
   },
   "engines": {
-    "node": "^14.15.0 || ^16.10.0",
+    "node": "^14.20.0 || ^16.10.0",
     "yarn": ">=1.21.1 <2",
     "npm": "Please use yarn instead of NPM to install dependencies"
   },
@@ -120,12 +120,11 @@
     "@types/semver": "^7.3.12",
     "@types/tar": "^6.1.2",
     "@types/text-table": "^0.2.1",
-    "@types/uuid": "^8.0.0",
     "@types/yargs": "^17.0.8",
     "@types/yargs-parser": "^21.0.0",
     "@types/yarnpkg__lockfile": "^1.1.5",
-    "@typescript-eslint/eslint-plugin": "5.38.1",
-    "@typescript-eslint/parser": "5.38.1",
+    "@typescript-eslint/eslint-plugin": "5.39.0",
+    "@typescript-eslint/parser": "5.39.0",
     "@yarnpkg/lockfile": "1.1.0",
     "ajv": "8.11.0",
     "ajv-formats": "2.1.1",
