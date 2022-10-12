@@ -36,15 +36,14 @@ import {
   getIndexOutputFile,
 } from '../../utils/webpack-browser-config';
 import { addError, addWarning } from '../../utils/webpack-diagnostics';
-import {
-  getAnalyticsConfig,
-  getCommonConfig,
-  getDevServerConfig,
-  getStylesConfig,
-} from '../../webpack/configs';
+import { getCommonConfig, getDevServerConfig, getStylesConfig } from '../../webpack/configs';
 import { IndexHtmlWebpackPlugin } from '../../webpack/plugins/index-html-webpack-plugin';
 import { ServiceWorkerPlugin } from '../../webpack/plugins/service-worker-plugin';
-import { createWebpackLoggingCallback } from '../../webpack/utils/stats';
+import {
+  BuildEventStats,
+  createWebpackLoggingCallback,
+  generateBuildEventStats,
+} from '../../webpack/utils/stats';
 import { Schema as BrowserBuilderSchema, OutputHashing } from '../browser/schema';
 import { Schema } from './schema';
 
@@ -55,6 +54,7 @@ export type DevServerBuilderOptions = Schema;
  */
 export type DevServerBuilderOutput = DevServerBuildOutput & {
   baseUrl: string;
+  stats: BuildEventStats;
 };
 
 /**
@@ -167,12 +167,7 @@ export function serveWebpackBrowser(
     const { config, projectRoot, i18n } = await generateI18nBrowserWebpackConfigFromContext(
       browserOptions,
       context,
-      (wco) => [
-        getDevServerConfig(wco),
-        getCommonConfig(wco),
-        getStylesConfig(wco),
-        getAnalyticsConfig(wco, context),
-      ],
+      (wco) => [getDevServerConfig(wco), getCommonConfig(wco), getStylesConfig(wco)],
       options,
     );
 
@@ -262,6 +257,11 @@ export function serveWebpackBrowser(
         webpackDevServerFactory: require('webpack-dev-server') as typeof webpackDevServer,
       }).pipe(
         concatMap(async (buildEvent, index) => {
+          const webpackRawStats = buildEvent.webpackStats;
+          if (!webpackRawStats) {
+            throw new Error('Webpack stats build result is required.');
+          }
+
           // Resolve serve address.
           const publicPath = webpackConfig.devServer?.devMiddleware?.publicPath;
 
@@ -296,7 +296,11 @@ export function serveWebpackBrowser(
             logger.info(`\n${colors.redBright(colors.symbols.cross)} Failed to compile.`);
           }
 
-          return { ...buildEvent, baseUrl: serverAddress } as DevServerBuilderOutput;
+          return {
+            ...buildEvent,
+            baseUrl: serverAddress,
+            stats: generateBuildEventStats(webpackRawStats, browserOptions),
+          } as DevServerBuilderOutput;
         }),
       );
     }),

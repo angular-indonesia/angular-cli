@@ -16,6 +16,7 @@ import { spawnSync } from 'child_process';
 import { existsSync } from 'fs';
 import { resolve } from 'path';
 import { isPackageNameSafeForAnalytics } from '../analytics/analytics';
+import { EventCustomDimension, EventCustomMetric } from '../analytics/analytics-parameters';
 import { assertIsError } from '../utilities/error';
 import { askConfirmation, askQuestion } from '../utilities/prompt';
 import { isTTY } from '../utilities/tty';
@@ -38,7 +39,6 @@ export abstract class ArchitectBaseCommandModule<T extends object>
   implements CommandModuleImplementation<T>
 {
   override scope = CommandScope.In;
-  protected override shouldReportAnalytics = false;
   protected readonly missingTargetChoices: MissingTargetChoice[] | undefined;
 
   protected async runSingleTarget(target: Target, options: OtherOptions): Promise<number> {
@@ -53,31 +53,88 @@ export abstract class ArchitectBaseCommandModule<T extends object>
       return this.onMissingTarget(e.message);
     }
 
-    await this.reportAnalytics(
-      {
-        ...(await architectHost.getOptionsForTarget(target)),
-        ...options,
-      },
-      undefined /** paths */,
-      undefined /** dimensions */,
-      builderName,
-    );
-
     const { logger } = this.context;
-
     const run = await this.getArchitect().scheduleTarget(target, options as json.JsonObject, {
       logger,
-      analytics: isPackageNameSafeForAnalytics(builderName) ? await this.getAnalytics() : undefined,
     });
 
-    const { error, success } = await run.output.toPromise();
-    await run.stop();
+    const analytics = isPackageNameSafeForAnalytics(builderName)
+      ? await this.getAnalytics()
+      : undefined;
 
-    if (error) {
-      logger.error(error);
+    let outputSubscription;
+    if (analytics) {
+      analytics.reportArchitectRunEvent({
+        [EventCustomDimension.BuilderTarget]: builderName,
+      });
+
+      let firstRun = true;
+      outputSubscription = run.output.subscribe(({ stats }) => {
+        const parameters = this.builderStatsToAnalyticsParameters(stats, builderName);
+        if (!parameters) {
+          return;
+        }
+
+        if (firstRun) {
+          firstRun = false;
+          analytics.reportBuildRunEvent(parameters);
+        } else {
+          analytics.reportRebuildRunEvent(parameters);
+        }
+      });
     }
 
-    return success ? 0 : 1;
+    try {
+      const { error, success } = await run.output.toPromise();
+
+      if (error) {
+        logger.error(error);
+      }
+
+      return success ? 0 : 1;
+    } finally {
+      await run.stop();
+      outputSubscription?.unsubscribe();
+    }
+  }
+
+  private builderStatsToAnalyticsParameters(
+    stats: json.JsonValue,
+    builderName: string,
+  ): Partial<
+    | Record<EventCustomDimension & EventCustomMetric, string | number | undefined | boolean>
+    | undefined
+  > {
+    if (!stats || typeof stats !== 'object' || !('durationInMs' in stats)) {
+      return undefined;
+    }
+
+    const {
+      optimization,
+      allChunksCount,
+      aot,
+      lazyChunksCount,
+      initialChunksCount,
+      durationInMs,
+      changedChunksCount,
+      cssSizeInBytes,
+      jsSizeInBytes,
+      ngComponentCount,
+    } = stats;
+
+    return {
+      [EventCustomDimension.BuilderTarget]: builderName,
+      [EventCustomDimension.Aot]: aot,
+      [EventCustomDimension.Optimization]: optimization,
+      [EventCustomMetric.AllChunksCount]: allChunksCount,
+      [EventCustomMetric.LazyChunksCount]: lazyChunksCount,
+      [EventCustomMetric.InitialChunksCount]: initialChunksCount,
+      [EventCustomMetric.ChangedChunksCount]: changedChunksCount,
+      [EventCustomMetric.DurationInMs]: durationInMs,
+      [EventCustomMetric.JsSizeInBytes]: jsSizeInBytes,
+      [EventCustomMetric.CssSizeInBytes]: cssSizeInBytes,
+      [EventCustomMetric.NgComponentCount]: ngComponentCount,
+    };
   }
 
   private _architectHost: WorkspaceNodeModulesArchitectHost | undefined;
