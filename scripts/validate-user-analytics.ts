@@ -28,9 +28,7 @@ const metricsTableRe = /<!--METRICS_TABLE_BEGIN-->([\s\S]*)<!--METRICS_TABLE_END
 
 async function _checkUserDimensions(dimensionsTable: string, logger: logging.Logger) {
   logger.info('Gathering user dimensions from @angular/cli...');
-  const eventCustomDimensionValues = new Set(Object.values(UserCustomDimension));
-
-  const data = Object.entries(EventCustomDimension).map(([key, value]) => ({
+  const data = Object.entries(UserCustomDimension).map(([key, value]) => ({
     parameter: value,
     name: key,
     type: value.charAt(2) === 'n' ? 'number' : 'string',
@@ -40,6 +38,13 @@ async function _checkUserDimensions(dimensionsTable: string, logger: logging.Log
     throw new Error(
       'GA has a limit of 25 custom user dimensions. Delete and archive the ones that are not needed.',
     );
+  }
+
+  for (const { parameter } of data) {
+    const param = parameter.split('.')[1];
+    if (param.length > 24) {
+      throw new Error(`User dimension parameter ${param} is more than 24 characters.`);
+    }
   }
 
   const generatedTable = userAnalyticsTable({ data }).trim();
@@ -61,7 +66,7 @@ async function _checkDimensions(dimensionsTable: string, logger: logging.Logger)
 
   logger.info('Gathering options for user-analytics...');
   const schemaUserAnalyticsValidator = (obj: Object) => {
-    for (const [key, value] of Object.entries(obj)) {
+    for (const value of Object.values(obj)) {
       if (value && typeof value === 'object') {
         const userAnalytics = value['x-user-analytics'];
         if (userAnalytics && !eventCustomDimensionValues.has(userAnalytics)) {
@@ -99,6 +104,13 @@ async function _checkDimensions(dimensionsTable: string, logger: logging.Logger)
     );
   }
 
+  for (const { parameter } of data) {
+    const param = parameter.split('.')[1];
+    if (param.length > 40) {
+      throw new Error(`Event dimension parameter ${param} is more than 40 characters.`);
+    }
+  }
+
   const generatedTable = userAnalyticsTable({ data }).trim();
   if (dimensionsTable !== generatedTable) {
     logger.error(
@@ -124,6 +136,13 @@ async function _checkMetrics(metricsTable: string, logger: logging.Logger) {
     throw new Error(
       'GA has a limit of 50 custom metrics. Delete and archive the ones that are not needed.',
     );
+  }
+
+  for (const { parameter } of data) {
+    const param = parameter.split('.')[1];
+    if (param.length > 40) {
+      throw new Error(`Event metric parameter ${param} is more than 40 characters.`);
+    }
   }
 
   const generatedTable = userAnalyticsTable({ data }).trim();

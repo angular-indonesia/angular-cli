@@ -96,14 +96,33 @@ export async function getCommonConfig(wco: WebpackConfigOptions): Promise<Config
     extraPlugins.push(new ProgressPlugin(platform));
   }
 
+  const localizePackageInitEntryPoint = '@angular/localize/init';
+  const hasLocalizeType = tsConfig.options.types?.some(
+    (t) => t === '@angular/localize' || t === localizePackageInitEntryPoint,
+  );
+
+  if (hasLocalizeType) {
+    entryPoints['main'] = [localizePackageInitEntryPoint];
+  }
+
   if (buildOptions.main) {
     const mainPath = path.resolve(root, buildOptions.main);
-    entryPoints['main'] = [mainPath];
+    if (Array.isArray(entryPoints['main'])) {
+      entryPoints['main'].push(mainPath);
+    } else {
+      entryPoints['main'] = [mainPath];
+    }
   }
 
   if (isPlatformServer) {
     // Fixes Critical dependency: the request of a dependency is an expression
     extraPlugins.push(new ContextReplacementPlugin(/@?hapi|express[\\/]/));
+
+    if (Array.isArray(entryPoints['main'])) {
+      // This import must come before any imports (direct or transitive) that rely on DOM built-ins being
+      // available, such as `@angular/elements`.
+      entryPoints['main'].unshift('@angular/platform-server/init');
+    }
   }
 
   if (polyfills?.length) {

@@ -4,18 +4,6 @@ This document list exactly what is gathered and how.
 
 Any change to analytics should most probably include a change to this document.
 
-## Pageview
-
-Each command creates a pageview with the path `/command/${commandName}/${subcommandName}`. IE.
-`ng generate component my-component --dryRun` would create a page view with the path
-`/command/generate/@schematics_angular/component`.
-
-We use page views to keep track of sessions more effectively, and to tag events to a page.
-
-Project names and target names will be removed.
-The command `ng run some-project:lint:some-configuration` will create a page view with the path
-`/command/run`.
-
 ## Dimensions and Metrics
 
 Google Analytics Custom Dimensions are used to track system values and flag values. These
@@ -26,13 +14,13 @@ simplicity it should remain unique across all CLI commands. The dimension is the
 `x-user-analytics` field in the `schema.json` files.
 
 ### Adding dimension or metic.
-1. Create the dimension or metric in (https://analytics.google.com/)[Google Analytics] first. These are not tracked if they aren't
+1. Create the dimension or metric in [Google Analytics](https://analytics.google.com/) first. These are not tracked if they aren't
    defined in Google Analytics.
 1. Use the ID of the dimension as the `x-user-analytics` value in the `schema.json` file.
-1. New dimension and metrics PRs need to be approved by the tooling lead and require a new (http://go/launch)[Launch].
+1. New dimension and metrics PRs need to be approved by the tooling lead and require a new [Launch](http://go/launch).
 
 ### Deleting a dimension or metic.
-1. Archive the dimension and metric in (https://analytics.google.com/)[Google Analytics].
+1. Archive the dimension and metric in [Google Analytics](https://analytics.google.com/).
 
 
 **DO NOT ADD `x-user-analytics` FOR VALUES THAT ARE USER IDENTIFIABLE (PII), FOR EXAMPLE A
@@ -50,17 +38,14 @@ PROJECT NAME TO BUILD OR A MODULE NAME.**
 <!--USER_DIMENSIONS_TABLE_BEGIN-->
 | Name | Parameter | Type |
 |:---:|:---|:---|
-| Command | `ep.ng_command` | `string` |
-| SchematicCollectionName | `ep.ng_schematic_collection_name` | `string` |
-| SchematicName | `ep.ng_schematic_name` | `string` |
-| Standalone | `ep.ng_standalone` | `string` |
-| Style | `ep.ng_style` | `string` |
-| Routing | `ep.ng_routing` | `string` |
-| InlineTemplate | `ep.ng_inline_template` | `string` |
-| InlineStyle | `ep.ng_inline_style` | `string` |
-| BuilderTarget | `ep.ng_builder_target` | `string` |
-| Aot | `ep.ng_aot` | `string` |
-| Optimization | `ep.ng_optimization` | `string` |
+| OsArchitecture | `up.ng_os_architecture` | `string` |
+| NodeVersion | `up.ng_node_version` | `string` |
+| NodeMajorVersion | `upn.ng_node_major_version` | `number` |
+| AngularCLIVersion | `up.ng_cli_version` | `string` |
+| AngularCLIMajorVersion | `upn.ng_cli_major_version` | `number` |
+| PackageManager | `up.ng_package_manager` | `string` |
+| PackageManagerVersion | `up.ng_pkg_manager_version` | `string` |
+| PackageManagerMajorVersion | `upn.ng_pkg_manager_major_v` | `number` |
 <!--USER_DIMENSIONS_TABLE_END-->
 
 ### List of Event Custom Dimensions

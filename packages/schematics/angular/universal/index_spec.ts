@@ -9,6 +9,7 @@
 import { SchematicTestRunner, UnitTestTree } from '@angular-devkit/schematics/testing';
 import { parse as parseJson } from 'jsonc-parser';
 import { Schema as ApplicationOptions, Style } from '../application/schema';
+import { CompilerOptions } from '../third_party/github.com/Microsoft/TypeScript/lib/typescript';
 import { NodeDependencyType, addPackageJsonDependency } from '../utility/dependencies';
 import { Schema as WorkspaceOptions } from '../workspace/schema';
 import { Schema as UniversalOptions } from './schema';
@@ -162,7 +163,7 @@ describe('Universal Schematic', () => {
     expect(targets.build.options.outputPath).toEqual('dist/bar/browser');
   });
 
-  it('should add a server transition to BrowerModule import', async () => {
+  it('should add a server transition to BrowserModule import', async () => {
     const tree = await schematicRunner
       .runSchematicAsync('universal', defaultOptions, appTree)
       .toPromise();
@@ -225,36 +226,29 @@ describe('Universal Schematic', () => {
     expect(tree.exists(filePath)).toEqual(true);
   });
 
-  it(`should add import to '@angular/platform-server/init' in main file`, async () => {
+  it(`should not add import to '@angular/localize' as type in 'tsconfig.server.json' when it's not a dependency`, async () => {
     const tree = await schematicRunner
       .runSchematicAsync('universal', defaultOptions, appTree)
       .toPromise();
-    const filePath = '/projects/bar/src/main.server.ts';
-    const contents = tree.readContent(filePath);
-    expect(contents).toContain("import '@angular/platform-server/init'");
+    const { compilerOptions } = tree.readJson('/projects/bar/tsconfig.server.json') as {
+      compilerOptions: CompilerOptions;
+    };
+    expect(compilerOptions.types).not.toContain('@angular/localize/init');
   });
 
-  it(`should not add import to '@angular/localize' in main file when it's not a depedency`, async () => {
-    const tree = await schematicRunner
-      .runSchematicAsync('universal', defaultOptions, appTree)
-      .toPromise();
-    const filePath = '/projects/bar/src/main.server.ts';
-    const contents = tree.readContent(filePath);
-    expect(contents).not.toContain('@angular/localize');
-  });
-
-  it(`should add import to '@angular/localize' in main file when it's a depedency`, async () => {
+  it(`should add import to '@angular/localize' as type in 'tsconfig.server.json' when it's a dependency`, async () => {
     addPackageJsonDependency(appTree, {
       name: '@angular/localize',
       type: NodeDependencyType.Default,
       version: 'latest',
     });
-
     const tree = await schematicRunner
       .runSchematicAsync('universal', defaultOptions, appTree)
       .toPromise();
-    const filePath = '/projects/bar/src/main.server.ts';
-    const contents = tree.readContent(filePath);
-    expect(contents).toContain('@angular/localize/init');
+
+    const { compilerOptions } = tree.readJson('/projects/bar/tsconfig.server.json') as {
+      compilerOptions: CompilerOptions;
+    };
+    expect(compilerOptions.types).toContain('@angular/localize/init');
   });
 });
