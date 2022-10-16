@@ -6,14 +6,16 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import * as fs from 'fs';
 import MiniCssExtractPlugin from 'mini-css-extract-plugin';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import type { FileImporter } from 'sass';
-import { pathToFileURL } from 'url';
 import type { Configuration, LoaderContext, RuleSetUseItem } from 'webpack';
-import { StyleElement } from '../../builders/browser/schema';
-import { SassWorkerImplementation } from '../../sass/sass-service';
+import {
+  FileImporterWithRequestContextOptions,
+  SassWorkerImplementation,
+} from '../../sass/sass-service';
 import { SassLegacyWorkerImplementation } from '../../sass/sass-service-legacy';
 import { WebpackConfigOptions } from '../../utils/build-options';
 import { useLegacySass } from '../../utils/environment-options';
@@ -28,13 +30,12 @@ import { StylesWebpackPlugin } from '../plugins/styles-webpack-plugin';
 import {
   assetNameTemplateFactory,
   getOutputHashFormat,
-  normalizeExtraEntryPoints,
   normalizeGlobalStyles,
 } from '../utils/helpers';
 
 // eslint-disable-next-line max-lines-per-function
 export function getStylesConfig(wco: WebpackConfigOptions): Configuration {
-  const { root, projectRoot, buildOptions } = wco;
+  const { root, buildOptions } = wco;
   const extraPlugins: Configuration['plugins'] = [];
 
   extraPlugins.push(new AnyComponentStyleBudgetChecker(buildOptions.budgets));
@@ -103,12 +104,10 @@ export function getStylesConfig(wco: WebpackConfigOptions): Configuration {
     }
   }
 
-  const postcssImports = require('postcss-import');
   const autoprefixer: typeof import('autoprefixer') = require('autoprefixer');
 
   const postcssOptionsCreator = (inlineSourcemaps: boolean, extracted: boolean) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const optionGenerator = (loader: any) => ({
+    const optionGenerator = (loader: LoaderContext<unknown>) => ({
       map: inlineSourcemaps
         ? {
             inline: true,
@@ -116,22 +115,6 @@ export function getStylesConfig(wco: WebpackConfigOptions): Configuration {
           }
         : undefined,
       plugins: [
-        postcssImports({
-          load: (filename: string) => {
-            return new Promise<string>((resolve, reject) => {
-              loader.fs.readFile(filename, (err: Error, data: Buffer) => {
-                if (err) {
-                  reject(err);
-
-                  return;
-                }
-
-                const content = data.toString();
-                resolve(content);
-              });
-            });
-          },
-        }),
         PostcssCliResources({
           baseHref: buildOptions.baseHref,
           deployUrl: buildOptions.deployUrl,
@@ -179,6 +162,16 @@ export function getStylesConfig(wco: WebpackConfigOptions): Configuration {
 
   const componentStyleLoaders: RuleSetUseItem[] = [
     {
+      loader: require.resolve('css-loader'),
+      options: {
+        url: false,
+        sourceMap: componentsSourceMap,
+        importLoaders: 1,
+        exportType: 'string',
+        esModule: false,
+      },
+    },
+    {
       loader: postCssLoaderPath,
       options: {
         implementation: postCss,
@@ -196,6 +189,7 @@ export function getStylesConfig(wco: WebpackConfigOptions): Configuration {
       options: {
         url: false,
         sourceMap: !!cssSourceMap,
+        importLoaders: 1,
       },
     },
     {
@@ -294,7 +288,6 @@ export function getStylesConfig(wco: WebpackConfigOptions): Configuration {
               // Component styles are all styles except defined global styles
               {
                 use: componentStyleLoaders,
-                type: 'asset/source',
                 resourceQuery: /\?ngResource/,
               },
             ],
@@ -423,30 +416,53 @@ function getSassResolutionImporter(
   });
 
   return {
-    findFileUrl: async (url, { fromImport }): Promise<URL | null> => {
+    findFileUrl: async (
+      url,
+      { fromImport, previousResolvedModules }: FileImporterWithRequestContextOptions,
+    ): Promise<URL | null> => {
       if (url.charAt(0) === '.') {
         // Let Sass handle relative imports.
         return null;
       }
 
-      let file: string | undefined;
       const resolve = fromImport ? resolveImport : resolveModule;
+      // Try to resolve from root of workspace
+      let result = await tryResolve(resolve, root, url);
 
-      try {
-        file = await resolve(root, url);
-      } catch {
-        // Try to resolve a partial file
-        // @use '@material/button/button' as mdc-button;
-        // `@material/button/button` -> `@material/button/_button`
-        const lastSlashIndex = url.lastIndexOf('/');
-        const underscoreIndex = lastSlashIndex + 1;
-        if (underscoreIndex > 0 && url.charAt(underscoreIndex) !== '_') {
-          const partialFileUrl = `${url.slice(0, underscoreIndex)}_${url.slice(underscoreIndex)}`;
-          file = await resolve(root, partialFileUrl).catch(() => undefined);
+      // Try to resolve from previously resolved modules.
+      if (!result && previousResolvedModules) {
+        for (const path of previousResolvedModules) {
+          result = await tryResolve(resolve, path, url);
+          if (result) {
+            break;
+          }
         }
       }
 
-      return file ? pathToFileURL(file) : null;
+      return result ? pathToFileURL(result) : null;
     },
   };
+}
+
+async function tryResolve(
+  resolve: ReturnType<LoaderContext<{}>['getResolve']>,
+  root: string,
+  url: string,
+): Promise<string | undefined> {
+  try {
+    return await resolve(root, url);
+  } catch {
+    // Try to resolve a partial file
+    // @use '@material/button/button' as mdc-button;
+    // `@material/button/button` -> `@material/button/_button`
+    const lastSlashIndex = url.lastIndexOf('/');
+    const underscoreIndex = lastSlashIndex + 1;
+    if (underscoreIndex > 0 && url.charAt(underscoreIndex) !== '_') {
+      const partialFileUrl = `${url.slice(0, underscoreIndex)}_${url.slice(underscoreIndex)}`;
+
+      return resolve(root, partialFileUrl).catch(() => undefined);
+    }
+  }
+
+  return undefined;
 }
