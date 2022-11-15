@@ -23,13 +23,10 @@ export interface BundleStylesheetOptions {
   target: string[];
 }
 
-async function bundleStylesheet(
-  entry: Required<Pick<BuildOptions, 'stdin'> | Pick<BuildOptions, 'entryPoints'>>,
+export function createStylesheetBundleOptions(
   options: BundleStylesheetOptions,
-) {
-  // Execute esbuild
-  const result = await bundle({
-    ...entry,
+): BuildOptions & { plugins: NonNullable<BuildOptions['plugins']> } {
+  return {
     absWorkingDir: options.workspaceRoot,
     bundle: true,
     entryNames: options.outputNames?.bundles,
@@ -49,6 +46,17 @@ async function bundleStylesheet(
       createSassPlugin({ sourcemap: !!options.sourcemap, loadPaths: options.includePaths }),
       createCssResourcePlugin(),
     ],
+  };
+}
+
+async function bundleStylesheet(
+  entry: Required<Pick<BuildOptions, 'stdin'> | Pick<BuildOptions, 'entryPoints'>>,
+  options: BundleStylesheetOptions,
+) {
+  // Execute esbuild
+  const result = await bundle(options.workspaceRoot, {
+    ...createStylesheetBundleOptions(options),
+    ...entry,
   });
 
   // Extract the result of the bundling from the output files
@@ -58,7 +66,6 @@ async function bundleStylesheet(
   const resourceFiles: OutputFile[] = [];
   if (result.outputFiles) {
     for (const outputFile of result.outputFiles) {
-      outputFile.path = path.relative(options.workspaceRoot, outputFile.path);
       const filename = path.basename(outputFile.path);
       if (filename.endsWith('.css')) {
         outputPath = outputFile.path;
