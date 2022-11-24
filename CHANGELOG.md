@@ -1,3 +1,57 @@
+<a name="15.1.0-next.0"></a>
+
+# 15.1.0-next.0 (2022-11-23)
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                                          |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------------- |
+| [6c39a162b](https://github.com/angular/angular-cli/commit/6c39a162bec67083bf6c11b54e84612f1d68c384) | feat | Add schematics for generating functional router guards and resolvers |
+| [62121f89a](https://github.com/angular/angular-cli/commit/62121f89abce54e0a1c2b816cdd32b57f2b5a5d1) | feat | add sideEffects:false to library package.json                        |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                  |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ |
+| [c29df6954](https://github.com/angular/angular-cli/commit/c29df695467c41feccd3846a55c91c6784af87b2) | feat | add `assets` option to server builder                        |
+| [0c01532cb](https://github.com/angular/angular-cli/commit/0c01532cb5a3072b96cd65845a38b88ed4543de6) | perf | use worker pool for JavaScript transforms in esbuild builder |
+
+## Special Thanks
+
+Alan Agius, Andrew Scott, Charles Lyding, Doug Parker, Felix Hamann and Joey Perrott
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="15.0.1"></a>
+
+# 15.0.1 (2022-11-23)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                         |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------- |
+| [eda96def4](https://github.com/angular/angular-cli/commit/eda96def48e11533cd0a3353c96b7eac9a881e1e) | fix  | use global version of the CLI when running `ng new` |
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                                  |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ |
+| [48426852b](https://github.com/angular/angular-cli/commit/48426852b0c1d5541a3e7369dc2b343e33856968) | fix  | show warning when a TS Config is not found during migrations |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                         |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------- |
+| [2af32fd3a](https://github.com/angular/angular-cli/commit/2af32fd3a981b1c29e1cf77b442982e1e07aae38) | fix  | hide loader paths in webpack warnings                               |
+| [19f5cc746](https://github.com/angular/angular-cli/commit/19f5cc746ec724f15d1b89126c7c1b8a343818fe) | fix  | improve package deep import Sass index resolution in esbuild plugin |
+| [2220a907d](https://github.com/angular/angular-cli/commit/2220a907daf9ccd9e22dfc8e5ddc259b9d495997) | fix  | use url function lexer to rebase Sass URLs                          |
+
+## Special Thanks
+
+Alan Agius, Charles Lyding, Doug Parker, Joey Perrott and Piotr Wysocki
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="15.0.0"></a>
 
 # 15.0.0 (2022-11-16)
