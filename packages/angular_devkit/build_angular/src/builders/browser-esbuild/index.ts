@@ -242,6 +242,7 @@ function createCodeBundleOptions(
     preserveSymlinks,
     stylePreprocessorOptions,
     advancedOptimizations,
+    inlineStyleLanguage,
   } = options;
 
   return {
@@ -292,11 +293,16 @@ function createCodeBundleOptions(
           includePaths: stylePreprocessorOptions?.includePaths,
           externalDependencies,
           target,
+          inlineStyleLanguage,
         },
       ),
     ],
     define: {
+      // Only set to false when script optimizations are enabled. It should not be set to true because
+      // Angular turns `ngDevMode` into an object for development debugging purposes when not defined
+      // which a constant true value would break.
       ...(optimizationOptions.scripts ? { 'ngDevMode': 'false' } : undefined),
+      // Only AOT mode is supported currently
       'ngJitMode': 'false',
     },
   };
