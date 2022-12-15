@@ -1,3 +1,64 @@
+<a name="15.1.0-next.3"></a>
+
+# 15.1.0-next.3 (2022-12-14)
+
+## Deprecations
+
+### @angular-devkit/schematics
+
+- The Observable based `SchematicTestRunner.runSchematicAsync` and `SchematicTestRunner.runExternalSchematicAsync` methods have been deprecated in favor of the Promise based `SchematicTestRunner.runSchematic` and `SchematicTestRunner.runExternalSchematic`.
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                           |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------- |
+| [8d000d156](https://github.com/angular/angular-cli/commit/8d000d1563684f9a9b6869e549e265f0997187c4) | feat | add environments generation schematic |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                           |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------------- |
+| [216991b9d](https://github.com/angular/angular-cli/commit/216991b9d9ca1d8f09992880a5fa92e7c98813fa) | feat | support inline component Sass styles with esbuild builder             |
+| [8fd08491a](https://github.com/angular/angular-cli/commit/8fd08491a88bc2b088dcb3ac68a6c328167e38c3) | fix  | display actionable error when a style does not exist in Karma builder |
+| [97373016c](https://github.com/angular/angular-cli/commit/97373016cfe2635125015b2fec390f43d22ebf31) | fix  | downlevel class private methods when targeting Safari <=v15           |
+| [27b22b02d](https://github.com/angular/angular-cli/commit/27b22b02dccef2e2d4f2f1f03910f4b70c676f84) | fix  | include sources in generated                                          |
+| [310144d32](https://github.com/angular/angular-cli/commit/310144d324bd773aa6026f47b345827d5fe48332) | fix  | only set ngDevMode when script optimizations are enabled              |
+| [20376649c](https://github.com/angular/angular-cli/commit/20376649c5e3003b0aa99b9328e2b61699ccba78) | fix  | transform async generator class methods for Zone.js support           |
+| [afe9feaa4](https://github.com/angular/angular-cli/commit/afe9feaa45913cbebe7f22c678d693d96f38584a) | fix  | update locale setting snippet to use `globalThis`.                    |
+
+### @angular-devkit/schematics
+
+| Commit                                                                                              | Type | Description                                           |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------- |
+| [207358afb](https://github.com/angular/angular-cli/commit/207358afb89e6515cb8d73f5a3a63d9101e80d97) | feat | add `runSchematic` and `runExternalSchematic` methods |
+
+## Special Thanks
+
+Alan Agius and Charles Lyding
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="15.0.4"></a>
+
+# 15.0.4 (2022-12-14)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                           |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------------- |
+| [ccc8e0350](https://github.com/angular/angular-cli/commit/ccc8e0350810d123269f55de29acd7964e663f7e) | fix  | display actionable error when a style does not exist in Karma builder |
+| [507f756c3](https://github.com/angular/angular-cli/commit/507f756c34171db842365398150460e1e29f531a) | fix  | downlevel class private methods when targeting Safari <=v15           |
+| [a0da91dba](https://github.com/angular/angular-cli/commit/a0da91dba3d9b4c4a86102668f52ab933406e5da) | fix  | include sources in generated                                          |
+| [9fd356234](https://github.com/angular/angular-cli/commit/9fd356234210734ec5f44ae18f055308b7acc963) | fix  | only set ngDevMode when script optimizations are enabled              |
+| [8e85f4728](https://github.com/angular/angular-cli/commit/8e85f47284472f9df49f2ca6c59057ad28240e9c) | fix  | update `css-loader` to `6.7.3`                                        |
+| [b2d4415ca](https://github.com/angular/angular-cli/commit/b2d4415caa486bebe55e6147a153f120cf08b070) | fix  | update locale setting snippet to use `globalThis`.                    |
+
+## Special Thanks
+
+Alan Agius and Charles Lyding
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="15.1.0-next.2"></a>
 
 # 15.1.0-next.2 (2022-12-08)
