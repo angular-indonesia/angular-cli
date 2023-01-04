@@ -34,6 +34,7 @@ export function createStylesheetBundleOptions(
     assetNames: options.outputNames?.media,
     logLevel: 'silent',
     minify: options.optimization,
+    metafile: true,
     sourcemap: options.sourcemap,
     outdir: options.workspaceRoot,
     write: false,
@@ -46,7 +47,10 @@ export function createStylesheetBundleOptions(
     plugins: [
       createSassPlugin({
         sourcemap: !!options.sourcemap,
-        loadPaths: options.includePaths,
+        // Ensure Sass load paths are absolute based on the workspace root
+        loadPaths: options.includePaths?.map((includePath) =>
+          path.resolve(options.workspaceRoot, includePath),
+        ),
         inlineComponentData,
       }),
       createCssResourcePlugin(),
@@ -140,5 +144,6 @@ export async function bundleComponentStylesheet(
     map,
     path: outputPath,
     resourceFiles,
+    metafile: result.outputFiles && result.metafile,
   };
 }
