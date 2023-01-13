@@ -31,7 +31,7 @@
     "copy-webpack-plugin": "11.0.0",
     "critters": "0.0.16",
     "css-loader": "6.7.3",
-    "esbuild-wasm": "0.16.16",
+    "esbuild-wasm": "0.16.17",
     "glob": "8.0.3",
     "https-proxy-agent": "5.0.1",
     "inquirer": "8.2.4",
@@ -67,15 +67,15 @@
     "webpack-subresource-integrity": "5.1.0"
   },
   "optionalDependencies": {
-    "esbuild": "0.16.16"
+    "esbuild": "0.16.17"
   },
   "peerDependencies": {
-    "@angular/compiler-cli": "^15.0.0-next || ^15.1.0-next",
-    "@angular/localize": "^15.0.0-next || ^15.1.0-next",
-    "@angular/platform-server": "^15.0.0-next || ^15.1.0-next",
-    "@angular/service-worker": "^15.0.0-next || ^15.1.0-next",
+    "@angular/compiler-cli": "^15.0.0 || ^15.2.0-next",
+    "@angular/localize": "^15.0.0 || ^15.2.0-next",
+    "@angular/platform-server": "^15.0.0 || ^15.2.0-next",
+    "@angular/service-worker": "^15.0.0 || ^15.2.0-next",
     "karma": "^6.3.0",
-    "ng-packagr": "^15.0.0-next || ^15.1.0-next",
+    "ng-packagr": "^15.0.0",
     "protractor": "^7.0.0",
     "tailwindcss": "^2.0.0 || ^3.0.0",
     "typescript": ">=4.8.2 <5.0"

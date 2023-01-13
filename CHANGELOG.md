@@ -1,3 +1,35 @@
+<a name="15.2.0-next.0"></a>
+
+# 15.2.0-next.0 (2023-01-12)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                  |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ |
+| [09af70743](https://github.com/angular/angular-cli/commit/09af70743800aefdefe06e0ca32bcdde18f9eb77) | feat | implement node module license extraction for esbuild builder |
+
+## Special Thanks
+
+Alan Agius and Charles Lyding
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="15.1.1"></a>
+
+# 15.1.1 (2023-01-12)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                   |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------- |
+| [b94bf60ca](https://github.com/angular/angular-cli/commit/b94bf60ca828a22d548d65b819ea745eafb96deb) | fix  | update `esbuild` to `0.16.17` |
+
+## Special Thanks
+
+Alan Agius
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="15.1.0"></a>
 
 # 15.1.0 (2023-01-11)
