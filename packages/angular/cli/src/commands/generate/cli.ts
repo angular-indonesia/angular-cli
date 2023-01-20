@@ -7,7 +7,12 @@
  */
 
 import { strings } from '@angular-devkit/core';
-import { Argv } from 'yargs';
+import { Collection } from '@angular-devkit/schematics';
+import {
+  FileSystemCollectionDescription,
+  FileSystemSchematicDescription,
+} from '@angular-devkit/schematics/tools';
+import { ArgumentsCamelCase, Argv } from 'yargs';
 import {
   CommandModuleError,
   CommandModuleImplementation,
@@ -35,7 +40,7 @@ export class GenerateCommandModule
   longDescriptionPath?: string | undefined;
 
   override async builder(argv: Argv): Promise<Argv<GenerateCommandArgs>> {
-    let localYargs = (await super.builder(argv)).command<GenerateCommandArgs>({
+    let localYargs = (await super.builder(argv)).command({
       command: '$0 <schematic>',
       describe: 'Run the provided schematic.',
       builder: (localYargs) =>
@@ -46,7 +51,7 @@ export class GenerateCommandModule
             demandOption: true,
           })
           .strict(),
-      handler: (options) => this.handler(options),
+      handler: (options) => this.handler(options as ArgumentsCamelCase<GenerateCommandArgs>),
     });
 
     for (const [schematicName, collectionName] of await this.getSchematicsToRegister()) {
@@ -69,7 +74,6 @@ export class GenerateCommandModule
       const {
         'x-deprecated': xDeprecated,
         description = schematicDescription,
-        aliases = schematicAliases,
         hidden = schematicHidden,
       } = schemaJson;
       const options = await this.getSchematicOptions(collection, schematicName, workflow);
@@ -79,12 +83,19 @@ export class GenerateCommandModule
         // When 'describe' is set to false, it results in a hidden command.
         describe: hidden === true ? false : typeof description === 'string' ? description : '',
         deprecated: xDeprecated === true || typeof xDeprecated === 'string' ? xDeprecated : false,
-        aliases: Array.isArray(aliases)
-          ? await this.generateCommandAliasesStrings(collectionName, aliases as string[])
+        aliases: Array.isArray(schematicAliases)
+          ? await this.generateCommandAliasesStrings(collectionName, schematicAliases)
           : undefined,
         builder: (localYargs) => this.addSchemaOptionsToCommand(localYargs, options).strict(),
         handler: (options) =>
-          this.handler({ ...options, schematic: `${collectionName}:${schematicName}` }),
+          this.handler({
+            ...options,
+            schematic: `${collectionName}:${schematicName}`,
+          } as ArgumentsCamelCase<
+            SchematicsCommandArgs & {
+              schematic: string;
+            }
+          >),
       });
     }
 
@@ -205,13 +216,37 @@ export class GenerateCommandModule
         // If a schematic with this same name is already registered skip.
         if (!seenNames.has(schematicName)) {
           seenNames.add(schematicName);
-          const { aliases } = collection.description.schematics[schematicName];
-          const schematicAliases = aliases && new Set(aliases);
 
-          yield { schematicName, schematicAliases, collectionName };
+          yield {
+            schematicName,
+            collectionName,
+            schematicAliases: this.listSchematicAliases(collection, schematicName),
+          };
         }
       }
     }
+  }
+
+  private listSchematicAliases(
+    collection: Collection<FileSystemCollectionDescription, FileSystemSchematicDescription>,
+    schematicName: string,
+  ): Set<string> | undefined {
+    const description = collection.description.schematics[schematicName];
+    if (description) {
+      return description.aliases && new Set(description.aliases);
+    }
+
+    // Extended collections
+    if (collection.baseDescriptions) {
+      for (const base of collection.baseDescriptions) {
+        const description = base.schematics[schematicName];
+        if (description) {
+          return description.aliases && new Set(description.aliases);
+        }
+      }
+    }
+
+    return undefined;
   }
 
   /**
