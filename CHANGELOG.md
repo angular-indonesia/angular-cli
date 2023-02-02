@@ -1,3 +1,37 @@
+<a name="15.2.0-next.3"></a>
+
+# 15.2.0-next.3 (2023-02-01)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                 |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------- |
+| [3512a0362](https://github.com/angular/angular-cli/commit/3512a03621c7ed99324e82771e239e77c907367e) | fix  | load JavaScript bundles as modules in karma |
+| [f35e9908c](https://github.com/angular/angular-cli/commit/f35e9908c08fe1d1bda82124c3ec2b6fe4242125) | fix  | print server builder errors and warnings    |
+
+## Special Thanks
+
+Alan Agius and Doug Parker
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="15.1.4"></a>
+
+# 15.1.4 (2023-02-01)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                 |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------- |
+| [6c8fdfc69](https://github.com/angular/angular-cli/commit/6c8fdfc6985c5b5017a0b6ab6fa38daf4cb9a775) | fix  | load JavaScript bundles as modules in karma |
+| [317452e3b](https://github.com/angular/angular-cli/commit/317452e3b7e25080132b7f7a069696d1c5054f69) | fix  | print server builder errors and warnings    |
+
+## Special Thanks
+
+Alan Agius
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="15.2.0-next.2"></a>
 
 # 15.2.0-next.2 (2023-01-25)

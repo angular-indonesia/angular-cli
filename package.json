@@ -1,6 +1,6 @@
 {
   "name": "@angular/devkit-repo",
-  "version": "15.2.0-next.2",
+  "version": "15.2.0-next.3",
   "private": true,
   "description": "Software Development Kit for Angular",
   "bin": {
@@ -190,7 +190,7 @@
     "prettier": "^2.0.0",
     "protractor": "~7.0.0",
     "puppeteer": "18.2.1",
-    "quicktype-core": "21.0.4",
+    "quicktype-core": "21.0.9",
     "resolve-url-loader": "5.0.0",
     "rxjs": "6.6.7",
     "sass": "1.57.1",
@@ -209,7 +209,7 @@
     "tree-kill": "1.2.2",
     "ts-node": "^10.0.0",
     "tslib": "2.5.0",
-    "typescript": "4.9.4",
+    "typescript": "4.9.5",
     "verdaccio": "5.20.1",
     "verdaccio-auth-memory": "^10.0.0",
     "webpack": "5.75.0",
