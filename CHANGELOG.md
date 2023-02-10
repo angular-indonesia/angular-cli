@@ -1,3 +1,69 @@
+<a name="15.2.0-next.4"></a>
+
+# 15.2.0-next.4 (2023-02-08)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                      |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------ |
+| [234f265d1](https://github.com/angular/angular-cli/commit/234f265d161796a7cdfc2edbaa7e9a50d99a4863) | fix  | error if Angular compiler is used in a schematic |
+| [7bcb19cdd](https://github.com/angular/angular-cli/commit/7bcb19cddb676c650b1592aae81eceb66e8511fe) | fix  | only set `DebugView` when `NG_DEBUG` is passed   |
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                          |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------- |
+| [88fddc050](https://github.com/angular/angular-cli/commit/88fddc05039ee92d60267cf565b19ae1b56ad633) | fix  | remove bootstrapping wrapping in universal schematic |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                           |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------------- |
+| [01b3bcf89](https://github.com/angular/angular-cli/commit/01b3bcf898108f9b879da4a791fa2a21c6d9f7c5) | feat | add Less stylesheet support to experimental esbuild-based builder     |
+| [8cf0d17fb](https://github.com/angular/angular-cli/commit/8cf0d17fb1b39ea7bbd1c751995a56de3df45114) | feat | support JIT compilation with esbuild                                  |
+| [bfc0faced](https://github.com/angular/angular-cli/commit/bfc0facedda1150177b84fbc82f195678ce00b1e) | fix  | build optimizer support for spec-compliant downlevel class properties |
+| [d9c697b2b](https://github.com/angular/angular-cli/commit/d9c697b2bc284e432c9c1ab76b1179789e253c92) | fix  | do not fail compilation when spec pattern does not match              |
+| [df7c7f430](https://github.com/angular/angular-cli/commit/df7c7f430c5f4ec2b9b4d2f316ed9b4a8e2a5772) | fix  | fix support of Safari TP versions                                     |
+| [bf3be56db](https://github.com/angular/angular-cli/commit/bf3be56db8b3a1ef8a0e02dfc5de914651d8ec93) | fix  | load polyfills and runtime as scripts instead of modules              |
+
+## Special Thanks
+
+Alan Agius, Charles Lyding, Doug Parker, Jason Bedard, Kristiyan Kostadinov and Ricardo
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="15.1.5"></a>
+
+# 15.1.5 (2023-02-08)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                      |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------ |
+| [b8bbe9688](https://github.com/angular/angular-cli/commit/b8bbe9688e0e684245636e7d58d50c51719039c8) | fix  | error if Angular compiler is used in a schematic |
+| [fabbb8a93](https://github.com/angular/angular-cli/commit/fabbb8a936f3b3b1cee8ea5cbdb7bb7832cb02a7) | fix  | only set `DebugView` when `NG_DEBUG` is passed   |
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                          |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------- |
+| [499173b5d](https://github.com/angular/angular-cli/commit/499173b5d197f14377203b92b49ff3cbbf55b260) | fix  | remove bootstrapping wrapping in universal schematic |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                           |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------------- |
+| [e87134fe9](https://github.com/angular/angular-cli/commit/e87134fe94831df76698fe0e90fe556da0011511) | fix  | build optimizer support for spec-compliant downlevel class properties |
+| [d80adde2f](https://github.com/angular/angular-cli/commit/d80adde2fec53e6513983a89dd194a35c426b8aa) | fix  | do not fail compilation when spec pattern does not match              |
+| [11be502e7](https://github.com/angular/angular-cli/commit/11be502e7cc2544371d55c8b3d32b7bcbbf8066e) | fix  | fix support of Safari TP versions                                     |
+| [14e317d85](https://github.com/angular/angular-cli/commit/14e317d85429c83e6285c5cec4a1c4483d8a1c8f) | fix  | load polyfills and runtime as scripts instead of modules              |
+
+## Special Thanks
+
+Alan Agius, Charles Lyding, Kristiyan Kostadinov and Ricardo
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="15.2.0-next.3"></a>
 
 # 15.2.0-next.3 (2023-02-01)
