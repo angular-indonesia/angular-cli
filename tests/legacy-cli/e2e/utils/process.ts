@@ -7,7 +7,6 @@ import { getGlobalVariable, getGlobalVariablesEnv } from './env';
 import { catchError } from 'rxjs/operators';
 import treeKill from 'tree-kill';
 import { delimiter, join, resolve } from 'path';
-import { IS_BAZEL } from './bazel';
 
 interface ExecOptions {
   silent?: boolean;
@@ -17,7 +16,12 @@ interface ExecOptions {
   cwd?: string;
 }
 
-const NPM_CONFIG_RE = /^(npm_config_|yarn_|no_update_notifier)/i;
+/**
+ * While `NPM_CONFIG_` and `YARN_` are case insensitive we filter based on case.
+ * This is because when invoking a command using `yarn` it will add a bunch of these variables in lower case.
+ * This causes problems when we try to update the variables during the test setup.
+ */
+const NPM_CONFIG_RE = /^(NPM_CONFIG_|YARN_|NO_UPDATE_NOTIFIER)/;
 
 let _processes: child_process.ChildProcess[] = [];
 
@@ -32,6 +36,7 @@ function _exec(options: ExecOptions, cmd: string, args: string[]): Promise<Proce
 
   const cwd = options.cwd ?? process.cwd();
   const env = options.env ?? process.env;
+
   console.log(
     `==========================================================================================`,
   );
@@ -420,11 +425,7 @@ export async function launchTestProcess(entry: string, ...args: any[]): Promise<
     .filter((p) => p.startsWith(tempRoot) || p.startsWith(TEMP) || !p.includes('angular-cli'))
     .join(delimiter);
 
-  const testProcessArgs = [
-    resolve(__dirname, IS_BAZEL ? 'test_process' : 'run_test_process'),
-    entry,
-    ...args,
-  ];
+  const testProcessArgs = [resolve(__dirname, 'test_process'), entry, ...args];
 
   return new Promise<void>((resolve, reject) => {
     spawn(process.execPath, testProcessArgs, {
