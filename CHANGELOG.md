@@ -1,3 +1,58 @@
+<a name="15.2.0-rc.0"></a>
+
+# 15.2.0-rc.0 (2023-02-15)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                 |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------- |
+| [5f407337f](https://github.com/angular/angular-cli/commit/5f407337f9a355a29654f32346f20e070853332a) | fix  | add set `SessionEngaged` in GA              |
+| [545c180e2](https://github.com/angular/angular-cli/commit/545c180e2ba1f2465fa38f264a7a5c1711306406) | fix  | convert `before` option in `.npmrc` to Date |
+| [522463c42](https://github.com/angular/angular-cli/commit/522463c42ba873a32e85d47d692951537ab10716) | fix  | replace `os.version` with `os.release`.     |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                  |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ |
+| [421417a36](https://github.com/angular/angular-cli/commit/421417a36b13a44d39e0818171482871ea8b895f) | fix  | avoid CommonJS warning for zone.js in esbuild                |
+| [d3f255087](https://github.com/angular/angular-cli/commit/d3f255087ffaa474d37c45fb2db8611f6b437408) | fix  | correctly copy `safety-worker.js` contents                   |
+| [c65b026e2](https://github.com/angular/angular-cli/commit/c65b026e2f375f35826d985c8cc558a2729b520e) | fix  | update the ECMA output warning message to be more actionable |
+| [8356240dd](https://github.com/angular/angular-cli/commit/8356240dda74f772435e7b0a639b2e928b61a657) | fix  | use babel default export helper in build optimizer           |
+| [1e5286326](https://github.com/angular/angular-cli/commit/1e528632629f2d0eb96580a8d7672758f5c23270) | perf | reduce rebuilt times when using the `scripts` option         |
+
+## Special Thanks
+
+Alan Agius and Charles Lyding
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="15.1.6"></a>
+
+# 15.1.6 (2023-02-15)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                 |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------- |
+| [3d1f48fa2](https://github.com/angular/angular-cli/commit/3d1f48fa2991ded75da3a1b3a431480710a8ce15) | fix  | add set `SessionEngaged` in GA              |
+| [df07ab113](https://github.com/angular/angular-cli/commit/df07ab11351d6f2d82922ae251ccd17b23d9d0a9) | fix  | convert `before` option in `.npmrc` to Date |
+| [c787cc780](https://github.com/angular/angular-cli/commit/c787cc7803598eb67260cbd2112d411384d518cc) | fix  | replace `os.version` with `os.release`.     |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                  |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ |
+| [34a4a1bbf](https://github.com/angular/angular-cli/commit/34a4a1bbf608eb54b0a33b3aa3a6be3e2a576770) | fix  | correctly copy `safety-worker.js` contents                   |
+| [88a33155d](https://github.com/angular/angular-cli/commit/88a33155d4bc00077d32bef42588427fb2ed49f4) | fix  | update the ECMA output warning message to be more actionable |
+| [384ad29c9](https://github.com/angular/angular-cli/commit/384ad29c9a66d78e545ed7e48bf962e4df9d0549) | fix  | use babel default export helper in build optimizer           |
+| [59aa1cdbd](https://github.com/angular/angular-cli/commit/59aa1cdbdf3e2712f988790f68bacc174d070b0c) | perf | reduce rebuilt times when using the `scripts` option         |
+
+## Special Thanks
+
+Alan Agius and Charles Lyding
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="15.2.0-next.4"></a>
 
 # 15.2.0-next.4 (2023-02-08)
