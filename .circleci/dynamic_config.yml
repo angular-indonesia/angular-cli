@@ -11,7 +11,7 @@ version: 2.1
 
 orbs:
   browser-tools: circleci/browser-tools@1.4.0
-  devinfra: angular/dev-infra@1.0.7
+  devinfra: angular/dev-infra@1.0.8
 
 parameters:
   snapshot_changed:
@@ -23,13 +23,13 @@ parameters:
 ## IMPORTANT
 # Windows needs its own cache key because binaries in node_modules are different.
 # See https://circleci.com/docs/2.0/caching/#restoring-cache for how prefixes work in CircleCI.
-var_1: &cache_key v1-angular_devkit-14.20-{{ checksum "yarn.lock" }}
+var_1: &cache_key v1-angular_devkit-16.13-{{ checksum "yarn.lock" }}
 var_1_win: &cache_key_win v1-angular_devkit-win-16.13-{{ checksum "yarn.lock" }}
-var_3: &default_nodeversion '14.20'
-var_3_major: &default_nodeversion_major '14'
+var_3: &default_nodeversion '16.13'
+var_3_major: &default_nodeversion_major '16'
 # The major version of node toolchains. See tools/toolchain_info.bzl
 # NOTE: entries in this array may be repeated elsewhere in the file, find them before adding more
-var_3_all_major: &all_nodeversion_major ['14', '16', '18']
+var_3_all_major: &all_nodeversion_major ['16', '18']
 # Workspace initially persisted by the `setup` job, and then enhanced by `setup-and-build-win`.
 # https://circleci.com/docs/2.0/workflows/#using-workspaces-to-share-data-among-jobs
 # https://circleci.com/blog/deep-diving-into-circleci-workspaces/
@@ -236,7 +236,7 @@ jobs:
             equal: [*default_nodeversion_major, << parameters.nodeversion >>]
           steps:
             - run:
-                command: yarn bazel test --test_tag_filters=-node16,-node18,-node<< parameters.nodeversion >>-broken //packages/...
+                command: yarn bazel test --test_tag_filters=-node18,-node<< parameters.nodeversion >>-broken //packages/...
                 # This timeout provides time for the actual tests to timeout and report status
                 # instead of CircleCI stopping the job without test failure information.
                 no_output_timeout: 40m
@@ -277,9 +277,9 @@ jobs:
           command: yarn bazel test --define=E2E_TEMP=/mnt/ramdisk/e2e --define=E2E_SHARD_TOTAL=${CIRCLE_NODE_TOTAL} --define=E2E_SHARD_INDEX=${CIRCLE_NODE_INDEX} --config=e2e //tests/legacy-cli:e2e<<# parameters.snapshots >>.snapshots<</ parameters.snapshots >>.<< parameters.subset >>_node<< parameters.nodeversion >>
           no_output_timeout: 40m
       - store_artifacts:
-          path: dist/testlogs/tests/legacy-cli/e2e.<<parameters.nodeversion>>.<< parameters.subset >>
+          path: dist/testlogs/tests/legacy-cli/e2e<<# parameters.snapshots >>.snapshots<</ parameters.snapshots >>.<< parameters.subset >>_node<< parameters.nodeversion >>
       - store_test_results:
-          path: dist/testlogs/tests/legacy-cli/e2e.<<parameters.nodeversion>>.<< parameters.subset >>
+          path: dist/testlogs/tests/legacy-cli/e2e<<# parameters.snapshots >>.snapshots<</ parameters.snapshots >>.<< parameters.subset >>_node<< parameters.nodeversion >>
       - fail_fast
 
   test-browsers:
@@ -402,7 +402,7 @@ workflows:
               # Disable running this on Node.js 18 for now. This causes failures when using RBE.
               # Example: `GLIBC_2.28' not found.
               # Likely this is caused by outdated Ubuntu image https://github.com/angular/dev-infra/blob/main/bazel/remote-execution/BUILD.bazel#L21
-              nodeversion: ['14', '16']
+              nodeversion: ['16']
           requires:
             - build
 

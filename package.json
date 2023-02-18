@@ -19,9 +19,8 @@
   ],
   "scripts": {
     "admin": "node ./bin/devkit-admin",
-    "bazel:test": "bazel test //packages/...",
+    "test": "bazel test //packages/...",
     "build": "node ./bin/devkit-admin build",
-    "build:bazel": "node ./bin/devkit-admin build-bazel",
     "build-tsc": "tsc -p tsconfig.json",
     "lint": "eslint --cache --max-warnings=0 \"**/*.ts\"",
     "ng-dev": "cross-env TS_NODE_PROJECT=$PWD/.ng-dev/tsconfig.json TS_NODE_TRANSPILE_ONLY=1 node --no-warnings --loader ts-node/esm node_modules/@angular/ng-dev/bundles/cli.mjs",
@@ -41,7 +40,7 @@
     "url": "https://github.com/angular/angular-cli.git"
   },
   "engines": {
-    "node": "^14.20.0 || ^16.13.0 || ^18.10.0",
+    "node": "^16.13.0 || ^18.10.0",
     "yarn": ">=1.21.1 <2",
     "npm": "Please use yarn instead of NPM to install dependencies"
   },
@@ -93,8 +92,8 @@
     "@babel/template": "7.20.7",
     "@bazel/bazelisk": "1.12.1",
     "@bazel/buildifier": "6.0.1",
-    "@bazel/concatjs": "5.7.3",
-    "@bazel/jasmine": "5.7.3",
+    "@bazel/concatjs": "5.8.1",
+    "@bazel/jasmine": "5.8.1",
     "@discoveryjs/json-ext": "0.5.7",
     "@types/babel__core": "7.20.0",
     "@types/babel__template": "7.4.1",
@@ -192,10 +191,10 @@
     "prettier": "^2.0.0",
     "protractor": "~7.0.0",
     "puppeteer": "18.2.1",
-    "quicktype-core": "22.0.0",
+    "quicktype-core": "23.0.1",
     "resolve-url-loader": "5.0.0",
-    "rxjs": "6.6.7",
-    "sass": "1.58.1",
+    "rxjs": "7.8.0",
+    "sass": "1.58.2",
     "sass-loader": "13.2.0",
     "sauce-connect-proxy": "https://saucelabs.com/downloads/sc-4.8.1-linux.tar.gz",
     "semver": "7.3.8",
@@ -206,7 +205,7 @@
     "spdx-satisfies": "^5.0.0",
     "symbol-observable": "4.0.0",
     "tar": "^6.1.6",
-    "terser": "5.16.3",
+    "terser": "5.16.4",
     "text-table": "0.2.0",
     "tree-kill": "1.2.2",
     "ts-node": "^10.0.0",
@@ -219,7 +218,7 @@
     "webpack-dev-server": "4.11.1",
     "webpack-merge": "5.8.0",
     "webpack-subresource-integrity": "5.1.0",
-    "yargs": "17.6.2",
+    "yargs": "17.7.0",
     "yargs-parser": "21.1.1",
     "zone.js": "^0.12.0"
   }

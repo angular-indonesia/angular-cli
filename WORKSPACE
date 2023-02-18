@@ -52,8 +52,19 @@ rules_pkg_dependencies()
 load("@rules_nodejs//nodejs:repositories.bzl", "nodejs_register_toolchains")
 
 nodejs_register_toolchains(
+    name = "node16",
+    node_version = "16.13.1",
+)
+
+nodejs_register_toolchains(
+    name = "node18",
+    node_version = "18.10.0",
+)
+
+# Set the default nodejs toolchain to the latest supported major version
+nodejs_register_toolchains(
     name = "nodejs",
-    node_version = "14.20.0",
+    node_version = "18.10.0",
 )
 
 load("@build_bazel_rules_nodejs//:index.bzl", "yarn_install")
@@ -78,9 +89,9 @@ yarn_install(
 
 http_archive(
     name = "aspect_bazel_lib",
-    sha256 = "ef83252dea2ed8254c27e65124b756fc9476be2b73a7799b7a2a0935937fc573",
-    strip_prefix = "bazel-lib-1.24.2",
-    url = "https://github.com/aspect-build/bazel-lib/archive/v1.24.2.tar.gz",
+    sha256 = "d2a71e1e39961535db2f9164c7a588cff1a86938564634532062ed3a3cf307b3",
+    strip_prefix = "bazel-lib-1.25.0",
+    url = "https://github.com/aspect-build/bazel-lib/archive/v1.25.0.tar.gz",
 )
 
 load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies", "register_jq_toolchains")
@@ -88,21 +99,6 @@ load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies",
 aspect_bazel_lib_dependencies()
 
 register_jq_toolchains(version = "1.6")
-
-nodejs_register_toolchains(
-    name = "node14",
-    node_version = "14.20.0",
-)
-
-nodejs_register_toolchains(
-    name = "node16",
-    node_version = "16.13.1",
-)
-
-nodejs_register_toolchains(
-    name = "node18",
-    node_version = "18.10.0",
-)
 
 register_toolchains(
     "@npm//@angular/build-tooling/bazel/git-toolchain:git_linux_toolchain",
