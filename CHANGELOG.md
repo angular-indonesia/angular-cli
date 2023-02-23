@@ -1,28 +1,125 @@
-<a name="15.2.0-rc.0"></a>
+<a name="16.0.0-next.0"></a>
 
-# 15.2.0-rc.0 (2023-02-15)
+# 16.0.0-next.0 (2023-02-22)
+
+## Breaking Changes
 
 ### @angular/cli
 
-| Commit                                                                                              | Type | Description                                 |
-| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------- |
-| [5f407337f](https://github.com/angular/angular-cli/commit/5f407337f9a355a29654f32346f20e070853332a) | fix  | add set `SessionEngaged` in GA              |
-| [545c180e2](https://github.com/angular/angular-cli/commit/545c180e2ba1f2465fa38f264a7a5c1711306406) | fix  | convert `before` option in `.npmrc` to Date |
-| [522463c42](https://github.com/angular/angular-cli/commit/522463c42ba873a32e85d47d692951537ab10716) | fix  | replace `os.version` with `os.release`.     |
+- The deprecated `defaultCollection` workspace option has been removed. Use `schematicCollections` instead.
 
-### @angular-devkit/build-angular
+  Before
 
-| Commit                                                                                              | Type | Description                                                  |
-| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ |
-| [421417a36](https://github.com/angular/angular-cli/commit/421417a36b13a44d39e0818171482871ea8b895f) | fix  | avoid CommonJS warning for zone.js in esbuild                |
-| [d3f255087](https://github.com/angular/angular-cli/commit/d3f255087ffaa474d37c45fb2db8611f6b437408) | fix  | correctly copy `safety-worker.js` contents                   |
-| [c65b026e2](https://github.com/angular/angular-cli/commit/c65b026e2f375f35826d985c8cc558a2729b520e) | fix  | update the ECMA output warning message to be more actionable |
-| [8356240dd](https://github.com/angular/angular-cli/commit/8356240dda74f772435e7b0a639b2e928b61a657) | fix  | use babel default export helper in build optimizer           |
-| [1e5286326](https://github.com/angular/angular-cli/commit/1e528632629f2d0eb96580a8d7672758f5c23270) | perf | reduce rebuilt times when using the `scripts` option         |
+  ```json
+  "defaultCollection": "@angular/material"
+  ```
+
+  After
+
+  ```json
+  "schematicCollections": ["@angular/material"]
+  ```
+
+- The deprecated `defaultProject` workspace option has been removed. The project to use will be determined from the current working directory.
+- Node.js v14 support has been removed
+
+  Node.js v14 is planned to be End-of-Life on 2023-04-30. Angular will stop supporting Node.js v14 in Angular v16.
+  Angular v16 will continue to officially support Node.js versions v16 and v18.
+
+### @schematics/angular
+
+- `ng g resolver` and `ng g guard` now generate a functional resolver or guard by default. It is still possible to generate a (deprecated) class-based resolver or guard by using `ng g resolver --no-functional` or `ng g guard --no-functional`.
+- The CLI no longer allows to generate `CanLoad` guards. Use `CanMatch` instead.
+
+### @angular-devkit/core
+
+- Several changes to the `SchemaRegistry`.
+  - `compile` method now returns a `Promise`.
+  - Deprecated `flatten` has been removed without replacement.
+- - `ContentHasMutatedException`, `InvalidUpdateRecordException`, `UnimplementedException` and `MergeConflictException` API from `@angular-devkit/core` have been removed in favor of the API from `@angular-devkit/schematics`.
+  - `UnsupportedPlatformException` - A custom error exception should be created instead.
+
+### @angular-devkit/schematics
+
+- The depracated `UpdateBuffer` has been removed and `UpdateBuffer2`
+  is renamed to `UpdateBuffer`. With this change the related and
+  deprecated symbols `ContentCannotBeRemovedException` and `Chunk`
+  have also been removed.
+
+### @ngtools/webpack
+
+- NGCC integration has been removed and as a result Angular View Engine libraries will no longer work.
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                         |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------- |
+| [22fdd7da9](https://github.com/angular/angular-cli/commit/22fdd7da97c832048410ca89622712d097490c5d) | feat | generate functional resolvers and guards by default |
+| [5ceedcb11](https://github.com/angular/angular-cli/commit/5ceedcb11e3ca5bdad4248c7c76ca2562fab43f2) | feat | remove deprecated CanLoad option for guards         |
+
+### @angular/cli
+
+| Commit                                                                                              | Type     | Description                                                        |
+| --------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------ |
+| [68024234e](https://github.com/angular/angular-cli/commit/68024234edcb942d5a177d6bd7567e77d7e40245) | feat     | remove deprecated `defaultCollection` from workspace configuration |
+| [d58428d3d](https://github.com/angular/angular-cli/commit/d58428d3dbdb7275e2e4f6d271fcc5fdda5c489e) | feat     | remove deprecated `defaultProject` from workspace configuration    |
+| [c29c8e18d](https://github.com/angular/angular-cli/commit/c29c8e18d84096e2f72af12643c31bde51010548) | refactor | remove Node.js v14 support                                         |
+
+### @angular-devkit/core
+
+| Commit                                                                                              | Type     | Description                                         |
+| --------------------------------------------------------------------------------------------------- | -------- | --------------------------------------------------- |
+| [f6624b974](https://github.com/angular/angular-cli/commit/f6624b974faf13fa718d304e1a473260c16f0c1d) | feat     | update SchemaRegistry `compile` to return `Promise` |
+| [0ad81cdbc](https://github.com/angular/angular-cli/commit/0ad81cdbc72e80ca75d9d5cc2bc0c6163267a0bb) | refactor | remove deprecated exceptions                        |
+
+### @angular-devkit/schematics
+
+| Commit                                                                                              | Type     | Description                                                        |
+| --------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------ |
+| [d2ef386f4](https://github.com/angular/angular-cli/commit/d2ef386f46131af904ca800cc77388c03239cd9d) | refactor | remove `UpdateBuffer` and rename `UpdateBuffer2` to `UpdateBuffer` |
+
+### @ngtools/webpack
+
+| Commit                                                                                              | Type     | Description             |
+| --------------------------------------------------------------------------------------------------- | -------- | ----------------------- |
+| [c8ac660d8](https://github.com/angular/angular-cli/commit/c8ac660d8b13922be7ebcc92dfd5b18392602c40) | refactor | remove NGCC integration |
 
 ## Special Thanks
 
-Alan Agius and Charles Lyding
+Alan Agius, Charles Lyding, Cédric Exbrayat, Doug Parker and Lukas Spirig
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="15.2.0"></a>
+
+# 15.2.0 (2023-02-22)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                   |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------- |
+| [0f58a17c4](https://github.com/angular/angular-cli/commit/0f58a17c4ce92495d96721bc3f2b632a890bbab4) | feat | log number of files update during `ng update` |
+
+### @angular-devkit/schematics-cli
+
+| Commit                                                                                              | Type | Description                                                                               |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------------------- |
+| [ecf43090d](https://github.com/angular/angular-cli/commit/ecf43090d110f996f45a259c279f1b83dcab3fd8) | feat | auto detect package manager ([#24305](https://github.com/angular/angular-cli/pull/24305)) |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                       |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------------- |
+| [01b3bcf89](https://github.com/angular/angular-cli/commit/01b3bcf898108f9b879da4a791fa2a21c6d9f7c5) | feat | add Less stylesheet support to experimental esbuild-based builder |
+| [09af70743](https://github.com/angular/angular-cli/commit/09af70743800aefdefe06e0ca32bcdde18f9eb77) | feat | implement node module license extraction for esbuild builder      |
+| [bbc1a4f0d](https://github.com/angular/angular-cli/commit/bbc1a4f0dc93437fe97a53a35f68d978cc50bb9e) | feat | support CommonJS dependency checking in esbuild                   |
+| [8cf0d17fb](https://github.com/angular/angular-cli/commit/8cf0d17fb1b39ea7bbd1c751995a56de3df45114) | feat | support JIT compilation with esbuild                              |
+| [3f6769ef9](https://github.com/angular/angular-cli/commit/3f6769ef953b1f880508a9152e669064cbb4dcc9) | fix  | allow empty scripts to be optimized                               |
+| [421417a36](https://github.com/angular/angular-cli/commit/421417a36b13a44d39e0818171482871ea8b895f) | fix  | avoid CommonJS warning for zone.js in esbuild                     |
+
+## Special Thanks
+
+Alan Agius, Charles Lyding, Doug Parker, Jason Bedard, Joey Perrott, Marvin and Paul Gschwendtner
 
 <!-- CHANGELOG SPLIT MARKER -->
 
@@ -50,40 +147,6 @@ Alan Agius and Charles Lyding
 ## Special Thanks
 
 Alan Agius and Charles Lyding
-
-<!-- CHANGELOG SPLIT MARKER -->
-
-<a name="15.2.0-next.4"></a>
-
-# 15.2.0-next.4 (2023-02-08)
-
-### @angular/cli
-
-| Commit                                                                                              | Type | Description                                      |
-| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------ |
-| [234f265d1](https://github.com/angular/angular-cli/commit/234f265d161796a7cdfc2edbaa7e9a50d99a4863) | fix  | error if Angular compiler is used in a schematic |
-| [7bcb19cdd](https://github.com/angular/angular-cli/commit/7bcb19cddb676c650b1592aae81eceb66e8511fe) | fix  | only set `DebugView` when `NG_DEBUG` is passed   |
-
-### @schematics/angular
-
-| Commit                                                                                              | Type | Description                                          |
-| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------- |
-| [88fddc050](https://github.com/angular/angular-cli/commit/88fddc05039ee92d60267cf565b19ae1b56ad633) | fix  | remove bootstrapping wrapping in universal schematic |
-
-### @angular-devkit/build-angular
-
-| Commit                                                                                              | Type | Description                                                           |
-| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------------- |
-| [01b3bcf89](https://github.com/angular/angular-cli/commit/01b3bcf898108f9b879da4a791fa2a21c6d9f7c5) | feat | add Less stylesheet support to experimental esbuild-based builder     |
-| [8cf0d17fb](https://github.com/angular/angular-cli/commit/8cf0d17fb1b39ea7bbd1c751995a56de3df45114) | feat | support JIT compilation with esbuild                                  |
-| [bfc0faced](https://github.com/angular/angular-cli/commit/bfc0facedda1150177b84fbc82f195678ce00b1e) | fix  | build optimizer support for spec-compliant downlevel class properties |
-| [d9c697b2b](https://github.com/angular/angular-cli/commit/d9c697b2bc284e432c9c1ab76b1179789e253c92) | fix  | do not fail compilation when spec pattern does not match              |
-| [df7c7f430](https://github.com/angular/angular-cli/commit/df7c7f430c5f4ec2b9b4d2f316ed9b4a8e2a5772) | fix  | fix support of Safari TP versions                                     |
-| [bf3be56db](https://github.com/angular/angular-cli/commit/bf3be56db8b3a1ef8a0e02dfc5de914651d8ec93) | fix  | load polyfills and runtime as scripts instead of modules              |
-
-## Special Thanks
-
-Alan Agius, Charles Lyding, Doug Parker, Jason Bedard, Kristiyan Kostadinov and Ricardo
 
 <!-- CHANGELOG SPLIT MARKER -->
 
@@ -119,23 +182,6 @@ Alan Agius, Charles Lyding, Kristiyan Kostadinov and Ricardo
 
 <!-- CHANGELOG SPLIT MARKER -->
 
-<a name="15.2.0-next.3"></a>
-
-# 15.2.0-next.3 (2023-02-01)
-
-### @angular-devkit/build-angular
-
-| Commit                                                                                              | Type | Description                                 |
-| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------- |
-| [3512a0362](https://github.com/angular/angular-cli/commit/3512a03621c7ed99324e82771e239e77c907367e) | fix  | load JavaScript bundles as modules in karma |
-| [f35e9908c](https://github.com/angular/angular-cli/commit/f35e9908c08fe1d1bda82124c3ec2b6fe4242125) | fix  | print server builder errors and warnings    |
-
-## Special Thanks
-
-Alan Agius and Doug Parker
-
-<!-- CHANGELOG SPLIT MARKER -->
-
 <a name="15.1.4"></a>
 
 # 15.1.4 (2023-02-01)
@@ -150,48 +196,6 @@ Alan Agius and Doug Parker
 ## Special Thanks
 
 Alan Agius
-
-<!-- CHANGELOG SPLIT MARKER -->
-
-<a name="15.2.0-next.2"></a>
-
-# 15.2.0-next.2 (2023-01-25)
-
-### @angular/cli
-
-| Commit                                                                                              | Type | Description                                        |
-| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------- |
-| [0f58a17c4](https://github.com/angular/angular-cli/commit/0f58a17c4ce92495d96721bc3f2b632a890bbab4) | feat | log number of files update during `ng update`      |
-| [b5737efae](https://github.com/angular/angular-cli/commit/b5737efae8448084af319fd077863ff6922d651e) | fix  | handle extended schematics when retrieving aliases |
-
-### @schematics/angular
-
-| Commit                                                                                              | Type | Description                                                 |
-| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------- |
-| [7b0c1ce0c](https://github.com/angular/angular-cli/commit/7b0c1ce0ca10bbb3a2099dc97f7d87afa07a2eef) | fix  | update browserslist config to include last 2 Chrome version |
-
-### @angular-devkit/schematics-cli
-
-| Commit                                                                                              | Type | Description                                                                               |
-| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------------------- |
-| [ecf43090d](https://github.com/angular/angular-cli/commit/ecf43090d110f996f45a259c279f1b83dcab3fd8) | feat | auto detect package manager ([#24305](https://github.com/angular/angular-cli/pull/24305)) |
-
-### @angular-devkit/build-angular
-
-| Commit                                                                                              | Type | Description                                                  |
-| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ |
-| [d19f260ba](https://github.com/angular/angular-cli/commit/d19f260baa8bb55142d69c9c71440b3c444d4b92) | fix  | avoid undefined module path for Sass imports in esbuild      |
-| [97907addf](https://github.com/angular/angular-cli/commit/97907addfce1e630e71c186e836ab6a0ceec548b) | fix  | update browserslist config to include last 2 Chrome versions |
-
-### @angular-devkit/core
-
-| Commit                                                                                              | Type | Description                                    |
-| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------- |
-| [f6f5d7919](https://github.com/angular/angular-cli/commit/f6f5d79199613b9f9fa82680cdafd4a622ff4be0) | fix  | handle number like strings in workspace writer |
-
-## Special Thanks
-
-Alan Agius, Charles Lyding, Doug Parker and Marvin
 
 <!-- CHANGELOG SPLIT MARKER -->
 
@@ -230,36 +234,6 @@ Alan Agius, Charles Lyding and Doug Parker
 
 <!-- CHANGELOG SPLIT MARKER -->
 
-<a name="15.2.0-next.1"></a>
-
-# 15.2.0-next.1 (2023-01-18)
-
-### @angular/cli
-
-| Commit                                                                                              | Type | Description                                                                 |
-| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------------------- |
-| [3ebb19552](https://github.com/angular/angular-cli/commit/3ebb19552527fdd69c6e8db55aea5bf5157cdb06) | fix  | register schematic aliases when providing collection name in `ng generate`  |
-| [697df4f6e](https://github.com/angular/angular-cli/commit/697df4f6e562ae1f1465970694c8b26652af033f) | fix  | remove `--to` option from being required when using `--from` in `ng update` |
-
-### @schematics/angular
-
-| Commit                                                                                              | Type | Description                                                                                  |
-| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------------------------------------- |
-| [c8a3b3000](https://github.com/angular/angular-cli/commit/c8a3b30000c407937bff4bdeeda8a109fd27259c) | fix  | replace existing `BrowserModule.withServerTransition` calls when running universal schematic |
-
-### @angular-devkit/build-angular
-
-| Commit                                                                                              | Type | Description                                                 |
-| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------- |
-| [bbc1a4f0d](https://github.com/angular/angular-cli/commit/bbc1a4f0dc93437fe97a53a35f68d978cc50bb9e) | feat | support CommonJS dependency checking in esbuild             |
-| [c3447e364](https://github.com/angular/angular-cli/commit/c3447e3640b059b62e4c2c5d18543195b0d6c820) | fix  | prevent hanging initial build during exception with esbuild |
-
-## Special Thanks
-
-Alan Agius, Charles Lyding and Doug Parker
-
-<!-- CHANGELOG SPLIT MARKER -->
-
 <a name="15.1.2"></a>
 
 # 15.1.2 (2023-01-18)
@@ -286,22 +260,6 @@ Alan Agius, Charles Lyding and Doug Parker
 ## Special Thanks
 
 Alan Agius, Charles Lyding and Doug Parker
-
-<!-- CHANGELOG SPLIT MARKER -->
-
-<a name="15.2.0-next.0"></a>
-
-# 15.2.0-next.0 (2023-01-12)
-
-### @angular-devkit/build-angular
-
-| Commit                                                                                              | Type | Description                                                  |
-| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ |
-| [09af70743](https://github.com/angular/angular-cli/commit/09af70743800aefdefe06e0ca32bcdde18f9eb77) | feat | implement node module license extraction for esbuild builder |
-
-## Special Thanks
-
-Alan Agius and Charles Lyding
 
 <!-- CHANGELOG SPLIT MARKER -->
 
