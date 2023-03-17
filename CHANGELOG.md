@@ -1,3 +1,51 @@
+<a name="15.2.4"></a>
+
+# 15.2.4 (2023-03-16)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                             |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------- |
+| [f74bfea24](https://github.com/angular/angular-cli/commit/f74bfea241b189f261ec81a8561aea7a56774ae8) | fix  | update `webpack` dependency to `5.76.1` |
+
+## Special Thanks
+
+Alan Agius
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="14.2.11"></a>
+
+# 14.2.11 (2023-03-16)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                           |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------- |
+| [ddd33bf38](https://github.com/angular/angular-cli/commit/ddd33bf38d7d76e816ebc0459559917da514477d) | fix  | update webpack dependency to `5.76.1` |
+
+## Special Thanks
+
+Alan Agius and Joey Perrott
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="13.3.11"></a>
+
+# 13.3.11 (2023-03-16)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                             |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------- |
+| [50fa9300f](https://github.com/angular/angular-cli/commit/50fa9300f264f68ad35606ae46da820c3798f665) | fix  | update `webpack` dependency to `5.76.1` |
+
+## Special Thanks
+
+Alan Agius and Joey Perrott
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="16.0.0-next.4"></a>
 
 # 16.0.0-next.4 (2023-03-15)
