@@ -12,7 +12,6 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { normalizeAssetPatterns, normalizeOptimization, normalizeSourceMaps } from '../../utils';
 import { normalizeCacheOptions } from '../../utils/normalize-cache';
-import { normalizePolyfills } from '../../utils/normalize-polyfills';
 import { generateEntryPoints } from '../../utils/package-chunk-sort';
 import { getIndexInputFile, getIndexOutputFile } from '../../utils/webpack-browser-config';
 import { normalizeGlobalStyles } from '../../webpack/utils/helpers';
@@ -46,19 +45,6 @@ export async function normalizeOptions(
   const cacheOptions = normalizeCacheOptions(projectMetadata, workspaceRoot);
 
   const mainEntryPoint = path.join(workspaceRoot, options.main);
-
-  // Currently esbuild do not support multiple files per entry-point
-  const [polyfillsEntryPoint, ...remainingPolyfills] = normalizePolyfills(
-    options.polyfills,
-    workspaceRoot,
-  );
-
-  if (remainingPolyfills.length) {
-    context.logger.warn(
-      `The 'polyfills' option currently does not support multiple entries by this experimental builder. The first entry will be used.`,
-    );
-  }
-
   const tsconfig = path.join(workspaceRoot, options.tsConfig);
   const outputPath = path.join(workspaceRoot, options.outputPath);
   const optimizationOptions = normalizeOptimization(options.optimization);
@@ -105,7 +91,8 @@ export async function normalizeOptions(
   let tailwindConfiguration: { file: string; package: string } | undefined;
   const tailwindConfigurationPath = findTailwindConfigurationFile(workspaceRoot, projectRoot);
   if (tailwindConfigurationPath) {
-    const resolver = createRequire(projectRoot);
+    // Create a node resolver at the project root as a directory
+    const resolver = createRequire(projectRoot + '/');
     try {
       tailwindConfiguration = {
         file: tailwindConfigurationPath,
@@ -133,9 +120,6 @@ export async function normalizeOptions(
   const entryPoints: Record<string, string> = {
     main: mainEntryPoint,
   };
-  if (polyfillsEntryPoint) {
-    entryPoints['polyfills'] = polyfillsEntryPoint;
-  }
 
   let indexHtmlOptions;
   if (options.index) {
@@ -162,6 +146,7 @@ export async function normalizeOptions(
     extractLicenses,
     inlineStyleLanguage = 'css',
     poll,
+    polyfills,
     preserveSymlinks,
     statsJson,
     stylePreprocessorOptions,
@@ -182,6 +167,7 @@ export async function normalizeOptions(
     inlineStyleLanguage,
     jit: !aot,
     stats: !!statsJson,
+    polyfills: polyfills === undefined || Array.isArray(polyfills) ? polyfills : [polyfills],
     poll,
     // If not explicitly set, default to the Node.js process argument
     preserveSymlinks: preserveSymlinks ?? process.execArgv.includes('--preserve-symlinks'),
