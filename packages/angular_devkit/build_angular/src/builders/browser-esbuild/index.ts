@@ -12,7 +12,6 @@ import assert from 'node:assert';
 import { constants as fsConstants } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { deleteOutputDir } from '../../utils';
 import { copyAssets } from '../../utils/copy-assets';
 import { assertIsError } from '../../utils/error';
 import { transformSupportedBrowsersToTargets } from '../../utils/esbuild-targets';
@@ -22,8 +21,8 @@ import { augmentAppWithServiceWorkerEsbuild } from '../../utils/service-worker';
 import { Spinner } from '../../utils/spinner';
 import { getSupportedBrowsers } from '../../utils/supported-browsers';
 import { BundleStats, generateBuildStatsTable } from '../../webpack/utils/stats';
+import { SourceFileCache, createCompilerPlugin } from './angular/compiler-plugin';
 import { checkCommonJSModules } from './commonjs-checker';
-import { SourceFileCache, createCompilerPlugin } from './compiler-plugin';
 import { BundlerContext, logMessages } from './esbuild';
 import { logExperimentalWarnings } from './experimental-warnings';
 import { createGlobalScriptsBundleOptions } from './global-scripts';
@@ -32,7 +31,7 @@ import { NormalizedBrowserOptions, normalizeOptions } from './options';
 import { shutdownSassWorkerPool } from './sass-plugin';
 import { Schema as BrowserBuilderOptions } from './schema';
 import { createStylesheetBundleOptions } from './stylesheets';
-import { ChangedFiles, createWatcher } from './watcher';
+import type { ChangedFiles } from './watcher';
 
 interface RebuildState {
   codeRebuild?: BundlerContext;
@@ -278,7 +277,7 @@ async function execute(
     }
   }
 
-  logBuildStats(context, metafile);
+  logBuildStats(context, metafile, initialFiles);
 
   const buildTime = Number(process.hrtime.bigint() - startTime) / 10 ** 9;
   context.logger.info(`Complete. [${buildTime.toFixed(3)} seconds]`);
@@ -315,12 +314,7 @@ async function writeResultFiles(
           directoryExists.add(basePath);
         }
         // Copy file contents
-        await fs.copyFile(
-          source,
-          path.join(outputPath, destination),
-          // This is not yet available from `fs/promises` in Node.js v16.13
-          fsConstants.COPYFILE_FICLONE,
-        );
+        await fs.copyFile(source, path.join(outputPath, destination), fsConstants.COPYFILE_FICLONE);
       }),
     );
   }
@@ -628,7 +622,13 @@ export async function* buildEsbuildBrowser(
   if (shouldWriteResult) {
     // Clean output path if enabled
     if (userOptions.deleteOutputPath) {
-      deleteOutputDir(normalizedOptions.workspaceRoot, userOptions.outputPath);
+      if (normalizedOptions.outputPath === normalizedOptions.workspaceRoot) {
+        context.logger.error('Output path MUST not be workspace root directory!');
+
+        return;
+      }
+
+      await fs.rm(normalizedOptions.outputPath, { force: true, recursive: true, maxRetries: 3 });
     }
 
     // Create output directory if needed
@@ -678,21 +678,37 @@ export async function* buildEsbuildBrowser(
   }
 
   // Setup a watcher
+  const { createWatcher } = await import('./watcher');
   const watcher = createWatcher({
     polling: typeof userOptions.poll === 'number',
     interval: userOptions.poll,
-    // Ignore the output and cache paths to avoid infinite rebuild cycles
-    ignored: [normalizedOptions.outputPath, normalizedOptions.cacheOptions.basePath],
+    ignored: [
+      // Ignore the output and cache paths to avoid infinite rebuild cycles
+      normalizedOptions.outputPath,
+      normalizedOptions.cacheOptions.basePath,
+      // Ignore all node modules directories to avoid excessive file watchers.
+      // Package changes are handled below by watching manifest and lock files.
+      '**/node_modules/**',
+    ],
   });
 
   // Temporarily watch the entire project
   watcher.add(normalizedOptions.projectRoot);
 
-  // Watch workspace root node modules
-  // Includes Yarn PnP manifest files (https://yarnpkg.com/advanced/pnp-spec/)
-  watcher.add(path.join(normalizedOptions.workspaceRoot, 'node_modules'));
-  watcher.add(path.join(normalizedOptions.workspaceRoot, '.pnp.cjs'));
-  watcher.add(path.join(normalizedOptions.workspaceRoot, '.pnp.data.json'));
+  // Watch workspace for package manager changes
+  const packageWatchFiles = [
+    // manifest can affect module resolution
+    'package.json',
+    // npm lock file
+    'package-lock.json',
+    // pnpm lock file
+    'pnpm-lock.yaml',
+    // yarn lock file including Yarn PnP manifest files (https://yarnpkg.com/advanced/pnp-spec/)
+    'yarn.lock',
+    '.pnp.cjs',
+    '.pnp.data.json',
+  ];
+  watcher.add(packageWatchFiles.map((file) => path.join(normalizedOptions.workspaceRoot, file)));
 
   // Wait for changes and rebuild as needed
   try {
@@ -727,11 +743,12 @@ export async function* buildEsbuildBrowser(
 
 export default createBuilder(buildEsbuildBrowser);
 
-function logBuildStats(context: BuilderContext, metafile: Metafile) {
+function logBuildStats(context: BuilderContext, metafile: Metafile, initialFiles: FileInfo[]) {
+  const initial = new Map(initialFiles.map((info) => [info.file, info.name]));
   const stats: BundleStats[] = [];
   for (const [file, output] of Object.entries(metafile.outputs)) {
-    // Skip sourcemaps
-    if (file.endsWith('.map')) {
+    // Only display JavaScript and CSS files
+    if (!file.endsWith('.js') && !file.endsWith('.css')) {
       continue;
     }
     // Skip internal component resources
@@ -741,8 +758,8 @@ function logBuildStats(context: BuilderContext, metafile: Metafile) {
     }
 
     stats.push({
-      initial: !!output.entryPoint,
-      stats: [file, '', output.bytes, ''],
+      initial: initial.has(file),
+      stats: [file, initial.get(file) ?? '', output.bytes, ''],
     });
   }
 

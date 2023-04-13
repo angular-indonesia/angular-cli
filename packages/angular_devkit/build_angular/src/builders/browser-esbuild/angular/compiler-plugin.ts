@@ -20,19 +20,20 @@ import { platform } from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
-import { maxWorkers } from '../../utils/environment-options';
-import { JitCompilation } from './angular/jit-compilation';
-import { setupJitPluginCallbacks } from './angular/jit-plugin-callbacks';
-import { AngularCompilation, FileEmitter } from './angular-compilation';
-import { AngularHostOptions } from './angular-host';
-import { JavaScriptTransformer } from './javascript-transformer';
+import { maxWorkers } from '../../../utils/environment-options';
+import { JavaScriptTransformer } from '../javascript-transformer';
 import {
   logCumulativeDurations,
   profileAsync,
   profileSync,
   resetCumulativeDurations,
-} from './profiling';
-import { BundleStylesheetOptions, bundleComponentStylesheet } from './stylesheets';
+} from '../profiling';
+import { BundleStylesheetOptions, bundleComponentStylesheet } from '../stylesheets';
+import { AngularCompilation, FileEmitter } from './angular-compilation';
+import { AngularHostOptions } from './angular-host';
+import { AotCompilation } from './aot-compilation';
+import { JitCompilation } from './jit-compilation';
+import { setupJitPluginCallbacks } from './jit-plugin-callbacks';
 
 /**
  * Converts TypeScript Diagnostic related information into an esbuild compatible note object.
@@ -291,7 +292,7 @@ export function createCompilerPlugin(
         if (pluginOptions.jit) {
           compilation ??= new JitCompilation();
         } else {
-          compilation ??= new AngularCompilation();
+          compilation ??= new AotCompilation();
         }
 
         // Initialize the Angular compilation for the current build.
