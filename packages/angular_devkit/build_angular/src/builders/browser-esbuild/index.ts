@@ -28,9 +28,10 @@ import { logExperimentalWarnings } from './experimental-warnings';
 import { createGlobalScriptsBundleOptions } from './global-scripts';
 import { extractLicenses } from './license-extractor';
 import { LoadResultCache } from './load-result-cache';
-import { NormalizedBrowserOptions, normalizeOptions } from './options';
+import { BrowserEsbuildOptions, NormalizedBrowserOptions, normalizeOptions } from './options';
 import { shutdownSassWorkerPool } from './sass-plugin';
 import { Schema as BrowserBuilderOptions } from './schema';
+import { createSourcemapIngorelistPlugin } from './sourcemap-ignorelist-plugin';
 import { createStylesheetBundleOptions } from './stylesheets';
 import type { ChangedFiles } from './watcher';
 
@@ -267,7 +268,7 @@ async function execute(
   logBuildStats(context, metafile, initialFiles);
 
   const buildTime = Number(process.hrtime.bigint() - startTime) / 10 ** 9;
-  context.logger.info(`Complete. [${buildTime.toFixed(3)} seconds]`);
+  context.logger.info(`Application bundle generation complete. [${buildTime.toFixed(3)} seconds]`);
 
   return executionResult;
 }
@@ -331,6 +332,7 @@ function createCodeBundleOptions(
     sourcemapOptions,
     tsconfig,
     outputNames,
+    outExtension,
     fileReplacements,
     externalDependencies,
     preserveSymlinks,
@@ -359,6 +361,7 @@ function createCodeBundleOptions(
     minify: optimizationOptions.scripts,
     pure: ['forwardRef'],
     outdir: workspaceRoot,
+    outExtension: outExtension ? { '.js': `.${outExtension}` } : undefined,
     sourcemap: sourcemapOptions.scripts && (sourcemapOptions.hidden ? 'external' : true),
     splitting: true,
     tsconfig,
@@ -367,6 +370,7 @@ function createCodeBundleOptions(
     platform: 'browser',
     preserveSymlinks,
     plugins: [
+      createSourcemapIngorelistPlugin(),
       createCompilerPlugin(
         // JS/TS options
         {
@@ -393,6 +397,7 @@ function createCodeBundleOptions(
           externalDependencies,
           target,
           inlineStyleLanguage,
+          preserveSymlinks,
           browsers,
           tailwindConfiguration,
         },
@@ -584,8 +589,30 @@ async function withNoProgress<T>(test: string, action: () => T | Promise<T>): Pr
  * @param context The Architect builder context object
  * @returns An async iterable with the builder result output
  */
-export async function* buildEsbuildBrowser(
+export function buildEsbuildBrowser(
   userOptions: BrowserBuilderOptions,
+  context: BuilderContext,
+  infrastructureSettings?: {
+    write?: boolean;
+  },
+): AsyncIterable<
+  BuilderOutput & {
+    outputFiles?: OutputFile[];
+    assetFiles?: { source: string; destination: string }[];
+  }
+> {
+  return buildEsbuildBrowserInternal(userOptions, context, infrastructureSettings);
+}
+
+/**
+ * Internal version of the main execution function for the esbuild-based application builder.
+ * Exposes some additional "private" options in addition to those exposed by the schema.
+ * @param userOptions The browser-esbuild builder options to use when setting up the application build
+ * @param context The Architect builder context object
+ * @returns An async iterable with the builder result output
+ */
+export async function* buildEsbuildBrowserInternal(
+  userOptions: BrowserEsbuildOptions,
   context: BuilderContext,
   infrastructureSettings?: {
     write?: boolean;

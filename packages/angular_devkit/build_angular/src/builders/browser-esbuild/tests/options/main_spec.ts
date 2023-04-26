@@ -59,5 +59,32 @@ describeBuilder(buildEsbuildBrowser, BROWSER_BUILDER_INFO, (harness) => {
       harness.expectFile('dist/main.js').toNotExist();
       harness.expectFile('dist/index.html').toNotExist();
     });
+
+    it('throws an error when given an empty string', async () => {
+      harness.useTarget('build', {
+        ...BASE_OPTIONS,
+        main: '',
+      });
+
+      const { result, error } = await harness.executeOnce();
+      expect(result).toBeUndefined();
+
+      expect(error?.message).toContain('cannot be an empty string');
+    });
+
+    it('resolves an absolute path as relative inside the workspace root', async () => {
+      await harness.writeFile('file.mjs', `console.log('Hello!');`);
+
+      harness.useTarget('build', {
+        ...BASE_OPTIONS,
+        main: '/file.mjs',
+      });
+
+      const { result } = await harness.executeOnce();
+      expect(result?.success).toBeTrue();
+
+      // Always uses the name `main.js` for the `main` option.
+      harness.expectFile('dist/main.js').toExist();
+    });
   });
 });
