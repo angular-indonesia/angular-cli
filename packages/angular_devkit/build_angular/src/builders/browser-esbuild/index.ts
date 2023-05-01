@@ -22,9 +22,9 @@ import { Spinner } from '../../utils/spinner';
 import { getSupportedBrowsers } from '../../utils/supported-browsers';
 import { BundleStats, generateBuildStatsTable } from '../../webpack/utils/stats';
 import { SourceFileCache, createCompilerPlugin } from './angular/compiler-plugin';
+import { logBuilderStatusWarnings } from './builder-status-warnings';
 import { checkCommonJSModules } from './commonjs-checker';
 import { BundlerContext, logMessages } from './esbuild';
-import { logExperimentalWarnings } from './experimental-warnings';
 import { createGlobalScriptsBundleOptions } from './global-scripts';
 import { extractLicenses } from './license-extractor';
 import { LoadResultCache } from './load-result-cache';
@@ -327,7 +327,6 @@ function createCodeBundleOptions(
   const {
     workspaceRoot,
     entryPoints,
-    polyfills,
     optimizationOptions,
     sourcemapOptions,
     tsconfig,
@@ -411,6 +410,11 @@ function createCodeBundleOptions(
       'ngJitMode': jit ? 'true' : 'false',
     },
   };
+
+  const polyfills = options.polyfills ? [...options.polyfills] : [];
+  if (jit) {
+    polyfills.push('@angular/compiler');
+  }
 
   if (polyfills?.length) {
     const namespace = 'angular:polyfills';
@@ -623,8 +627,8 @@ export async function* buildEsbuildBrowserInternal(
     assetFiles?: { source: string; destination: string }[];
   }
 > {
-  // Inform user of experimental status of builder and options
-  logExperimentalWarnings(userOptions, context);
+  // Inform user of status of builder and options
+  logBuilderStatusWarnings(userOptions, context);
 
   // Determine project name from builder context target
   const projectName = context.target?.project;
