@@ -1,3 +1,31 @@
+<a name="16.1.0-next.2"></a>
+
+# 16.1.0-next.2 (2023-06-01)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                         |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------- |
+| [9aa9b5264](https://github.com/angular/angular-cli/commit/9aa9b5264eee1b1dda7abd334b560d4b446c4970) | feat | support autoprefixer/tailwind CSS with Less/Sass in esbuild builder |
+| [3d1c09b23](https://github.com/angular/angular-cli/commit/3d1c09b235bf1db0d031c36fdc68ab99359b34b1) | feat | support dev-server package prebundling with esbuild builder         |
+| [fc60d2227](https://github.com/angular/angular-cli/commit/fc60d2227672f8276255f95be135923c4d82b75c) | fix  | correctly set overridden compiler option                            |
+| [c462d9cb9](https://github.com/angular/angular-cli/commit/c462d9cb90377342980384c6bccb3ddfef533282) | fix  | preemptively remove AOT metadata in esbuild builder                 |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="16.0.4"></a>
+
+# 16.0.4 (2023-06-01)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                         |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------- |
+| [5bff97d5b](https://github.com/angular/angular-cli/commit/5bff97d5b965373cd7e4dc0b731c24d80b512faa) | fix  | correctly set overridden compiler option            |
+| [cd0247514](https://github.com/angular/angular-cli/commit/cd0247514db295661d319bec33ad7167229d99f9) | fix  | preemptively remove AOT metadata in esbuild builder |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="16.1.0-next.1"></a>
 
 # 16.1.0-next.1 (2023-05-25)
