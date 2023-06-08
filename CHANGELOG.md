@@ -1,3 +1,35 @@
+<a name="16.1.0-rc.0"></a>
+
+# 16.1.0-rc.0 (2023-06-07)
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                                    |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------- |
+| [b14b95990](https://github.com/angular/angular-cli/commit/b14b959901d5a670da0df45e082b8fd4c3392d14) | feat | add bootstrap-agnostic utilities for writing ng-add schematics |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                   |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------- |
+| [772fe84ed](https://github.com/angular/angular-cli/commit/772fe84ed399ccc085893e645163b4b12c461d0e) | fix  | ignore .git folder in browser-esbuild watcher                 |
+| [7155cbe5b](https://github.com/angular/angular-cli/commit/7155cbe5b2991f986c0683d16a6fc4d9b411e47b) | fix  | ignore folders starting with a dot in browser-esbuild watcher |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="16.0.5"></a>
+
+# 16.0.5 (2023-06-07)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                   |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------- |
+| [9817b984b](https://github.com/angular/angular-cli/commit/9817b984b15e352caedac6e347cc662117b9e0f8) | fix  | ignore .git folder in browser-esbuild watcher                 |
+| [ce95d2545](https://github.com/angular/angular-cli/commit/ce95d254510ffa93a9bd4230f6447530d511ef5f) | fix  | ignore folders starting with a dot in browser-esbuild watcher |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="16.1.0-next.2"></a>
 
 # 16.1.0-next.2 (2023-06-01)
