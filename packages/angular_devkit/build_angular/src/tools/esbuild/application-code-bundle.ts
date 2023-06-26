@@ -7,15 +7,16 @@
  */
 
 import type { BuildOptions } from 'esbuild';
-import { NormalizedBrowserOptions } from '../../builders/browser-esbuild/options';
+import type { NormalizedApplicationBuildOptions } from '../../builders/application/options';
 import { SourceFileCache, createCompilerPlugin } from '../../tools/esbuild/angular/compiler-plugin';
 import { createExternalPackagesPlugin } from '../../tools/esbuild/external-packages-plugin';
 import { createSourcemapIngorelistPlugin } from '../../tools/esbuild/sourcemap-ignorelist-plugin';
 import { getFeatureSupport } from '../../tools/esbuild/utils';
 import { createVirtualModulePlugin } from '../../tools/esbuild/virtual-module-plugin';
+import { allowMangle } from '../../utils/environment-options';
 
 export function createCodeBundleOptions(
-  options: NormalizedBrowserOptions,
+  options: NormalizedApplicationBuildOptions,
   target: string[],
   browsers: string[],
   sourceFileCache?: SourceFileCache,
@@ -57,7 +58,9 @@ export function createCodeBundleOptions(
     metafile: true,
     legalComments: options.extractLicenses ? 'none' : 'eof',
     logLevel: options.verbose ? 'debug' : 'silent',
-    minify: optimizationOptions.scripts,
+    minifyIdentifiers: optimizationOptions.scripts && allowMangle,
+    minifySyntax: optimizationOptions.scripts,
+    minifyWhitespace: optimizationOptions.scripts,
     pure: ['forwardRef'],
     outdir: workspaceRoot,
     outExtension: outExtension ? { '.js': `.${outExtension}` } : undefined,

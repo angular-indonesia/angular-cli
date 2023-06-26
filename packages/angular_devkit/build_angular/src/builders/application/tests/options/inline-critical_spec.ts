@@ -6,10 +6,10 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import { buildEsbuildBrowser } from '../../index';
-import { BASE_OPTIONS, BROWSER_BUILDER_INFO, describeBuilder } from '../setup';
+import { buildApplication } from '../../index';
+import { APPLICATION_BUILDER_INFO, BASE_OPTIONS, describeBuilder } from '../setup';
 
-describeBuilder(buildEsbuildBrowser, BROWSER_BUILDER_INFO, (harness) => {
+describeBuilder(buildApplication, APPLICATION_BUILDER_INFO, (harness) => {
   describe('Option: "inlineCritical"', () => {
     beforeEach(async () => {
       await harness.writeFile('src/styles.css', 'body { color: #000 }');
@@ -35,7 +35,7 @@ describeBuilder(buildEsbuildBrowser, BROWSER_BUILDER_INFO, (harness) => {
       harness
         .expectFile('dist/index.html')
         .content.toContain(
-          `<link rel="stylesheet" href="styles.css" media="print" onload="this.media=&apos;all&apos;">`,
+          `<link rel="stylesheet" href="styles.css" media="print" onload="this.media='all'">`,
         );
       harness.expectFile('dist/index.html').content.toContain(`body{color:#000}`);
     });
@@ -53,7 +53,7 @@ describeBuilder(buildEsbuildBrowser, BROWSER_BUILDER_INFO, (harness) => {
       harness
         .expectFile('dist/index.html')
         .content.toContain(
-          `<link rel="stylesheet" href="styles.css" media="print" onload="this.media=&apos;all&apos;">`,
+          `<link rel="stylesheet" href="styles.css" media="print" onload="this.media='all'">`,
         );
       harness.expectFile('dist/index.html').content.toContain(`body{color:#000}`);
     });
@@ -71,7 +71,7 @@ describeBuilder(buildEsbuildBrowser, BROWSER_BUILDER_INFO, (harness) => {
       harness
         .expectFile('dist/index.html')
         .content.toContain(
-          `<link rel="stylesheet" href="styles.css" media="print" onload="this.media=&apos;all&apos;">`,
+          `<link rel="stylesheet" href="styles.css" media="print" onload="this.media='all'">`,
         );
       harness.expectFile('dist/index.html').content.toContain(`body{color:#000}`);
     });
@@ -130,7 +130,7 @@ describeBuilder(buildEsbuildBrowser, BROWSER_BUILDER_INFO, (harness) => {
       harness
         .expectFile('dist/index.html')
         .content.toContain(
-          `<link rel="stylesheet" href="styles.css" media="print" onload="this.media=&apos;all&apos;">`,
+          `<link rel="stylesheet" href="styles.css" media="print" onload="this.media='all'">`,
         );
       harness.expectFile('dist/index.html').content.toContain(`body{color:#000}`);
     });
