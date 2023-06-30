@@ -1,3 +1,72 @@
+<a name="16.1.3"></a>
+
+# 16.1.3 (2023-06-29)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                              |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------- |
+| [b56ab0798](https://github.com/angular/angular-cli/commit/b56ab07980c5d990606ddb1e298fc1c4ecf8a2a8) | fix  | use absolute watch paths for postcss dependency messages |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="15.2.9"></a>
+
+# 15.2.9 (2023-06-28)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------ |
+| [f36e38a91](https://github.com/angular/angular-cli/commit/f36e38a913b454ec340d6bf2311391c5df1cee24) | fix  | update direct semver dependencies to 7.5.3 |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="16.2.0-next.0"></a>
+
+# 16.2.0-next.0 (2023-06-28)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                        |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------ |
+| [c05c83be7](https://github.com/angular/angular-cli/commit/c05c83be7c6c8bcdad4be8686a6e0701a55304cc) | feat | add initial application builder implementation                     |
+| [2a3fc6846](https://github.com/angular/angular-cli/commit/2a3fc68460152a48758b9353bff48193641861c5) | feat | add preload hints based on transitive initial files                |
+| [f42f10135](https://github.com/angular/angular-cli/commit/f42f10135c1e2184a9080b726dc5e41669937b13) | fix  | ensure preload hints for external stylesheets are marked as styles |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="16.1.2"></a>
+
+# 16.1.2 (2023-06-28)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                  |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------- |
+| [3475e0281](https://github.com/angular/angular-cli/commit/3475e0281da3298f288a5f8836155c0b8c971372) | fix  | update direct `semver` dependencies to 7.5.3 |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                    |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------- |
+| [8108b8c2d](https://github.com/angular/angular-cli/commit/8108b8c2da3ebfdb74f0f9d3554df01f484670bd) | fix  | allow linker JIT support with prebundling with esbuild builder |
+| [502365037](https://github.com/angular/angular-cli/commit/502365037bf7dbacd0e28d29a074a246971848ea) | fix  | use all style language watch files in esbuild builder          |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="14.2.12"></a>
+
+# 14.2.12 (2023-06-28)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------ |
+| [bd396b656](https://github.com/angular/angular-cli/commit/bd396b65623fb0b8e826be13f88709e87b54336e) | fix  | update direct semver dependencies to 7.5.3 |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="16.1.1"></a>
 
 # 16.1.1 (2023-06-22)
