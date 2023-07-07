@@ -8,7 +8,10 @@
 
 import { BuilderContext } from '@angular-devkit/architect';
 import { SourceFileCache } from '../../tools/esbuild/angular/compiler-plugin';
-import { createCodeBundleOptions } from '../../tools/esbuild/application-code-bundle';
+import {
+  createBrowserCodeBundleOptions,
+  createServerCodeBundleOptions,
+} from '../../tools/esbuild/application-code-bundle';
 import { BundlerContext } from '../../tools/esbuild/bundler-context';
 import { ExecutionResult, RebuildState } from '../../tools/esbuild/bundler-execution-result';
 import { checkCommonJSModules } from '../../tools/esbuild/commonjs-checker';
@@ -39,6 +42,7 @@ export async function executeBuild(
     workspaceRoot,
     serviceWorker,
     optimizationOptions,
+    serverEntryPoint,
     assets,
     indexHtmlOptions,
     cacheOptions,
@@ -55,12 +59,12 @@ export async function executeBuild(
   if (bundlerContexts === undefined) {
     bundlerContexts = [];
 
-    // Application code
+    // Browser application code
     bundlerContexts.push(
       new BundlerContext(
         workspaceRoot,
         !!options.watch,
-        createCodeBundleOptions(options, target, browsers, codeBundleCache),
+        createBrowserCodeBundleOptions(options, target, codeBundleCache),
       ),
     );
 
@@ -70,7 +74,6 @@ export async function executeBuild(
         const bundleOptions = createGlobalStylesBundleOptions(
           options,
           target,
-          browsers,
           initial,
           codeBundleCache?.loadResultCache,
         );
@@ -92,6 +95,24 @@ export async function executeBuild(
           );
         }
       }
+    }
+
+    // Server application code
+    if (serverEntryPoint) {
+      bundlerContexts.push(
+        new BundlerContext(
+          workspaceRoot,
+          !!options.watch,
+          createServerCodeBundleOptions(
+            options,
+            // NOTE: earlier versions of Node.js are not supported due to unsafe promise patching.
+            // See: https://github.com/angular/angular/pull/50552#issue-1737967592
+            [...target, 'node18.13'],
+            codeBundleCache,
+          ),
+          () => false,
+        ),
+      );
     }
   }
 

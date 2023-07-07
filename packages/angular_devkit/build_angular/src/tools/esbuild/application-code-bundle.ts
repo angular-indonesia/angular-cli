@@ -7,111 +7,52 @@
  */
 
 import type { BuildOptions } from 'esbuild';
+import assert from 'node:assert';
+import path from 'node:path';
 import type { NormalizedApplicationBuildOptions } from '../../builders/application/options';
-import { SourceFileCache, createCompilerPlugin } from '../../tools/esbuild/angular/compiler-plugin';
-import { createExternalPackagesPlugin } from '../../tools/esbuild/external-packages-plugin';
-import { createSourcemapIngorelistPlugin } from '../../tools/esbuild/sourcemap-ignorelist-plugin';
-import { getFeatureSupport } from '../../tools/esbuild/utils';
-import { createVirtualModulePlugin } from '../../tools/esbuild/virtual-module-plugin';
 import { allowMangle } from '../../utils/environment-options';
+import { SourceFileCache, createCompilerPlugin } from './angular/compiler-plugin';
+import { createCompilerPluginOptions } from './compiler-plugin-options';
+import { createExternalPackagesPlugin } from './external-packages-plugin';
+import { createRxjsEsmResolutionPlugin } from './rxjs-esm-resolution-plugin';
+import { createSourcemapIngorelistPlugin } from './sourcemap-ignorelist-plugin';
+import { getFeatureSupport } from './utils';
+import { createVirtualModulePlugin } from './virtual-module-plugin';
 
-export function createCodeBundleOptions(
+export function createBrowserCodeBundleOptions(
   options: NormalizedApplicationBuildOptions,
   target: string[],
-  browsers: string[],
   sourceFileCache?: SourceFileCache,
 ): BuildOptions {
-  const {
-    workspaceRoot,
-    entryPoints,
-    optimizationOptions,
-    sourcemapOptions,
-    tsconfig,
-    outputNames,
-    outExtension,
-    fileReplacements,
-    externalDependencies,
-    preserveSymlinks,
-    stylePreprocessorOptions,
-    advancedOptimizations,
-    inlineStyleLanguage,
-    jit,
-    tailwindConfiguration,
-  } = options;
+  const { workspaceRoot, entryPoints, outputNames, jit } = options;
+
+  const { pluginOptions, styleOptions } = createCompilerPluginOptions(
+    options,
+    target,
+    sourceFileCache,
+  );
 
   const buildOptions: BuildOptions = {
-    absWorkingDir: workspaceRoot,
-    bundle: true,
-    format: 'esm',
-    entryPoints,
-    entryNames: outputNames.bundles,
-    assetNames: outputNames.media,
-    target,
-    supported: getFeatureSupport(target),
+    ...getEsBuildCommonOptions(options),
+    platform: 'browser',
     // Note: `es2015` is needed for RxJS v6. If not specified, `module` would
     // match and the ES5 distribution would be bundled and ends up breaking at
     // runtime with the RxJS testing library.
     // More details: https://github.com/angular/angular-cli/issues/25405.
     mainFields: ['es2020', 'es2015', 'browser', 'module', 'main'],
-    conditions: ['es2020', 'es2015', 'module'],
-    resolveExtensions: ['.ts', '.tsx', '.mjs', '.js'],
-    metafile: true,
-    legalComments: options.extractLicenses ? 'none' : 'eof',
-    logLevel: options.verbose ? 'debug' : 'silent',
-    minifyIdentifiers: optimizationOptions.scripts && allowMangle,
-    minifySyntax: optimizationOptions.scripts,
-    minifyWhitespace: optimizationOptions.scripts,
-    pure: ['forwardRef'],
-    outdir: workspaceRoot,
-    outExtension: outExtension ? { '.js': `.${outExtension}` } : undefined,
-    sourcemap: sourcemapOptions.scripts && (sourcemapOptions.hidden ? 'external' : true),
-    splitting: true,
-    tsconfig,
-    external: externalDependencies,
-    write: false,
-    platform: 'browser',
-    preserveSymlinks,
+    entryNames: outputNames.bundles,
+    entryPoints,
+    target,
+    supported: getFeatureSupport(target),
     plugins: [
       createSourcemapIngorelistPlugin(),
       createCompilerPlugin(
         // JS/TS options
-        {
-          sourcemap: !!sourcemapOptions.scripts,
-          thirdPartySourcemaps: sourcemapOptions.vendor,
-          tsconfig,
-          jit,
-          advancedOptimizations,
-          fileReplacements,
-          sourceFileCache,
-          loadResultCache: sourceFileCache?.loadResultCache,
-        },
+        pluginOptions,
         // Component stylesheet options
-        {
-          workspaceRoot,
-          optimization: !!optimizationOptions.styles.minify,
-          sourcemap:
-            // Hidden component stylesheet sourcemaps are inaccessible which is effectively
-            // the same as being disabled. Disabling has the advantage of avoiding the overhead
-            // of sourcemap processing.
-            !!sourcemapOptions.styles && (sourcemapOptions.hidden ? false : 'inline'),
-          outputNames,
-          includePaths: stylePreprocessorOptions?.includePaths,
-          externalDependencies,
-          target,
-          inlineStyleLanguage,
-          preserveSymlinks,
-          browsers,
-          tailwindConfiguration,
-        },
+        styleOptions,
       ),
     ],
-    define: {
-      // Only set to false when script optimizations are enabled. It should not be set to true because
-      // Angular turns `ngDevMode` into an object for development debugging purposes when not defined
-      // which a constant true value would break.
-      ...(optimizationOptions.scripts ? { 'ngDevMode': 'false' } : undefined),
-      'ngJitMode': jit ? 'true' : 'false',
-    },
   };
 
   if (options.externalPackages) {
@@ -128,7 +69,7 @@ export function createCodeBundleOptions(
     const namespace = 'angular:polyfills';
     buildOptions.entryPoints = {
       ...buildOptions.entryPoints,
-      ['polyfills']: namespace,
+      'polyfills': namespace,
     };
 
     buildOptions.plugins?.unshift(
@@ -144,4 +85,138 @@ export function createCodeBundleOptions(
   }
 
   return buildOptions;
+}
+
+/**
+ * Create an esbuild 'build' options object for the server bundle.
+ * @param options The builder's user-provider normalized options.
+ * @returns An esbuild BuildOptions object.
+ */
+export function createServerCodeBundleOptions(
+  options: NormalizedApplicationBuildOptions,
+  target: string[],
+  sourceFileCache: SourceFileCache,
+): BuildOptions {
+  const { jit, serverEntryPoint, workspaceRoot } = options;
+
+  assert(
+    serverEntryPoint,
+    'createServerCodeBundleOptions should not be called without a defined serverEntryPoint.',
+  );
+
+  const { pluginOptions, styleOptions } = createCompilerPluginOptions(
+    options,
+    target,
+    sourceFileCache,
+  );
+
+  const namespace = 'angular:server-entry';
+
+  const buildOptions: BuildOptions = {
+    ...getEsBuildCommonOptions(options),
+    platform: 'node',
+    outExtension: { '.js': '.mjs' },
+    // Note: `es2015` is needed for RxJS v6. If not specified, `module` would
+    // match and the ES5 distribution would be bundled and ends up breaking at
+    // runtime with the RxJS testing library.
+    // More details: https://github.com/angular/angular-cli/issues/25405.
+    mainFields: ['es2020', 'es2015', 'module', 'main'],
+    entryNames: '[name]',
+    target,
+    banner: {
+      // Note: Needed as esbuild does not provide require shims / proxy from ESModules.
+      // See: https://github.com/evanw/esbuild/issues/1921.
+      js: [
+        `import { createRequire } from 'node:module';`,
+        `globalThis['require'] ??= createRequire(import.meta.url);`,
+      ].join('\n'),
+    },
+    entryPoints: {
+      'server': namespace,
+    },
+    supported: getFeatureSupport(target),
+    plugins: [
+      createSourcemapIngorelistPlugin(),
+      createCompilerPlugin(
+        // JS/TS options
+        { ...pluginOptions, noopTypeScriptCompilation: true },
+        // Component stylesheet options
+        styleOptions,
+      ),
+      createVirtualModulePlugin({
+        namespace,
+        loadContent: () => {
+          const importAndExportDec: string[] = [
+            `import '@angular/platform-server/init';`,
+            `import './${path.relative(workspaceRoot, serverEntryPoint).replace(/\\/g, '/')}';`,
+            `export { renderApplication, renderModule, ɵSERVER_CONTEXT } from '@angular/platform-server';`,
+          ];
+
+          if (jit) {
+            importAndExportDec.unshift(`import '@angular/compiler';`);
+          }
+
+          return {
+            contents: importAndExportDec.join('\n'),
+            loader: 'js',
+            resolveDir: workspaceRoot,
+          };
+        },
+      }),
+    ],
+  };
+
+  buildOptions.plugins ??= [];
+  if (options.externalPackages) {
+    buildOptions.plugins.push(createExternalPackagesPlugin());
+  } else {
+    buildOptions.plugins.push(createRxjsEsmResolutionPlugin());
+  }
+
+  return buildOptions;
+}
+
+function getEsBuildCommonOptions(options: NormalizedApplicationBuildOptions): BuildOptions {
+  const {
+    workspaceRoot,
+    outExtension,
+    optimizationOptions,
+    sourcemapOptions,
+    tsconfig,
+    externalDependencies,
+    outputNames,
+    preserveSymlinks,
+    jit,
+  } = options;
+
+  return {
+    absWorkingDir: workspaceRoot,
+    bundle: true,
+    format: 'esm',
+    assetNames: outputNames.media,
+    conditions: ['es2020', 'es2015', 'module'],
+    resolveExtensions: ['.ts', '.tsx', '.mjs', '.js'],
+    metafile: true,
+    legalComments: options.extractLicenses ? 'none' : 'eof',
+    logLevel: options.verbose ? 'debug' : 'silent',
+    minifyIdentifiers: optimizationOptions.scripts && allowMangle,
+    minifySyntax: optimizationOptions.scripts,
+    minifyWhitespace: optimizationOptions.scripts,
+    pure: ['forwardRef'],
+    outdir: workspaceRoot,
+    outExtension: outExtension ? { '.js': `.${outExtension}` } : undefined,
+    sourcemap: sourcemapOptions.scripts && (sourcemapOptions.hidden ? 'external' : true),
+    splitting: true,
+    tsconfig,
+    external: externalDependencies,
+    write: false,
+    preserveSymlinks,
+    define: {
+      // Only set to false when script optimizations are enabled. It should not be set to true because
+      // Angular turns `ngDevMode` into an object for development debugging purposes when not defined
+      // which a constant true value would break.
+      ...(optimizationOptions.scripts ? { 'ngDevMode': 'false' } : undefined),
+      'ngJitMode': jit ? 'true' : 'false',
+    },
+  };
 }

@@ -27,11 +27,10 @@ export interface BundleStylesheetOptions {
   optimization: boolean;
   preserveSymlinks?: boolean;
   sourcemap: boolean | 'external' | 'inline';
-  outputNames?: { bundles?: string; media?: string };
+  outputNames: { bundles: string; media: string };
   includePaths?: string[];
   externalDependencies?: string[];
   target: string[];
-  browsers: string[];
   tailwindConfiguration?: { file: string; package: string };
 }
 
@@ -50,7 +49,6 @@ export function createStylesheetBundleOptions(
       sourcemap: !!options.sourcemap,
       includePaths,
       inlineComponentData,
-      browsers: options.browsers,
       tailwindConfiguration: options.tailwindConfiguration,
     },
     cache,
@@ -59,8 +57,8 @@ export function createStylesheetBundleOptions(
   return {
     absWorkingDir: options.workspaceRoot,
     bundle: true,
-    entryNames: options.outputNames?.bundles,
-    assetNames: options.outputNames?.media,
+    entryNames: options.outputNames.bundles,
+    assetNames: options.outputNames.media,
     logLevel: 'silent',
     minify: options.optimization,
     metafile: true,
