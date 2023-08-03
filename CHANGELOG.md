@@ -1,3 +1,27 @@
+<a name="16.2.0-rc.0"></a>
+
+# 16.2.0-rc.0 (2023-08-02)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                            |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------- |
+| [6539bb520](https://github.com/angular/angular-cli/commit/6539bb5200c924edbc62cc7be70072ecda84da1a) | fix  | hot update filename suffix with `.mjs` |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="16.1.7"></a>
+
+# 16.1.7 (2023-08-02)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                            |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------- |
+| [1dab4ed87](https://github.com/angular/angular-cli/commit/1dab4ed8738b42d6b93298889caf1546b011706f) | fix  | hot update filename suffix with `.mjs` |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="16.2.0-next.4"></a>
 
 # 16.2.0-next.4 (2023-07-26)
