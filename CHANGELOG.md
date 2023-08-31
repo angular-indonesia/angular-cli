@@ -1,3 +1,51 @@
+<a name="17.0.0-next.0"></a>
+
+# 17.0.0-next.0 (2023-08-30)
+
+## Breaking Changes
+
+### @schematics/angular
+
+- App-shell and Universal schematics deprecated unused `appId` option has been removed.
+
+### @angular-devkit/build-angular
+
+- Node.js v16 support has been removed
+
+  Node.js v16 is planned to be End-of-Life on 2023-09-11. Angular will stop supporting Node.js v16 in Angular v17.
+  For Node.js release schedule details, please see: https://github.com/nodejs/release#release-schedule
+
+### @schematics/angular
+
+| Commit                                                                                              | Type     | Description                    |
+| --------------------------------------------------------------------------------------------------- | -------- | ------------------------------ |
+| [b15e82758](https://github.com/angular/angular-cli/commit/b15e827580d6d3159c49521eb9b5d2b6d8ca2502) | refactor | remove deprecated appId option |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                             |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------- |
+| [3c0719bde](https://github.com/angular/angular-cli/commit/3c0719bde244c45d71881d35899e5ee6206c09ee) | feat | initial i18n extraction support for application builder |
+| [5bf7022c4](https://github.com/angular/angular-cli/commit/5bf7022c4749f1298de61ef75e36769bbb8aba12) | fix  | remove support for Node.js v16                          |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="16.2.1"></a>
+
+# 16.2.1 (2023-08-30)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                           |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------------- |
+| [221ab2483](https://github.com/angular/angular-cli/commit/221ab2483a5504b0ad864a18dc5a4dbeb8c0748e) | fix  | display warning when using `resourcesOutputPath` with esbuild builder |
+| [fe752ad87](https://github.com/angular/angular-cli/commit/fe752ad87b8588e2a1ee1611953b36d5c004e673) | fix  | encode Sass package resolve directories in importer URLs              |
+| [82b0f94fd](https://github.com/angular/angular-cli/commit/82b0f94fdacc5f4665d00eeb1c93fcfc104b0cc8) | fix  | handle HMR updates of global CSS when using Vite                      |
+| [6a48a11b8](https://github.com/angular/angular-cli/commit/6a48a11b8c218796e4b778bd00d453fc0ac0c48e) | fix  | update vite to be able to serve app-shell and SSG pages               |
+| [fdb16f7cd](https://github.com/angular/angular-cli/commit/fdb16f7cd4327980436ddb1ce190c67c86588d2d) | fix  | use correct type for `extraEntryPoints`                               |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="16.2.0"></a>
 
 # 16.2.0 (2023-08-09)
