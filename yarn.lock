@@ -121,10 +121,10 @@
   dependencies:
     tslib "^2.3.0"
 
-"@angular/bazel@https://github.com/angular/bazel-builds.git#82c9c2df8458e3b8e7a813adf1fcd893fea367f3":
-  version "17.0.0-next.2+sha-eab9216"
-  uid "82c9c2df8458e3b8e7a813adf1fcd893fea367f3"
-  resolved "https://github.com/angular/bazel-builds.git#82c9c2df8458e3b8e7a813adf1fcd893fea367f3"
+"@angular/bazel@https://github.com/angular/bazel-builds.git#91091a7265b992f7198771a990dcd02f6d76d349":
+  version "17.0.0-next.2+sha-970d68f"
+  uid "91091a7265b992f7198771a990dcd02f6d76d349"
+  resolved "https://github.com/angular/bazel-builds.git#91091a7265b992f7198771a990dcd02f6d76d349"
   dependencies:
     "@microsoft/api-extractor" "^7.24.2"
     magic-string "^0.30.0"
@@ -138,10 +138,10 @@
     "@angular/core" "^13.0.0 || ^14.0.0-0"
     reflect-metadata "^0.1.13"
 
-"@angular/build-tooling@https://github.com/angular/dev-infra-private-build-tooling-builds.git#2239c41551d95e89b2c666e828ef620c62997ef8":
-  version "0.0.0-ad327ca5766ef5dbf071a37056cee034bee258cd"
-  uid "2239c41551d95e89b2c666e828ef620c62997ef8"
-  resolved "https://github.com/angular/dev-infra-private-build-tooling-builds.git#2239c41551d95e89b2c666e828ef620c62997ef8"
+"@angular/build-tooling@https://github.com/angular/dev-infra-private-build-tooling-builds.git#148a2664e8323239f6535aa3d4cf5ef765891a7d":
+  version "0.0.0-9a54ceecfcd399051e18cd2dbdd6c9fc893f5dc4"
+  uid "148a2664e8323239f6535aa3d4cf5ef765891a7d"
+  resolved "https://github.com/angular/dev-infra-private-build-tooling-builds.git#148a2664e8323239f6535aa3d4cf5ef765891a7d"
   dependencies:
     "@angular-devkit/build-angular" "16.2.0-rc.1"
     "@angular/benchpress" "0.3.0"
@@ -168,7 +168,7 @@
     clang-format "1.8.0"
     prettier "3.0.3"
     protractor "^7.0.0"
-    selenium-webdriver "4.11.1"
+    selenium-webdriver "4.12.0"
     send "^0.18.0"
     source-map "^0.7.4"
     tmp "^0.2.1"
@@ -299,10 +299,10 @@
     "@material/typography" "15.0.0-canary.bc9ae6c9c.0"
     tslib "^2.3.0"
 
-"@angular/ng-dev@https://github.com/angular/dev-infra-private-ng-dev-builds.git#1a5c118150d1729a4a285e70ae9e5143b6eb91c7":
-  version "0.0.0-ad327ca5766ef5dbf071a37056cee034bee258cd"
-  uid "1a5c118150d1729a4a285e70ae9e5143b6eb91c7"
-  resolved "https://github.com/angular/dev-infra-private-ng-dev-builds.git#1a5c118150d1729a4a285e70ae9e5143b6eb91c7"
+"@angular/ng-dev@https://github.com/angular/dev-infra-private-ng-dev-builds.git#7a8480bb03fff8c139db4586286c439cd7366493":
+  version "0.0.0-9a54ceecfcd399051e18cd2dbdd6c9fc893f5dc4"
+  uid "7a8480bb03fff8c139db4586286c439cd7366493"
+  resolved "https://github.com/angular/dev-infra-private-ng-dev-builds.git#7a8480bb03fff8c139db4586286c439cd7366493"
   dependencies:
     "@yarnpkg/lockfile" "^1.1.0"
     typescript "~4.9.0"
@@ -9692,7 +9692,17 @@ npm-normalize-package-bin@^3.0.0:
   resolved "https://registry.yarnpkg.com/npm-normalize-package-bin/-/npm-normalize-package-bin-3.0.1.tgz#25447e32a9a7de1f51362c61a559233b89947832"
   integrity sha512-dMxCf+zZ+3zeQZXKxmyuCKlIDPGuv8EF940xbkC4kQVDTtqoh6rJFO+JTKSA6/Rwi0getWmtuy4Itup0AMcaDQ==
 
-npm-package-arg@11.0.0, npm-package-arg@^11.0.0:
+npm-package-arg@11.0.1:
+  version "11.0.1"
+  resolved "https://registry.yarnpkg.com/npm-package-arg/-/npm-package-arg-11.0.1.tgz#f208b0022c29240a1c532a449bdde3f0a4708ebc"
+  integrity sha512-M7s1BD4NxdAvBKUPqqRW957Xwcl/4Zvo8Aj+ANrzvIPzGJZElrH7Z//rSaec2ORcND6FHHLnZeY8qgTpXDMFQQ==
+  dependencies:
+    hosted-git-info "^7.0.0"
+    proc-log "^3.0.0"
+    semver "^7.3.5"
+    validate-npm-package-name "^5.0.0"
+
+npm-package-arg@^11.0.0:
   version "11.0.0"
   resolved "https://registry.yarnpkg.com/npm-package-arg/-/npm-package-arg-11.0.0.tgz#0f09cba4a2c7e1bcba9c6520cd1775fa18eda82d"
   integrity sha512-D8sItaQ8n6VlBUFed3DLz2sCpkabRAjaiLkTamDppvh8lmmAPirzNfBuhJd/2rlmoxZ2S9mOHmIEvzV2z2jOeA==
@@ -11190,10 +11200,17 @@ rollup-plugin-sourcemaps@^0.6.0:
     "@rollup/pluginutils" "^3.0.9"
     source-map-resolve "^0.6.0"
 
-rollup@^3.0.0, rollup@^3.25.2, rollup@^3.27.1, rollup@~3.28.0:
+rollup@^3.0.0, rollup@^3.25.2, rollup@^3.27.1:
   version "3.28.1"
   resolved "https://registry.yarnpkg.com/rollup/-/rollup-3.28.1.tgz#fb44aa6d5e65c7e13fd5bcfff266d0c4ea9ba433"
   integrity sha512-R9OMQmIHJm9znrU3m3cpE8uhN0fGdXiawME7aZIpQqvpS/85+Vt1Hq1/yVIcYfOmaQiHjvXkQAoJukvLpau6Yw==
+  optionalDependencies:
+    fsevents "~2.3.2"
+
+rollup@~3.29.0:
+  version "3.29.0"
+  resolved "https://registry.yarnpkg.com/rollup/-/rollup-3.29.0.tgz#1b40e64818afc979c7e5bef93de675829288986b"
+  integrity sha512-nszM8DINnx1vSS+TpbWKMkxem0CDWk3cSit/WWCBVs9/JZ1I/XLwOsiUglYuYReaeWWSsW9kge5zE5NZtf/a4w==
   optionalDependencies:
     fsevents "~2.3.2"
 
@@ -11348,10 +11365,10 @@ selenium-webdriver@3.6.0, selenium-webdriver@^3.0.1:
     tmp "0.0.30"
     xml2js "^0.4.17"
 
-selenium-webdriver@4.11.1:
-  version "4.11.1"
-  resolved "https://registry.yarnpkg.com/selenium-webdriver/-/selenium-webdriver-4.11.1.tgz#6a84f68d06199d075e6c2a5448bf08f4249b98c8"
-  integrity sha512-bvrnr3UZlLScErOmn8gV6cqc+1PYDHn0575CxUR2U14fMWt7OKxSy0lAThhZq4sq4d1HqP8ebz11oiHSlAQ2WA==
+selenium-webdriver@4.12.0:
+  version "4.12.0"
+  resolved "https://registry.yarnpkg.com/selenium-webdriver/-/selenium-webdriver-4.12.0.tgz#a8dc8ecf129a2414c2ace6e429aba84722a950a5"
+  integrity sha512-zvPzmTsky6WfO6+BGMj2mCJsw7qKnfQONur2b+pGn8jeTiC+WAUOthZOnaK+HkX5wiU6L4uoMF+JIcOVstp25A==
   dependencies:
     jszip "^3.10.1"
     tmp "^0.2.1"
