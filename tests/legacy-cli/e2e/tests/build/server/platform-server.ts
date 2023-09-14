@@ -8,7 +8,7 @@ import { updateJsonFile } from '../../../utils/project';
 const snapshots = require('../../../ng-snapshot/package.json');
 
 export default async function () {
-  await ng('generate', 'universal', '--project', 'test-project');
+  await ng('generate', 'server', '--project', 'test-project');
 
   const isSnapshotBuild = getGlobalVariable('argv')['ng-snapshots'];
   if (isSnapshotBuild) {
@@ -33,7 +33,7 @@ export default async function () {
     ` import 'zone.js/dist/zone-node';
         import * as fs from 'fs';
         import { renderModule } from '@angular/platform-server';
-        import { AppServerModule } from './src/main.server';
+        import AppServerModule from './src/main.server';
 
         renderModule(AppServerModule, {
           url: '/',
