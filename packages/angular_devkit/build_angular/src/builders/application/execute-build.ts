@@ -13,7 +13,7 @@ import {
   createBrowserCodeBundleOptions,
   createServerCodeBundleOptions,
 } from '../../tools/esbuild/application-code-bundle';
-import { BundlerContext } from '../../tools/esbuild/bundler-context';
+import { BuildOutputFileType, BundlerContext } from '../../tools/esbuild/bundler-context';
 import { ExecutionResult, RebuildState } from '../../tools/esbuild/bundler-execution-result';
 import { checkCommonJSModules } from '../../tools/esbuild/commonjs-checker';
 import { createGlobalScriptsBundleOptions } from '../../tools/esbuild/global-scripts';
@@ -22,6 +22,7 @@ import { generateIndexHtml } from '../../tools/esbuild/index-html-generator';
 import { extractLicenses } from '../../tools/esbuild/license-extractor';
 import {
   calculateEstimatedTransferSizes,
+  getSupportedNodeTargets,
   logBuildStats,
   logMessages,
   transformSupportedBrowsersToTargets,
@@ -114,17 +115,12 @@ export async function executeBuild(
 
     // Server application code
     if (serverEntryPoint) {
+      const nodeTargets = getSupportedNodeTargets();
       bundlerContexts.push(
         new BundlerContext(
           workspaceRoot,
           !!options.watch,
-          createServerCodeBundleOptions(
-            options,
-            // NOTE: earlier versions of Node.js are not supported due to unsafe promise patching.
-            // See: https://github.com/angular/angular/pull/50552#issue-1737967592
-            [...target, 'node18.13'],
-            codeBundleCache,
-          ),
+          createServerCodeBundleOptions(options, [...target, ...nodeTargets], codeBundleCache),
           () => false,
         ),
       );
@@ -178,15 +174,20 @@ export async function executeBuild(
     indexContentOutputNoCssInlining = contentWithoutCriticalCssInlined;
     printWarningsAndErrorsToConsole(context, warnings, errors);
 
-    executionResult.addOutputFile(indexHtmlOptions.output, content);
+    executionResult.addOutputFile(indexHtmlOptions.output, content, BuildOutputFileType.Browser);
 
     if (ssrOptions) {
-      executionResult.addOutputFile('index.server.html', contentWithoutCriticalCssInlined);
+      executionResult.addOutputFile(
+        'index.server.html',
+        contentWithoutCriticalCssInlined,
+        BuildOutputFileType.Server,
+      );
     }
   }
 
   // Pre-render (SSG) and App-shell
-  if (prerenderOptions || appShellOptions) {
+  // If localization is enabled, prerendering is handled in the inlining process.
+  if ((prerenderOptions || appShellOptions) && !options.i18nOptions.shouldInline) {
     assert(
       indexContentOutputNoCssInlining,
       'The "index" option is required when using the "ssg" or "appShell" options.',
@@ -206,7 +207,7 @@ export async function executeBuild(
     printWarningsAndErrorsToConsole(context, warnings, errors);
 
     for (const [path, content] of Object.entries(output)) {
-      executionResult.addOutputFile(path, content);
+      executionResult.addOutputFile(path, content, BuildOutputFileType.Browser);
     }
   }
 
@@ -214,12 +215,7 @@ export async function executeBuild(
   if (assets) {
     // The webpack copy assets helper is used with no base paths defined. This prevents the helper
     // from directly writing to disk. This should eventually be replaced with a more optimized helper.
-    executionResult.assetFiles.push(...(await copyAssets(assets, [], workspaceRoot)));
-  }
-
-  // Write metafile if stats option is enabled
-  if (options.stats) {
-    executionResult.addOutputFile('stats.json', JSON.stringify(metafile, null, 2));
+    executionResult.addAssets(await copyAssets(assets, [], workspaceRoot));
   }
 
   // Extract and write licenses for used packages
@@ -227,11 +223,13 @@ export async function executeBuild(
     executionResult.addOutputFile(
       '3rdpartylicenses.txt',
       await extractLicenses(metafile, workspaceRoot),
+      BuildOutputFileType.Root,
     );
   }
 
   // Augment the application with service worker support
-  if (serviceWorker) {
+  // If localization is enabled, service worker is handled in the inlining process.
+  if (serviceWorker && !options.i18nOptions.shouldInline) {
     try {
       const serviceWorkerResult = await augmentAppWithServiceWorkerEsbuild(
         workspaceRoot,
@@ -240,8 +238,12 @@ export async function executeBuild(
         executionResult.outputFiles,
         executionResult.assetFiles,
       );
-      executionResult.addOutputFile('ngsw.json', serviceWorkerResult.manifest);
-      executionResult.assetFiles.push(...serviceWorkerResult.assetFiles);
+      executionResult.addOutputFile(
+        'ngsw.json',
+        serviceWorkerResult.manifest,
+        BuildOutputFileType.Browser,
+      );
+      executionResult.addAssets(serviceWorkerResult.assetFiles);
     } catch (error) {
       context.logger.error(error instanceof Error ? error.message : `${error}`);
 
@@ -262,7 +264,17 @@ export async function executeBuild(
 
   // Perform i18n translation inlining if enabled
   if (options.i18nOptions.shouldInline) {
-    await inlineI18n(options, executionResult, initialFiles);
+    const { errors, warnings } = await inlineI18n(options, executionResult, initialFiles);
+    printWarningsAndErrorsToConsole(context, warnings, errors);
+  }
+
+  // Write metafile if stats option is enabled
+  if (options.stats) {
+    executionResult.addOutputFile(
+      'stats.json',
+      JSON.stringify(metafile, null, 2),
+      BuildOutputFileType.Root,
+    );
   }
 
   return executionResult;

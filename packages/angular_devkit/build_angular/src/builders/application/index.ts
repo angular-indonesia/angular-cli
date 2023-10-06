@@ -7,7 +7,7 @@
  */
 
 import { BuilderContext, BuilderOutput, createBuilder } from '@angular-devkit/architect';
-import type { OutputFile } from 'esbuild';
+import { BuildOutputFile, BuildOutputFileType } from '../../tools/esbuild/bundler-context';
 import { purgeStaleBuildCache } from '../../utils/purge-cache';
 import { assertCompatibleAngularVersion } from '../../utils/version';
 import { runEsBuildBuildAction } from './build-action';
@@ -17,13 +17,14 @@ import { Schema as ApplicationBuilderOptions } from './schema';
 
 export async function* buildApplicationInternal(
   options: ApplicationBuilderInternalOptions,
-  context: BuilderContext,
+  // TODO: Integrate abort signal support into builder system
+  context: BuilderContext & { signal?: AbortSignal },
   infrastructureSettings?: {
     write?: boolean;
   },
 ): AsyncIterable<
   BuilderOutput & {
-    outputFiles?: OutputFile[];
+    outputFiles?: BuildOutputFile[];
     assetFiles?: { source: string; destination: string }[];
   }
 > {
@@ -43,20 +44,12 @@ export async function* buildApplicationInternal(
 
   const normalizedOptions = await normalizeOptions(context, projectName, options);
 
-  // Warn about prerender/ssr not yet supporting localize
-  if (
-    normalizedOptions.i18nOptions.shouldInline &&
-    (normalizedOptions.prerenderOptions ||
-      normalizedOptions.ssrOptions ||
-      normalizedOptions.appShellOptions)
-  ) {
+  // Warn about SSR not yet supporting localize
+  if (normalizedOptions.i18nOptions.shouldInline && normalizedOptions.ssrOptions) {
     context.logger.warn(
-      `Prerendering, App Shell, and SSR are not yet supported with the 'localize' option and will be disabled for this build.`,
+      `SSR is not yet supported with the 'localize' option and will be disabled for this build.`,
     );
-    normalizedOptions.prerenderOptions =
-      normalizedOptions.ssrOptions =
-      normalizedOptions.appShellOptions =
-        undefined;
+    normalizedOptions.ssrOptions = undefined;
   }
 
   yield* runEsBuildBuildAction(
@@ -72,7 +65,14 @@ export async function* buildApplicationInternal(
       workspaceRoot: normalizedOptions.workspaceRoot,
       progress: normalizedOptions.progress,
       writeToFileSystem: infrastructureSettings?.write,
+      // For app-shell and SSG server files are not required by users.
+      // Omit these when SSR is not enabled.
+      writeToFileSystemFilter:
+        normalizedOptions.ssrOptions && normalizedOptions.serverEntryPoint
+          ? undefined
+          : (file) => file.type !== BuildOutputFileType.Server,
       logger: context.logger,
+      signal: context.signal,
     },
   );
 }
@@ -82,7 +82,7 @@ export function buildApplication(
   context: BuilderContext,
 ): AsyncIterable<
   BuilderOutput & {
-    outputFiles?: OutputFile[];
+    outputFiles?: BuildOutputFile[];
     assetFiles?: { source: string; destination: string }[];
   }
 > {

@@ -11,12 +11,13 @@ import { BuildOptions, Metafile, OutputFile, PartialMessage, formatMessages } fr
 import { createHash } from 'node:crypto';
 import { constants as fsConstants } from 'node:fs';
 import fs from 'node:fs/promises';
-import path from 'node:path';
+import path, { join } from 'node:path';
 import { promisify } from 'node:util';
 import { brotliCompress } from 'node:zlib';
+import { coerce } from 'semver';
 import { Spinner } from '../../utils/spinner';
 import { BundleStats, generateBuildStatsTable } from '../webpack/utils/stats';
-import { InitialFileRecord } from './bundler-context';
+import { BuildOutputFile, BuildOutputFileType, InitialFileRecord } from './bundler-context';
 
 const compressAsync = promisify(brotliCompress);
 
@@ -164,21 +165,22 @@ export function getFeatureSupport(target: string[]): BuildOptions['supported'] {
 }
 
 export async function writeResultFiles(
-  outputFiles: OutputFile[],
+  outputFiles: BuildOutputFile[],
   assetFiles: { source: string; destination: string }[] | undefined,
   outputPath: string,
 ) {
   const directoryExists = new Set<string>();
   await Promise.all(
     outputFiles.map(async (file) => {
+      const fullOutputPath = file.fullOutputPath;
       // Ensure output subdirectories exist
-      const basePath = path.dirname(file.path);
+      const basePath = path.dirname(fullOutputPath);
       if (basePath && !directoryExists.has(basePath)) {
         await fs.mkdir(path.join(outputPath, basePath), { recursive: true });
         directoryExists.add(basePath);
       }
       // Write file contents
-      await fs.writeFile(path.join(outputPath, file.path), file.contents);
+      await fs.writeFile(path.join(outputPath, fullOutputPath), file.contents);
     }),
   );
 
@@ -186,62 +188,79 @@ export async function writeResultFiles(
     await Promise.all(
       assetFiles.map(async ({ source, destination }) => {
         // Ensure output subdirectories exist
-        const basePath = path.dirname(destination);
+        const destPath = join('browser', destination);
+        const basePath = path.dirname(destPath);
         if (basePath && !directoryExists.has(basePath)) {
           await fs.mkdir(path.join(outputPath, basePath), { recursive: true });
           directoryExists.add(basePath);
         }
         // Copy file contents
-        await fs.copyFile(source, path.join(outputPath, destination), fsConstants.COPYFILE_FICLONE);
+        await fs.copyFile(source, path.join(outputPath, destPath), fsConstants.COPYFILE_FICLONE);
       }),
     );
   }
 }
 
-export function createOutputFileFromText(path: string, text: string): OutputFile {
+export function createOutputFileFromText(
+  path: string,
+  text: string,
+  type: BuildOutputFileType,
+): BuildOutputFile {
   return {
     path,
     text,
+    type,
     get hash() {
       return createHash('sha256').update(this.text).digest('hex');
     },
     get contents() {
       return Buffer.from(this.text, 'utf-8');
     },
-  };
-}
-
-export function createOutputFileFromData(path: string, data: Uint8Array): OutputFile {
-  return {
-    path,
-    get text() {
-      return Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString('utf-8');
+    get fullOutputPath(): string {
+      return getFullOutputPath(this);
     },
-    get hash() {
-      return createHash('sha256').update(data).digest('hex');
-    },
-    get contents() {
-      return data;
+    clone(): BuildOutputFile {
+      return createOutputFileFromText(this.path, this.text, this.type);
     },
   };
 }
 
-export function cloneOutputFile(file: OutputFile): OutputFile {
-  const path = file.path;
-  const data = file.contents;
-
+export function createOutputFileFromData(
+  path: string,
+  data: Uint8Array,
+  type: BuildOutputFileType,
+): BuildOutputFile {
   return {
     path,
+    type,
     get text() {
       return Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString('utf-8');
     },
     get hash() {
-      return createHash('sha256').update(data).digest('hex');
+      return createHash('sha256').update(this.text).digest('hex');
     },
     get contents() {
       return data;
     },
+    get fullOutputPath(): string {
+      return getFullOutputPath(this);
+    },
+    clone(): BuildOutputFile {
+      return createOutputFileFromData(this.path, this.contents, this.type);
+    },
   };
+}
+
+export function getFullOutputPath(file: BuildOutputFile): string {
+  switch (file.type) {
+    case BuildOutputFileType.Browser:
+    case BuildOutputFileType.Media:
+      return join('browser', file.path);
+    case BuildOutputFileType.Server:
+      return join('server', file.path);
+    default:
+      return file.path;
+  }
 }
 
 /**
@@ -292,4 +311,19 @@ export function transformSupportedBrowsersToTargets(supportedBrowsers: string[])
   }
 
   return transformed;
+}
+
+const SUPPORTED_NODE_VERSIONS = '0.0.0-ENGINES-NODE';
+
+/**
+ * Transform supported Node.js versions to esbuild target.
+ * @see https://esbuild.github.io/api/#target
+ */
+export function getSupportedNodeTargets(): string[] {
+  if (SUPPORTED_NODE_VERSIONS.charAt(0) === '0') {
+    // Unlike `pkg_npm`, `ts_library` which is used to run unit tests does not support substitutions.
+    return [];
+  }
+
+  return SUPPORTED_NODE_VERSIONS.split('||').map((v) => 'node' + coerce(v)?.version);
 }

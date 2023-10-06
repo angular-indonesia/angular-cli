@@ -1,3 +1,73 @@
+<a name="15.2.10"></a>
+
+# 15.2.10 (2023-10-05)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                          |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------ |
+| [05213c95b](https://github.com/angular/angular-cli/commit/05213c95b032dd64fdc73ed33af695e9f19b5d09) | fix  | update dependency postcss to v8.4.31 |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="14.2.13"></a>
+
+# 14.2.13 (2023-10-05)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                          |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------ |
+| [1ca44dcd9](https://github.com/angular/angular-cli/commit/1ca44dcd9d79916db70180da37b962c2672a76a8) | fix  | update dependency postcss to v8.4.31 |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="17.0.0-next.7"></a>
+
+# 17.0.0-next.7 (2023-10-04)
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                                |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------- |
+| [dc6b6eaf6](https://github.com/angular/angular-cli/commit/dc6b6eaf6f8af0d2b3f31cea77dc9a63ff845e3c) | feat | add migration to replace usages of `@nguniversal/builders` |
+| [03a1eaf01](https://github.com/angular/angular-cli/commit/03a1eaf01c009d814cb476d2db53b2d0a4d58bcd) | fix  | account for new block syntax in starter template           |
+| [e516a4bdb](https://github.com/angular/angular-cli/commit/e516a4bdb7f6bb87f556e58557e57db6f7e65845) | fix  | pass `ssr` option to application schematics                |
+| [419b5c191](https://github.com/angular/angular-cli/commit/419b5c1917c45dc115b107479d5066b9193497fa) | fix  | remove `baseUrl` from `tsconfig.json`                      |
+| [0368b23f2](https://github.com/angular/angular-cli/commit/0368b23f2e5d8ca9c6191a2db956dc6850daebfc) | fix  | use @types/node v18                                        |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                                                        |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------------------------------------------- |
+| [fd62a9315](https://github.com/angular/angular-cli/commit/fd62a9315defb89b4bea996d256887a6ec7b4327) | feat | support i18n with service worker and app-shell with esbuild builders                               |
+| [5898f72a9](https://github.com/angular/angular-cli/commit/5898f72a97c29d38b9e8b8ca23255f9fbce501e5) | feat | support namedChunks option in application builder                                                  |
+| [2d2e79921](https://github.com/angular/angular-cli/commit/2d2e79921a72c4fafad673abe501ba10400403d2) | fix  | clean up internal Angular state during rendering SSR                                               |
+| [83020fc32](https://github.com/angular/angular-cli/commit/83020fc3291715802c28c5f7dcf7a261bc7f32cd) | fix  | clear diagnostic cache when external templates change with esbuild builders                        |
+| [26456b93d](https://github.com/angular/angular-cli/commit/26456b93d558f8cde012c3fa7b1f5a58c616615c) | fix  | do not print `Angular is running in development mode.` in the server console when using dev-server |
+| [0c20cc4dc](https://github.com/angular/angular-cli/commit/0c20cc4dc5fe64221533d0a4cbe9d907881c85ae) | fix  | re-add TestBed compileComponents in schematics to support defer block testing                      |
+
+### @angular/ssr
+
+| Commit                                                                                              | Type | Description                                |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------ |
+| [dcf3fddff](https://github.com/angular/angular-cli/commit/dcf3fddff2fa4cf3433c5d726be9f514ba41e827) | feat | add performance profiler to `CommonEngine` |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="16.2.5"></a>
+
+# 16.2.5 (2023-10-04)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                                                        |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------------------------------------------- |
+| [933358186](https://github.com/angular/angular-cli/commit/93335818689a67557942ab27ec8cc5b96f2a5abe) | fix  | do not print `Angular is running in development mode.` in the server console when using dev-server |
+| [493bd3906](https://github.com/angular/angular-cli/commit/493bd390679889359a05b2f23b74787647aee341) | fix  | update dependency postcss to v8.4.31                                                               |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="17.0.0-next.6"></a>
 
 # 17.0.0-next.6 (2023-09-27)
