@@ -238,6 +238,7 @@ export async function normalizeOptions(
     externalPackages,
     deleteOutputPath,
     namedChunks,
+    budgets,
   } = options;
 
   // Return all the normalized options
@@ -286,6 +287,7 @@ export async function normalizeOptions(
     tailwindConfiguration,
     i18nOptions,
     namedChunks,
+    budgets: budgets?.length ? budgets : undefined,
   };
 }
 

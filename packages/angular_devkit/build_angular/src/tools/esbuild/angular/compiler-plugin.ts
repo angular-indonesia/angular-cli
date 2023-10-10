@@ -16,56 +16,25 @@ import type {
 } from 'esbuild';
 import assert from 'node:assert';
 import { realpath } from 'node:fs/promises';
-import { platform } from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 import { maxWorkers } from '../../../utils/environment-options';
 import { JavaScriptTransformer } from '../javascript-transformer';
-import { LoadResultCache, MemoryLoadResultCache } from '../load-result-cache';
+import { LoadResultCache } from '../load-result-cache';
 import {
   logCumulativeDurations,
   profileAsync,
   profileSync,
   resetCumulativeDurations,
 } from '../profiling';
-import { BundleStylesheetOptions, bundleComponentStylesheet } from '../stylesheets/bundle-options';
+import { BundleStylesheetOptions } from '../stylesheets/bundle-options';
 import { AngularHostOptions } from './angular-host';
 import { AngularCompilation, AotCompilation, JitCompilation, NoopCompilation } from './compilation';
+import { SharedTSCompilationState, getSharedCompilationState } from './compilation-state';
+import { ComponentStylesheetBundler } from './component-stylesheets';
 import { setupJitPluginCallbacks } from './jit-plugin-callbacks';
-
-const USING_WINDOWS = platform() === 'win32';
-const WINDOWS_SEP_REGEXP = new RegExp(`\\${path.win32.sep}`, 'g');
-
-export class SourceFileCache extends Map<string, ts.SourceFile> {
-  readonly modifiedFiles = new Set<string>();
-  readonly babelFileCache = new Map<string, Uint8Array>();
-  readonly typeScriptFileCache = new Map<string, string | Uint8Array>();
-  readonly loadResultCache = new MemoryLoadResultCache();
-
-  referencedFiles?: readonly string[];
-
-  constructor(readonly persistentCachePath?: string) {
-    super();
-  }
-
-  invalidate(files: Iterable<string>): void {
-    this.modifiedFiles.clear();
-    for (let file of files) {
-      this.babelFileCache.delete(file);
-      this.typeScriptFileCache.delete(pathToFileURL(file).href);
-      this.loadResultCache.invalidate(file);
-
-      // Normalize separators to allow matching TypeScript Host paths
-      if (USING_WINDOWS) {
-        file = file.replace(WINDOWS_SEP_REGEXP, path.posix.sep);
-      }
-
-      this.delete(file);
-      this.modifiedFiles.add(file);
-    }
-  }
-}
+import { SourceFileCache } from './source-file-cache';
 
 export interface CompilerPluginOptions {
   sourcemap: boolean;
@@ -80,29 +49,18 @@ export interface CompilerPluginOptions {
   loadResultCache?: LoadResultCache;
 }
 
-// TODO: find a better way to unblock TS compilation of server bundles.
-let TS_COMPILATION_READY: Promise<void> | undefined;
-
 // eslint-disable-next-line max-lines-per-function
 export function createCompilerPlugin(
   pluginOptions: CompilerPluginOptions,
   styleOptions: BundleStylesheetOptions & { inlineStyleLanguage: string },
 ): Plugin {
-  let resolveCompilationReady: (() => void) | undefined;
-
-  if (!pluginOptions.noopTypeScriptCompilation) {
-    TS_COMPILATION_READY = new Promise<void>((resolve) => {
-      resolveCompilationReady = resolve;
-    });
-  }
-
   return {
     name: 'angular-compiler',
     // eslint-disable-next-line max-lines-per-function
     async setup(build: PluginBuild): Promise<void> {
       let setupWarnings: PartialMessage[] | undefined = [];
-
       const preserveSymlinks = build.initialOptions.preserveSymlinks;
+
       let tsconfigPath = pluginOptions.tsconfig;
       if (!preserveSymlinks) {
         // Use the real path of the tsconfig if not preserving symlinks.
@@ -139,7 +97,19 @@ export function createCompilerPlugin(
       // Determines if TypeScript should process JavaScript files based on tsconfig `allowJs` option
       let shouldTsIgnoreJs = true;
 
+      // Track incremental component stylesheet builds
+      const stylesheetBundler = new ComponentStylesheetBundler(
+        styleOptions,
+        pluginOptions.loadResultCache,
+      );
+      let sharedTSCompilationState: SharedTSCompilationState | undefined;
+
       build.onStart(async () => {
+        sharedTSCompilationState = getSharedCompilationState();
+        if (!(compilation instanceof NoopCompilation)) {
+          sharedTSCompilationState.markAsInProgress();
+        }
+
         const result: OnStartResult = {
           warnings: setupWarnings,
         };
@@ -157,17 +127,18 @@ export function createCompilerPlugin(
           modifiedFiles: pluginOptions.sourceFileCache?.modifiedFiles,
           sourceFileCache: pluginOptions.sourceFileCache,
           async transformStylesheet(data, containingFile, stylesheetFile) {
-            // Stylesheet file only exists for external stylesheets
-            const filename = stylesheetFile ?? containingFile;
+            let stylesheetResult;
 
-            const stylesheetResult = await bundleComponentStylesheet(
-              styleOptions.inlineStyleLanguage,
-              data,
-              filename,
-              !stylesheetFile,
-              styleOptions,
-              pluginOptions.loadResultCache,
-            );
+            // Stylesheet file only exists for external stylesheets
+            if (stylesheetFile) {
+              stylesheetResult = await stylesheetBundler.bundleFile(stylesheetFile);
+            } else {
+              stylesheetResult = await stylesheetBundler.bundleInline(
+                data,
+                containingFile,
+                styleOptions.inlineStyleLanguage,
+              );
+            }
 
             const { contents, resourceFiles, errors, warnings } = stylesheetResult;
             if (errors) {
@@ -284,7 +255,7 @@ export function createCompilerPlugin(
         shouldTsIgnoreJs = !allowJs;
 
         if (compilation instanceof NoopCompilation) {
-          await TS_COMPILATION_READY;
+          await sharedTSCompilationState.waitUntilReady;
 
           return result;
         }
@@ -312,8 +283,7 @@ export function createCompilerPlugin(
         // Reset the setup warnings so that they are only shown during the first build.
         setupWarnings = undefined;
 
-        // TODO: find a better way to unblock TS compilation of server bundles.
-        resolveCompilationReady?.();
+        sharedTSCompilationState.markAsReady();
 
         return result;
       });
@@ -390,9 +360,9 @@ export function createCompilerPlugin(
       if (pluginOptions.jit) {
         setupJitPluginCallbacks(
           build,
-          styleOptions,
+          stylesheetBundler,
           additionalOutputFiles,
-          pluginOptions.loadResultCache,
+          styleOptions.inlineStyleLanguage,
         );
       }
 
@@ -411,6 +381,11 @@ export function createCompilerPlugin(
         }
 
         logCumulativeDurations();
+      });
+
+      build.onDispose(() => {
+        sharedTSCompilationState?.dispose();
+        void stylesheetBundler.dispose();
       });
     },
   };

@@ -8,11 +8,12 @@
 
 import { BuilderContext } from '@angular-devkit/architect';
 import assert from 'node:assert';
-import { SourceFileCache } from '../../tools/esbuild/angular/compiler-plugin';
+import { SourceFileCache } from '../../tools/esbuild/angular/source-file-cache';
 import {
   createBrowserCodeBundleOptions,
   createServerCodeBundleOptions,
 } from '../../tools/esbuild/application-code-bundle';
+import { generateBudgetStats } from '../../tools/esbuild/budget-stats';
 import { BuildOutputFileType, BundlerContext } from '../../tools/esbuild/bundler-context';
 import { ExecutionResult, RebuildState } from '../../tools/esbuild/bundler-execution-result';
 import { checkCommonJSModules } from '../../tools/esbuild/commonjs-checker';
@@ -27,6 +28,7 @@ import {
   logMessages,
   transformSupportedBrowsersToTargets,
 } from '../../tools/esbuild/utils';
+import { checkBudgets } from '../../utils/bundle-calculator';
 import { copyAssets } from '../../utils/copy-assets';
 import { maxWorkers } from '../../utils/environment-options';
 import { prerenderPages } from '../../utils/server-rendering/prerender';
@@ -114,7 +116,8 @@ export async function executeBuild(
     }
 
     // Server application code
-    if (serverEntryPoint) {
+    // Skip server build when non of the features are enabled.
+    if (serverEntryPoint && (prerenderOptions || appShellOptions || ssrOptions)) {
       const nodeTargets = getSupportedNodeTargets();
       bundlerContexts.push(
         new BundlerContext(
@@ -251,13 +254,27 @@ export async function executeBuild(
     }
   }
 
+  // Analyze files for bundle budget failures if present
+  let budgetFailures;
+  if (options.budgets) {
+    const compatStats = generateBudgetStats(metafile, initialFiles);
+    budgetFailures = [...checkBudgets(options.budgets, compatStats, true)];
+    for (const { severity, message } of budgetFailures) {
+      if (severity === 'error') {
+        context.logger.error(message);
+      } else {
+        context.logger.warn(message);
+      }
+    }
+  }
+
   // Calculate estimated transfer size if scripts are optimized
   let estimatedTransferSizes;
   if (optimizationOptions.scripts || optimizationOptions.styles.minify) {
     estimatedTransferSizes = await calculateEstimatedTransferSizes(executionResult.outputFiles);
   }
 
-  logBuildStats(context, metafile, initialFiles, estimatedTransferSizes);
+  logBuildStats(context, metafile, initialFiles, budgetFailures, estimatedTransferSizes);
 
   const buildTime = Number(process.hrtime.bigint() - startTime) / 10 ** 9;
   context.logger.info(`Application bundle generation complete. [${buildTime.toFixed(3)} seconds]`);
