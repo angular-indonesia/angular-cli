@@ -25,6 +25,7 @@ export interface BundleStylesheetOptions {
   externalDependencies?: string[];
   target: string[];
   tailwindConfiguration?: { file: string; package: string };
+  publicPath?: string;
 }
 
 export function createStylesheetBundleOptions(
@@ -62,7 +63,8 @@ export function createStylesheetBundleOptions(
     target: options.target,
     preserveSymlinks: options.preserveSymlinks,
     external: options.externalDependencies,
-    conditions: ['style', 'sass'],
+    publicPath: options.publicPath,
+    conditions: ['style', 'sass', 'less'],
     mainFields: ['style', 'sass'],
     plugins: [
       pluginFactory.create(SassStylesheetLanguage),

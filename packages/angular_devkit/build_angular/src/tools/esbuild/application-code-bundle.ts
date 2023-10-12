@@ -165,6 +165,10 @@ export function createBrowserCodeBundleOptions(
     );
   }
 
+  if (options.plugins) {
+    buildOptions.plugins?.push(...options.plugins);
+  }
+
   return buildOptions;
 }
 
@@ -343,6 +347,10 @@ export function createServerCodeBundleOptions(
     );
   }
 
+  if (options.plugins) {
+    buildOptions.plugins.push(...options.plugins);
+  }
+
   return buildOptions;
 }
 
@@ -405,5 +413,6 @@ function getEsBuildCommonOptions(options: NormalizedApplicationBuildOptions): Bu
       'ngJitMode': jit ? 'true' : 'false',
     },
     footer,
+    publicPath: options.publicPath,
   };
 }
