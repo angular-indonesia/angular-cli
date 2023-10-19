@@ -7,6 +7,7 @@
  */
 
 import type {
+  BuildFailure,
   Metafile,
   OnStartResult,
   OutputFile,
@@ -22,17 +23,13 @@ import ts from 'typescript';
 import { maxWorkers } from '../../../utils/environment-options';
 import { JavaScriptTransformer } from '../javascript-transformer';
 import { LoadResultCache } from '../load-result-cache';
-import {
-  logCumulativeDurations,
-  profileAsync,
-  profileSync,
-  resetCumulativeDurations,
-} from '../profiling';
+import { logCumulativeDurations, profileAsync, resetCumulativeDurations } from '../profiling';
 import { BundleStylesheetOptions } from '../stylesheets/bundle-options';
 import { AngularHostOptions } from './angular-host';
-import { AngularCompilation, AotCompilation, JitCompilation, NoopCompilation } from './compilation';
+import { AngularCompilation, NoopCompilation, createAngularCompilation } from './compilation';
 import { SharedTSCompilationState, getSharedCompilationState } from './compilation-state';
 import { ComponentStylesheetBundler } from './component-stylesheets';
+import { FileReferenceTracker } from './file-reference-tracker';
 import { setupJitPluginCallbacks } from './jit-plugin-callbacks';
 import { SourceFileCache } from './source-file-cache';
 
@@ -47,6 +44,7 @@ export interface CompilerPluginOptions {
   fileReplacements?: Record<string, string>;
   sourceFileCache?: SourceFileCache;
   loadResultCache?: LoadResultCache;
+  incremental: boolean;
 }
 
 // eslint-disable-next-line max-lines-per-function
@@ -83,16 +81,16 @@ export function createCompilerPlugin(
         pluginOptions.sourceFileCache?.typeScriptFileCache ??
         new Map<string, string | Uint8Array>();
 
-      // The stylesheet resources from component stylesheets that will be added to the build results output files
-      let additionalOutputFiles: OutputFile[] = [];
-      let additionalMetafiles: Metafile[];
+      // The resources from component stylesheets and web workers that will be added to the build results output files
+      const additionalResults = new Map<
+        string,
+        { outputFiles?: OutputFile[]; metafile?: Metafile; errors?: PartialMessage[] }
+      >();
 
       // Create new reusable compilation for the appropriate mode based on the `jit` plugin option
       const compilation: AngularCompilation = pluginOptions.noopTypeScriptCompilation
         ? new NoopCompilation()
-        : pluginOptions.jit
-        ? new JitCompilation()
-        : new AotCompilation();
+        : await createAngularCompilation(!!pluginOptions.jit);
 
       // Determines if TypeScript should process JavaScript files based on tsconfig `allowJs` option
       let shouldTsIgnoreJs = true;
@@ -100,10 +98,15 @@ export function createCompilerPlugin(
       // Track incremental component stylesheet builds
       const stylesheetBundler = new ComponentStylesheetBundler(
         styleOptions,
+        pluginOptions.incremental,
         pluginOptions.loadResultCache,
       );
       let sharedTSCompilationState: SharedTSCompilationState | undefined;
 
+      // To fully invalidate files, track resource referenced files and their referencing source
+      const referencedFileTracker = new FileReferenceTracker();
+
+      // eslint-disable-next-line max-lines-per-function
       build.onStart(async () => {
         sharedTSCompilationState = getSharedCompilationState();
         if (!(compilation instanceof NoopCompilation)) {
@@ -117,14 +120,32 @@ export function createCompilerPlugin(
         // Reset debug performance tracking
         resetCumulativeDurations();
 
-        // Reset additional output files
-        additionalOutputFiles = [];
-        additionalMetafiles = [];
+        // Update the reference tracker and generate a full set of modified files for the
+        // Angular compiler which does not have direct knowledge of transitive resource
+        // dependencies or web worker processing.
+        let modifiedFiles;
+        if (
+          pluginOptions.sourceFileCache?.modifiedFiles.size &&
+          referencedFileTracker &&
+          !pluginOptions.noopTypeScriptCompilation
+        ) {
+          // TODO: Differentiate between changed input files and stale output files
+          modifiedFiles = referencedFileTracker.update(pluginOptions.sourceFileCache.modifiedFiles);
+          pluginOptions.sourceFileCache.invalidate(modifiedFiles);
+        }
+
+        if (
+          !pluginOptions.noopTypeScriptCompilation &&
+          compilation.update &&
+          pluginOptions.sourceFileCache?.modifiedFiles.size
+        ) {
+          await compilation.update(modifiedFiles ?? pluginOptions.sourceFileCache.modifiedFiles);
+        }
 
         // Create Angular compiler host options
         const hostOptions: AngularHostOptions = {
           fileReplacements: pluginOptions.fileReplacements,
-          modifiedFiles: pluginOptions.sourceFileCache?.modifiedFiles,
+          modifiedFiles,
           sourceFileCache: pluginOptions.sourceFileCache,
           async transformStylesheet(data, containingFile, stylesheetFile) {
             let stylesheetResult;
@@ -140,14 +161,22 @@ export function createCompilerPlugin(
               );
             }
 
-            const { contents, resourceFiles, errors, warnings } = stylesheetResult;
+            const { contents, resourceFiles, referencedFiles, errors, warnings } = stylesheetResult;
             if (errors) {
               (result.errors ??= []).push(...errors);
             }
             (result.warnings ??= []).push(...warnings);
-            additionalOutputFiles.push(...resourceFiles);
-            if (stylesheetResult.metafile) {
-              additionalMetafiles.push(stylesheetResult.metafile);
+            additionalResults.set(stylesheetFile ?? containingFile, {
+              outputFiles: resourceFiles,
+              metafile: stylesheetResult.metafile,
+            });
+
+            if (referencedFiles) {
+              referencedFileTracker.add(containingFile, referencedFiles);
+              if (stylesheetFile) {
+                // Angular AOT compiler needs modified direct resource files to correctly invalidate its analysis
+                referencedFileTracker.add(stylesheetFile, referencedFiles);
+              }
             }
 
             return contents;
@@ -157,36 +186,37 @@ export function createCompilerPlugin(
             // The synchronous API must be used due to the TypeScript compilation currently being
             // fully synchronous and this process callback being called from within a TypeScript
             // transformer.
-            const workerResult = build.esbuild.buildSync({
-              platform: 'browser',
-              write: false,
-              bundle: true,
-              metafile: true,
-              format: 'esm',
-              mainFields: ['es2020', 'es2015', 'browser', 'module', 'main'],
-              sourcemap: pluginOptions.sourcemap,
-              entryNames: 'worker-[hash]',
-              entryPoints: [fullWorkerPath],
-              absWorkingDir: build.initialOptions.absWorkingDir,
-              outdir: build.initialOptions.outdir,
-              minifyIdentifiers: build.initialOptions.minifyIdentifiers,
-              minifySyntax: build.initialOptions.minifySyntax,
-              minifyWhitespace: build.initialOptions.minifyWhitespace,
-              target: build.initialOptions.target,
-            });
+            const workerResult = bundleWebWorker(build, pluginOptions, fullWorkerPath);
 
             (result.warnings ??= []).push(...workerResult.warnings);
-            additionalOutputFiles.push(...workerResult.outputFiles);
-            if (workerResult.metafile) {
-              additionalMetafiles.push(workerResult.metafile);
-            }
-
             if (workerResult.errors.length > 0) {
               (result.errors ??= []).push(...workerResult.errors);
+              // Track worker file errors to allow rebuilds on changes
+              referencedFileTracker.add(
+                containingFile,
+                workerResult.errors
+                  .map((error) => error.location?.file)
+                  .filter((file): file is string => !!file)
+                  .map((file) => path.join(build.initialOptions.absWorkingDir ?? '', file)),
+              );
+              additionalResults.set(fullWorkerPath, { errors: result.errors });
 
               // Return the original path if the build failed
               return workerFile;
             }
+
+            assert('outputFiles' in workerResult, 'Invalid web worker bundle result.');
+            additionalResults.set(fullWorkerPath, {
+              outputFiles: workerResult.outputFiles,
+              metafile: workerResult.metafile,
+            });
+
+            referencedFileTracker.add(
+              containingFile,
+              Object.keys(workerResult.metafile.inputs).map((input) =>
+                path.join(build.initialOptions.absWorkingDir ?? '', input),
+              ),
+            );
 
             // Return bundled worker file entry name to be used in the built output
             const workerCodeFile = workerResult.outputFiles.find((file) =>
@@ -269,15 +299,26 @@ export function createCompilerPlugin(
         }
 
         // Update TypeScript file output cache for all affected files
-        profileSync('NG_EMIT_TS', () => {
-          for (const { filename, contents } of compilation.emitAffectedFiles()) {
+        await profileAsync('NG_EMIT_TS', async () => {
+          for (const { filename, contents } of await compilation.emitAffectedFiles()) {
             typeScriptFileCache.set(pathToFileURL(filename).href, contents);
           }
         });
 
+        // Add errors from failed additional results.
+        // This must be done after emit to capture latest web worker results.
+        for (const { errors } of additionalResults.values()) {
+          if (errors) {
+            (result.errors ??= []).push(...errors);
+          }
+        }
+
         // Store referenced files for updated file watching if enabled
         if (pluginOptions.sourceFileCache) {
-          pluginOptions.sourceFileCache.referencedFiles = referencedFiles;
+          pluginOptions.sourceFileCache.referencedFiles = [
+            ...referencedFiles,
+            ...referencedFileTracker.referencedFiles,
+          ];
         }
 
         // Reset the setup warnings so that they are only shown during the first build.
@@ -361,20 +402,20 @@ export function createCompilerPlugin(
         setupJitPluginCallbacks(
           build,
           stylesheetBundler,
-          additionalOutputFiles,
+          additionalResults,
           styleOptions.inlineStyleLanguage,
         );
       }
 
       build.onEnd((result) => {
-        // Add any additional output files to the main output files
-        if (additionalOutputFiles.length) {
-          result.outputFiles?.push(...additionalOutputFiles);
-        }
+        for (const { outputFiles, metafile } of additionalResults.values()) {
+          // Add any additional output files to the main output files
+          if (outputFiles?.length) {
+            result.outputFiles?.push(...outputFiles);
+          }
 
-        // Combine additional metafiles with main metafile
-        if (result.metafile && additionalMetafiles.length) {
-          for (const metafile of additionalMetafiles) {
+          // Combine additional metafiles with main metafile
+          if (result.metafile && metafile) {
             result.metafile.inputs = { ...result.metafile.inputs, ...metafile.inputs };
             result.metafile.outputs = { ...result.metafile.outputs, ...metafile.outputs };
           }
@@ -386,9 +427,42 @@ export function createCompilerPlugin(
       build.onDispose(() => {
         sharedTSCompilationState?.dispose();
         void stylesheetBundler.dispose();
+        void compilation.close?.();
       });
     },
   };
+}
+
+function bundleWebWorker(
+  build: PluginBuild,
+  pluginOptions: CompilerPluginOptions,
+  workerFile: string,
+) {
+  try {
+    return build.esbuild.buildSync({
+      platform: 'browser',
+      write: false,
+      bundle: true,
+      metafile: true,
+      format: 'esm',
+      mainFields: ['es2020', 'es2015', 'browser', 'module', 'main'],
+      logLevel: 'silent',
+      sourcemap: pluginOptions.sourcemap,
+      entryNames: 'worker-[hash]',
+      entryPoints: [workerFile],
+      absWorkingDir: build.initialOptions.absWorkingDir,
+      outdir: build.initialOptions.outdir,
+      minifyIdentifiers: build.initialOptions.minifyIdentifiers,
+      minifySyntax: build.initialOptions.minifySyntax,
+      minifyWhitespace: build.initialOptions.minifyWhitespace,
+      target: build.initialOptions.target,
+    });
+  } catch (error) {
+    if (error && typeof error === 'object' && 'errors' in error && 'warnings' in error) {
+      return error as BuildFailure;
+    }
+    throw error;
+  }
 }
 
 function createMissingFileError(request: string, original: string, root: string): PartialMessage {
