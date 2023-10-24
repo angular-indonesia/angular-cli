@@ -6,22 +6,22 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
+import remapping, { SourceMapInput } from '@ampproject/remapping';
 import type { BuilderContext } from '@angular-devkit/architect';
 import type { json, logging } from '@angular-devkit/core';
 import type { Plugin } from 'esbuild';
 import { lookup as lookupMimeType } from 'mrmime';
 import assert from 'node:assert';
-import { BinaryLike, createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import path, { posix } from 'node:path';
+import path from 'node:path';
 import type { Connect, InlineConfig, ViteDevServer } from 'vite';
 import { BuildOutputFile, BuildOutputFileType } from '../../tools/esbuild/bundler-context';
 import { JavaScriptTransformer } from '../../tools/esbuild/javascript-transformer';
 import { getFeatureSupport, transformSupportedBrowsersToTargets } from '../../tools/esbuild/utils';
 import { createAngularLocaleDataPlugin } from '../../tools/vite/i18n-locale-plugin';
-import { RenderOptions, renderPage } from '../../utils/server-rendering/render-page';
+import { renderPage } from '../../utils/server-rendering/render-page';
 import { getSupportedBrowsers } from '../../utils/supported-browsers';
 import { getIndexOutputFile } from '../../utils/webpack-browser-config';
 import { buildApplicationInternal } from '../application';
@@ -34,16 +34,9 @@ import type { DevServerBuilderOutput } from './webpack-server';
 interface OutputFileRecord {
   contents: Uint8Array;
   size: number;
-  hash?: Buffer;
+  hash?: string;
   updated: boolean;
   servable: boolean;
-}
-
-const SSG_MARKER_REGEXP = /ng-server-context=["']\w*\|?ssg\|?\w*["']/;
-
-function hashContent(contents: BinaryLike): Buffer {
-  // TODO: Consider xxhash
-  return createHash('sha256').update(contents).digest();
 }
 
 export async function* serveWithVite(
@@ -72,6 +65,10 @@ export async function* serveWithVite(
     // This is so instead of prerendering all the routes for every change, the page is "prerendered" when it is requested.
     browserOptions.ssr = true;
     browserOptions.prerender = false;
+
+    // https://nodejs.org/api/process.html#processsetsourcemapsenabledval
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process as any).setSourceMapsEnabled(true);
   }
 
   // Set all packages as external to support Vite's prebundle caching
@@ -303,27 +300,22 @@ function analyzeResultFiles(
       continue;
     }
 
-    let fileHash: Buffer | undefined;
     const existingRecord = generatedFiles.get(filePath);
-    if (existingRecord && existingRecord.size === file.contents.byteLength) {
-      // Only hash existing file when needed
-      if (existingRecord.hash === undefined) {
-        existingRecord.hash = hashContent(existingRecord.contents);
-      }
-
-      // Compare against latest result output
-      fileHash = hashContent(file.contents);
-      if (fileHash.equals(existingRecord.hash)) {
-        // Same file
-        existingRecord.updated = false;
-        continue;
-      }
+    if (
+      existingRecord &&
+      existingRecord.size === file.contents.byteLength &&
+      existingRecord.hash === file.hash
+    ) {
+      // Same file
+      existingRecord.updated = false;
+      continue;
     }
 
+    // New or updated file
     generatedFiles.set(filePath, {
       contents: file.contents,
       size: file.contents.byteLength,
-      hash: fileHash,
+      hash: file.hash,
       updated: true,
       servable:
         file.type === BuildOutputFileType.Browser || file.type === BuildOutputFileType.Media,
@@ -428,6 +420,31 @@ export async function setupServer(
           };
         },
         configureServer(server) {
+          const originalssrTransform = server.ssrTransform;
+          server.ssrTransform = async (code, map, url, originalCode) => {
+            const result = await originalssrTransform(code, null, url, originalCode);
+            if (!result) {
+              return null;
+            }
+
+            let transformedCode = result.code;
+            if (result.map && map) {
+              transformedCode +=
+                `\n//# sourceMappingURL=` +
+                `data:application/json;base64,${Buffer.from(
+                  JSON.stringify(
+                    remapping([result.map as SourceMapInput, map as SourceMapInput], () => null),
+                  ),
+                ).toString('base64')}`;
+            }
+
+            return {
+              ...result,
+              map: null,
+              code: transformedCode,
+            };
+          };
+
           // Assets and resources get handled first
           server.middlewares.use(function angularAssetsMiddleware(req, res, next) {
             if (req.url === undefined || res.writableEnded) {
@@ -490,16 +507,6 @@ export async function setupServer(
                 return;
               }
 
-              const potentialPrerendered = outputFiles.get(posix.join(url, 'index.html'))?.contents;
-              if (potentialPrerendered) {
-                const content = Buffer.from(potentialPrerendered).toString('utf-8');
-                if (SSG_MARKER_REGEXP.test(content)) {
-                  transformIndexHtmlAndAddHeaders(url, potentialPrerendered, res, next);
-
-                  return;
-                }
-              }
-
               const rawHtml = outputFiles.get('/index.server.html')?.contents;
               if (!rawHtml) {
                 next();
@@ -513,9 +520,8 @@ export async function setupServer(
                   route: pathnameWithoutServePath(url, serverOptions),
                   serverContext: 'ssr',
                   loadBundle: (path: string) =>
-                    server.ssrLoadModule(path.slice(1)) as ReturnType<
-                      NonNullable<RenderOptions['loadBundle']>
-                    >,
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    server.ssrLoadModule(path.slice(1)) as any,
                   // Files here are only needed for critical CSS inlining.
                   outputFiles: {},
                   // TODO: add support for critical css inlining.

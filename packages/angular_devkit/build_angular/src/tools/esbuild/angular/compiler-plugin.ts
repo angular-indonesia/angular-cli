@@ -19,7 +19,6 @@ import assert from 'node:assert';
 import { realpath } from 'node:fs/promises';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import ts from 'typescript';
 import { maxWorkers } from '../../../utils/environment-options';
 import { JavaScriptTransformer } from '../javascript-transformer';
 import { LoadResultCache } from '../load-result-cache';
@@ -99,7 +98,6 @@ export function createCompilerPlugin(
       const stylesheetBundler = new ComponentStylesheetBundler(
         styleOptions,
         pluginOptions.incremental,
-        pluginOptions.loadResultCache,
       );
       let sharedTSCompilationState: SharedTSCompilationState | undefined;
 
@@ -132,6 +130,7 @@ export function createCompilerPlugin(
           // TODO: Differentiate between changed input files and stale output files
           modifiedFiles = referencedFileTracker.update(pluginOptions.sourceFileCache.modifiedFiles);
           pluginOptions.sourceFileCache.invalidate(modifiedFiles);
+          stylesheetBundler.invalidate(modifiedFiles);
         }
 
         if (
@@ -234,14 +233,12 @@ export function createCompilerPlugin(
           compilerOptions: { allowJs },
           referencedFiles,
         } = await compilation.initialize(tsconfigPath, hostOptions, (compilerOptions) => {
-          if (
-            compilerOptions.target === undefined ||
-            compilerOptions.target < ts.ScriptTarget.ES2022
-          ) {
+          // target of 9 is ES2022 (using the number avoids an expensive import of typescript just for an enum)
+          if (compilerOptions.target === undefined || compilerOptions.target < 9) {
             // If 'useDefineForClassFields' is already defined in the users project leave the value as is.
             // Otherwise fallback to false due to https://github.com/microsoft/TypeScript/issues/45995
             // which breaks the deprecated `@Effects` NGRX decorator and potentially other existing code as well.
-            compilerOptions.target = ts.ScriptTarget.ES2022;
+            compilerOptions.target = 9;
             compilerOptions.useDefineForClassFields ??= false;
 
             // Only add the warning on the initial build
@@ -258,6 +255,15 @@ export function createCompilerPlugin(
                 },
               ],
             });
+          }
+
+          if (compilerOptions.compilationMode === 'partial') {
+            setupWarnings?.push({
+              text: 'Angular partial compilation mode is not supported when building applications.',
+              location: null,
+              notes: [{ text: 'Full compilation mode will be used instead.' }],
+            });
+            compilerOptions.compilationMode = 'full';
           }
 
           // Enable incremental compilation by default if caching is enabled

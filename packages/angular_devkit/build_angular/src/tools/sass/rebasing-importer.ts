@@ -11,8 +11,8 @@ import MagicString from 'magic-string';
 import { readFileSync, readdirSync } from 'node:fs';
 import { basename, dirname, extname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import type { Importer, ImporterResult, Syntax } from 'sass';
-import { findImports, findUrls } from './lexer';
+import type { CanonicalizeContext, Importer, ImporterResult, Syntax } from 'sass';
+import { findUrls } from './lexer';
 
 /**
  * A preprocessed cache entry for the files and directories within a previously searched
@@ -21,45 +21,6 @@ import { findImports, findUrls } from './lexer';
 export interface DirectoryEntry {
   files: Set<string>;
   directories: Set<string>;
-}
-
-/**
- * A prefix that is added to import and use directive specifiers that should be resolved
- * as modules and that will contain added resolve directory information.
- *
- * This functionality is used to workaround the Sass limitation that it does not provide the
- * importer file to custom resolution plugins.
- */
-const MODULE_RESOLUTION_PREFIX = '__NG_PACKAGE__';
-
-function packModuleSpecifier(specifier: string, resolveDir: string): string {
-  const packed =
-    MODULE_RESOLUTION_PREFIX +
-    ';' +
-    // Encode the resolve directory to prevent unsupported characters from being present when
-    // Sass processes the URL. This is important on Windows which can contain drive letters
-    // and colons which would otherwise be interpreted as a URL scheme.
-    encodeURIComponent(resolveDir) +
-    ';' +
-    // Escape characters instead of encoding to provide more friendly not found error messages.
-    // Unescaping is automatically handled by Sass.
-    // https://developer.mozilla.org/en-US/docs/Web/CSS/url#syntax
-    specifier.replace(/[()\s'"]/g, '\\$&');
-
-  return packed;
-}
-
-function unpackModuleSpecifier(specifier: string): { specifier: string; resolveDir?: string } {
-  if (!specifier.startsWith(`${MODULE_RESOLUTION_PREFIX};`)) {
-    return { specifier };
-  }
-
-  const values = specifier.split(';', 3);
-
-  return {
-    specifier: values[2],
-    resolveDir: decodeURIComponent(values[1]),
-  };
 }
 
 /**
@@ -94,8 +55,8 @@ abstract class UrlRebasingImporter implements Importer<'sync'> {
     // Rebase any URLs that are found
     let updatedContents;
     for (const { start, end, value } of findUrls(contents)) {
-      // Skip if value is empty or a Sass variable
-      if (value.length === 0 || value.startsWith('$')) {
+      // Skip if value is empty, a Sass variable, or Webpack-specific prefix
+      if (value.length === 0 || value[0] === '$' || value[0] === '~' || value[0] === '^') {
         continue;
       }
 
@@ -112,27 +73,6 @@ abstract class UrlRebasingImporter implements Importer<'sync'> {
 
       updatedContents ??= new MagicString(contents);
       updatedContents.update(start, end, rebasedUrl);
-    }
-
-    // Add resolution directory information to module specifiers to facilitate resolution
-    for (const { start, end, specifier } of findImports(contents)) {
-      // Currently only provide directory information for known/common packages:
-      // * `@material/`
-      // * `@angular/`
-      //
-      // Comprehensive pre-resolution support may be added in the future. This is complicated by CSS/Sass not
-      // requiring a `./` or `../` prefix to signify relative paths. A bare specifier could be either relative
-      // or a module specifier. To differentiate, a relative resolution would need to be attempted first.
-      if (!specifier.startsWith('@angular/') && !specifier.startsWith('@material/')) {
-        continue;
-      }
-
-      updatedContents ??= new MagicString(contents);
-      updatedContents.update(
-        start,
-        end,
-        `"${packModuleSpecifier(specifier, stylesheetDirectory)}"`,
-      );
     }
 
     if (updatedContents) {
@@ -348,22 +288,17 @@ export class ModuleUrlRebasingImporter extends RelativeUrlRebasingImporter {
     entryDirectory: string,
     directoryCache: Map<string, DirectoryEntry>,
     rebaseSourceMaps: Map<string, RawSourceMap> | undefined,
-    private finder: (
-      specifier: string,
-      options: { fromImport: boolean; resolveDir?: string },
-    ) => URL | null,
+    private finder: (specifier: string, options: CanonicalizeContext) => URL | null,
   ) {
     super(entryDirectory, directoryCache, rebaseSourceMaps);
   }
 
-  override canonicalize(url: string, options: { fromImport: boolean }): URL | null {
+  override canonicalize(url: string, options: CanonicalizeContext): URL | null {
     if (url.startsWith('file://')) {
       return super.canonicalize(url, options);
     }
 
-    const { specifier, resolveDir } = unpackModuleSpecifier(url);
-
-    let result = this.finder(specifier, { ...options, resolveDir });
+    let result = this.finder(url, options);
     result &&= super.canonicalize(result.href, options);
 
     return result;
