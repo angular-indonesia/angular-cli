@@ -29,6 +29,7 @@ import {
   transformSupportedBrowsersToTargets,
 } from '../../tools/esbuild/utils';
 import { checkBudgets } from '../../utils/bundle-calculator';
+import { colors } from '../../utils/color';
 import { copyAssets } from '../../utils/copy-assets';
 import { getSupportedBrowsers } from '../../utils/supported-browsers';
 import { executePostBundleSteps } from './execute-post-bundle';
@@ -206,12 +207,15 @@ export async function executeBuild(
   if (options.budgets) {
     const compatStats = generateBudgetStats(metafile, initialFiles);
     budgetFailures = [...checkBudgets(options.budgets, compatStats, true)];
-    for (const { severity, message } of budgetFailures) {
-      if (severity === 'error') {
-        context.logger.error(message);
-      } else {
-        context.logger.warn(message);
-      }
+    if (budgetFailures.length > 0) {
+      await logMessages(context, {
+        errors: budgetFailures
+          .filter((failure) => failure.severity === 'error')
+          .map((failure) => ({ text: failure.message, location: null })),
+        warnings: budgetFailures
+          .filter((failure) => failure.severity !== 'error')
+          .map((failure) => ({ text: failure.message, location: null })),
+      });
     }
   }
 
@@ -247,16 +251,35 @@ export async function executeBuild(
     executionResult.assetFiles.push(...result.additionalAssets);
   }
 
+  await printWarningsAndErrorsToConsole(context, warnings, errors);
+
   if (prerenderOptions) {
     executionResult.addOutputFile(
       'prerendered-routes.json',
       JSON.stringify({ routes: prerenderedRoutes.sort((a, b) => a.localeCompare(b)) }, null, 2),
       BuildOutputFileType.Root,
     );
+
+    let prerenderMsg = `Prerendered ${prerenderedRoutes.length} static route`;
+    if (prerenderedRoutes.length > 1) {
+      prerenderMsg += 's.';
+    } else {
+      prerenderMsg += '.';
+    }
+
+    context.logger.info(colors.magenta(prerenderMsg) + '\n');
   }
 
-  printWarningsAndErrorsToConsole(context, warnings, errors);
-  logBuildStats(context, metafile, initialFiles, budgetFailures, estimatedTransferSizes);
+  const changedFiles =
+    rebuildState && executionResult.findChangedFiles(rebuildState.previousOutputHashes);
+  logBuildStats(
+    context,
+    metafile,
+    initialFiles,
+    budgetFailures,
+    changedFiles,
+    estimatedTransferSizes,
+  );
 
   // Write metafile if stats option is enabled
   if (options.stats) {
@@ -270,15 +293,13 @@ export async function executeBuild(
   return executionResult;
 }
 
-function printWarningsAndErrorsToConsole(
+async function printWarningsAndErrorsToConsole(
   context: BuilderContext,
   warnings: string[],
   errors: string[],
-): void {
-  for (const error of errors) {
-    context.logger.error(error);
-  }
-  for (const warning of warnings) {
-    context.logger.warn(warning);
-  }
+): Promise<void> {
+  await logMessages(context, {
+    errors: errors.map((text) => ({ text, location: null })),
+    warnings: warnings.map((text) => ({ text, location: null })),
+  });
 }

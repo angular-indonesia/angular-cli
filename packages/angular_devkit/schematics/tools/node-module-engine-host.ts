@@ -34,6 +34,7 @@ export class NodeModulesEngineHost extends FileSystemEngineHostBase {
   }
 
   private resolve(name: string, requester?: string, references = new Set<string>()): string {
+    // Keep track of the package requesting the schematic, in order to avoid infinite recursion
     if (requester) {
       if (references.has(requester)) {
         references.add(requester);
@@ -65,7 +66,16 @@ export class NodeModulesEngineHost extends FileSystemEngineHostBase {
         throw new NodePackageDoesNotSupportSchematics(name);
       }
 
-      collectionPath = this.resolve(schematics, packageJsonPath, references);
+      // If this is a relative path to the collection, then create the collection
+      // path in relation to the package path
+      if (schematics.startsWith('.')) {
+        const packageDirectory = dirname(packageJsonPath);
+        collectionPath = resolve(packageDirectory, schematics);
+      }
+      // Otherwise treat this as a package, and recurse to find the collection path
+      else {
+        collectionPath = this.resolve(schematics, packageJsonPath, references);
+      }
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'MODULE_NOT_FOUND') {
         throw e;

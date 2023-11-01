@@ -21,6 +21,7 @@ export interface RebuildState {
   rebuildContexts: BundlerContext[];
   codeBundleCache?: SourceFileCache;
   fileChanges: ChangedFiles;
+  previousOutputHashes: Map<string, string>;
 }
 
 /**
@@ -80,6 +81,9 @@ export class ExecutionResult {
     if (this.codeBundleCache?.referencedFiles) {
       files.push(...this.codeBundleCache.referencedFiles);
     }
+    if (this.codeBundleCache?.loadResultCache) {
+      files.push(...this.codeBundleCache.loadResultCache.watchFiles);
+    }
 
     return files;
   }
@@ -91,7 +95,20 @@ export class ExecutionResult {
       rebuildContexts: this.rebuildContexts,
       codeBundleCache: this.codeBundleCache,
       fileChanges,
+      previousOutputHashes: new Map(this.outputFiles.map((file) => [file.path, file.hash])),
     };
+  }
+
+  findChangedFiles(previousOutputHashes: Map<string, string>): Set<string> {
+    const changed = new Set<string>();
+    for (const file of this.outputFiles) {
+      const previousHash = previousOutputHashes.get(file.path);
+      if (previousHash === undefined || previousHash !== file.hash) {
+        changed.add(file.path);
+      }
+    }
+
+    return changed;
   }
 
   async dispose(): Promise<void> {
