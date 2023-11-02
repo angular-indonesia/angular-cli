@@ -18,7 +18,7 @@ export default async function () {
   });
 
   const { message: errorMessage } = await expectToFail(() => ng('build'));
-  if (!/Error.+budget/.test(errorMessage)) {
+  if (!/Error.+budget/i.test(errorMessage)) {
     throw new Error('Budget error: all, max error.');
   }
 
@@ -30,7 +30,7 @@ export default async function () {
   });
 
   const { stderr } = await ng('build');
-  if (!/Warning.+budget/.test(stderr)) {
+  if (!/Warning.+budget/i.test(stderr)) {
     throw new Error('Budget warning: all, min warning');
   }
 
@@ -42,7 +42,7 @@ export default async function () {
   });
 
   const { stderr: stderr2 } = await ng('build');
-  if (/(Warning|Error)/.test(stderr2)) {
+  if (/(Warning|Error)/i.test(stderr2)) {
     throw new Error('BIG max for all, should not error');
   }
 }
