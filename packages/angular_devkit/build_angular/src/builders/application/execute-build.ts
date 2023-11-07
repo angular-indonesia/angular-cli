@@ -125,7 +125,16 @@ export async function executeBuild(
         new BundlerContext(
           workspaceRoot,
           !!options.watch,
-          createServerCodeBundleOptions(options, nodeTargets, codeBundleCache),
+          createServerCodeBundleOptions(
+            {
+              ...options,
+              // Disable external deps for server bundles.
+              // This is because it breaks Vite 'optimizeDeps' for SSR.
+              externalPackages: false,
+            },
+            nodeTargets,
+            codeBundleCache,
+          ),
           () => false,
         ),
       );
@@ -169,11 +178,9 @@ export async function executeBuild(
 
   // Analyze external imports if external options are enabled
   if (options.externalPackages || options.externalDependencies?.length) {
+    const { browser = new Set(), server = new Set() } = bundlingResult.externalImports;
     // TODO: Filter externalImports to generate second argument to support wildcard externalDependency values
-    executionResult.setExternalMetadata(
-      [...bundlingResult.externalImports],
-      options.externalDependencies,
-    );
+    executionResult.setExternalMetadata([...browser], [...server], options.externalDependencies);
   }
 
   const { metafile, initialFiles, outputFiles } = bundlingResult;

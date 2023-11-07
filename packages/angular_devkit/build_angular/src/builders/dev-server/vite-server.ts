@@ -12,14 +12,14 @@ import type { json, logging } from '@angular-devkit/core';
 import type { Plugin } from 'esbuild';
 import { lookup as lookupMimeType } from 'mrmime';
 import assert from 'node:assert';
-import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { ServerResponse } from 'node:http';
-import type { AddressInfo } from 'node:net';
-import path from 'node:path';
-import type { Connect, InlineConfig, ViteDevServer } from 'vite';
+import { dirname, extname, join, relative } from 'node:path';
+import type { Connect, DepOptimizationConfig, InlineConfig, ViteDevServer } from 'vite';
 import { BuildOutputFile, BuildOutputFileType } from '../../tools/esbuild/bundler-context';
+import { ExternalResultMetadata } from '../../tools/esbuild/bundler-execution-result';
 import { JavaScriptTransformer } from '../../tools/esbuild/javascript-transformer';
+import { createRxjsEsmResolutionPlugin } from '../../tools/esbuild/rxjs-esm-resolution-plugin';
 import { getFeatureSupport, transformSupportedBrowsersToTargets } from '../../tools/esbuild/utils';
 import { createAngularLocaleDataPlugin } from '../../tools/vite/i18n-locale-plugin';
 import { renderPage } from '../../utils/server-rendering/render-page';
@@ -40,11 +40,18 @@ interface OutputFileRecord {
   servable: boolean;
 }
 
+// eslint-disable-next-line max-lines-per-function
 export async function* serveWithVite(
   serverOptions: NormalizedDevServerOptions,
   builderName: string,
   context: BuilderContext,
-  plugins?: Plugin[],
+  transformers?: {
+    indexHtml?: (content: string) => Promise<string>;
+  },
+  extensions?: {
+    middleware?: Connect.NextHandleFunction[];
+    buildPlugins?: Plugin[];
+  },
 ): AsyncIterableIterator<DevServerBuilderOutput> {
   // Get the browser configuration from the target name.
   const rawBrowserOptions = (await context.getTargetOptions(
@@ -101,6 +108,7 @@ export async function* serveWithVite(
     // have a negative effect unlike production where final output size is relevant.
     { sourcemap: true, jit: true },
     1,
+    true,
   );
 
   // Extract output index from options
@@ -116,8 +124,9 @@ export async function* serveWithVite(
   let hadError = false;
   const generatedFiles = new Map<string, OutputFileRecord>();
   const assetFiles = new Map<string, string>();
-  const externalMetadata: { implicit: string[]; explicit: string[] } = {
-    implicit: [],
+  const externalMetadata: ExternalResultMetadata = {
+    implicitBrowser: [],
+    implicitServer: [],
     explicit: [],
   };
   const build =
@@ -133,7 +142,7 @@ export async function* serveWithVite(
     {
       write: false,
     },
-    plugins,
+    extensions?.buildPlugins,
   )) {
     assert(result.outputFiles, 'Builder did not provide result files.');
 
@@ -171,15 +180,23 @@ export async function* serveWithVite(
       }
     }
 
-    // To avoid disconnecting the array objects from the option, these arrays need to be mutated
-    // instead of replaced.
+    // To avoid disconnecting the array objects from the option, these arrays need to be mutated instead of replaced.
     if (result.externalMetadata) {
-      if (result.externalMetadata.explicit) {
-        externalMetadata.explicit.push(...result.externalMetadata.explicit);
-      }
-      if (result.externalMetadata.implicit) {
-        externalMetadata.implicit.push(...result.externalMetadata.implicit);
-      }
+      const { implicitBrowser, implicitServer, explicit } = result.externalMetadata;
+      // Empty Arrays to avoid growing unlimited with every re-build.
+      externalMetadata.explicit.length = 0;
+      externalMetadata.implicitServer.length = 0;
+      externalMetadata.implicitBrowser.length = 0;
+
+      externalMetadata.explicit.push(...explicit);
+      externalMetadata.implicitServer.push(...implicitServer);
+      externalMetadata.implicitBrowser.push(...implicitBrowser);
+
+      // The below needs to be sorted as Vite uses these options are part of the hashing invalidation algorithm.
+      // See: https://github.com/vitejs/vite/blob/0873bae0cfe0f0718ad2f5743dd34a17e4ab563d/packages/vite/src/node/optimizer/index.ts#L1203-L1239
+      externalMetadata.explicit.sort();
+      externalMetadata.implicitServer.sort();
+      externalMetadata.implicitBrowser.sort();
     }
 
     if (server) {
@@ -191,7 +208,7 @@ export async function* serveWithVite(
       }
 
       const { root = '' } = await context.getProjectMetadata(projectName);
-      const projectRoot = path.join(context.workspaceRoot, root as string);
+      const projectRoot = join(context.workspaceRoot, root as string);
       const browsers = getSupportedBrowsers(projectRoot, context.logger);
       const target = transformSupportedBrowsersToTargets(browsers);
 
@@ -205,11 +222,25 @@ export async function* serveWithVite(
         !!browserOptions.ssr,
         prebundleTransformer,
         target,
+        extensions?.middleware,
+        transformers?.indexHtml,
       );
 
       server = await createServer(serverConfiguration);
-
       await server.listen();
+
+      if (serverConfiguration.ssr?.optimizeDeps?.disabled === false) {
+        /**
+         * Vite will only start dependency optimization of SSR modules when the first request comes in.
+         * In some cases, this causes a long waiting time. To mitigate this, we call `ssrLoadModule` to
+         * initiate this process before the first request.
+         *
+         * NOTE: This will intentionally fail from the unknown module, but currently there is no other way
+         * to initiate the SSR dep optimizer.
+         */
+        void server.ssrLoadModule('<deps-caller>').catch(() => {});
+      }
+
       const urls = server.resolvedUrls;
       if (urls && (urls.local.length || urls.network.length)) {
         serverUrl = new URL(urls.local[0] ?? urls.network[0]);
@@ -251,7 +282,7 @@ function handleUpdate(
     if (record.updated) {
       updatedFiles.push(file);
       const updatedModules = server.moduleGraph.getModulesByFile(
-        normalizePath(path.join(server.config.root, file)),
+        normalizePath(join(server.config.root, file)),
       );
       updatedModules?.forEach((m) => server?.moduleGraph.invalidateModule(m));
     }
@@ -307,8 +338,9 @@ function analyzeResultFiles(
       // This mimics the Webpack dev-server behavior.
       filePath = '/index.html';
     } else {
-      filePath = normalizePath(file.path);
+      filePath = '/' + normalizePath(file.path);
     }
+
     seen.add(filePath);
 
     // Skip analysis of sourcemaps
@@ -360,10 +392,12 @@ export async function setupServer(
   outputFiles: Map<string, OutputFileRecord>,
   assets: Map<string, string>,
   preserveSymlinks: boolean | undefined,
-  externalMetadata: { implicit: string[]; explicit: string[] },
+  externalMetadata: ExternalResultMetadata,
   ssr: boolean,
   prebundleTransformer: JavaScriptTransformer,
   target: string[],
+  extensionMiddleware?: Connect.NextHandleFunction[],
+  indexHtmlTransformer?: (content: string) => Promise<string>,
 ): Promise<InlineConfig> {
   const proxy = await loadProxyConfiguration(
     serverOptions.workspaceRoot,
@@ -376,13 +410,18 @@ export async function setupServer(
 
   // Path will not exist on disk and only used to provide separate path for Vite requests
   const virtualProjectRoot = normalizePath(
-    path.join(serverOptions.workspaceRoot, `.angular/vite-root/${randomUUID()}/`),
+    join(serverOptions.workspaceRoot, `.angular/vite-root`, serverOptions.buildTarget.project),
   );
+
+  const serverExplicitExternal = [
+    ...(await import('node:module')).builtinModules,
+    ...externalMetadata.explicit,
+  ];
 
   const configuration: InlineConfig = {
     configFile: false,
     envFile: false,
-    cacheDir: path.join(serverOptions.cacheOptions.path, 'vite'),
+    cacheDir: join(serverOptions.cacheOptions.path, 'vite'),
     root: virtualProjectRoot,
     publicDir: false,
     esbuild: false,
@@ -412,8 +451,32 @@ export async function setupServer(
       preTransformRequests: externalMetadata.explicit.length === 0,
     },
     ssr: {
-      // Exclude any provided dependencies (currently build defined externals)
-      external: externalMetadata.explicit,
+      // Note: `true` and `/.*/` have different sematics. When true, the `external` option is ignored.
+      noExternal: /.*/,
+      // Exclude any Node.js built in module and provided dependencies (currently build defined externals)
+      external: serverExplicitExternal,
+      optimizeDeps: getDepOptimizationConfig({
+        /**
+         * *********************************************
+         * NOTE: Temporary disable 'optimizeDeps' for SSR.
+         * *********************************************
+         *
+         * Currently this causes a number of issues.
+         * - Deps are re-optimized everytime the server is started.
+         * - Added deps after a rebuild are not optimized.
+         * - Breaks RxJs (Unless it is added as external). See: https://github.com/angular/angular-cli/issues/26235
+         */
+
+        // Only enable with caching since it causes prebundle dependencies to be cached
+        disabled: true, // !serverOptions.cacheOptions.enabled,
+        // Exclude any explicitly defined dependencies (currently build defined externals and node.js built-ins)
+        exclude: serverExplicitExternal,
+        // Include all implict dependencies from the external packages internal option
+        include: externalMetadata.implicitServer,
+        ssr: true,
+        prebundleTransformer,
+        target,
+      }),
     },
     plugins: [
       createAngularLocaleDataPlugin(),
@@ -433,21 +496,19 @@ export async function setupServer(
             // Remove query if present
             const [importerFile] = importer.split('?', 1);
 
-            source = normalizePath(
-              path.join(path.dirname(path.relative(virtualProjectRoot, importerFile)), source),
-            );
+            source =
+              '/' +
+              normalizePath(join(dirname(relative(virtualProjectRoot, importerFile)), source));
           }
-          if (source[0] === '/') {
-            source = source.slice(1);
-          }
+
           const [file] = source.split('?', 1);
           if (outputFiles.has(file)) {
-            return path.join(virtualProjectRoot, source);
+            return join(virtualProjectRoot, source);
           }
         },
         load(id) {
           const [file] = id.split('?', 1);
-          const relativeFile = normalizePath(path.relative(virtualProjectRoot, file));
+          const relativeFile = '/' + normalizePath(relative(virtualProjectRoot, file));
           const codeContents = outputFiles.get(relativeFile)?.contents;
           if (codeContents === undefined) {
             if (relativeFile.endsWith('/node_modules/vite/dist/client/client.mjs')) {
@@ -502,7 +563,7 @@ export async function setupServer(
             // Parse the incoming request.
             // The base of the URL is unused but required to parse the URL.
             const pathname = pathnameWithoutServePath(req.url, serverOptions);
-            const extension = path.extname(pathname);
+            const extension = extname(pathname);
 
             // Rewrite all build assets to a vite raw fs URL
             const assetSourcePath = assets.get(pathname);
@@ -540,6 +601,10 @@ export async function setupServer(
             next();
           });
 
+          if (extensionMiddleware?.length) {
+            extensionMiddleware.forEach((middleware) => server.middlewares.use(middleware));
+          }
+
           // Returning a function, installs middleware after the main transform middleware but
           // before the built-in HTML middleware
           return () => {
@@ -549,13 +614,19 @@ export async function setupServer(
               next: Connect.NextFunction,
             ) {
               const url = req.originalUrl;
-              if (!url || url.endsWith('.html')) {
+              if (
+                // Skip if path is not defined.
+                !url ||
+                // Skip if path is like a file.
+                // NOTE: We use a regexp to mitigate against matching requests like: /browse/pl.0ef59752c0cd457dbf1391f08cbd936f
+                /^\.[a-z]{2,4}$/i.test(extname(url.split('?')[0]))
+              ) {
                 next();
 
                 return;
               }
 
-              const rawHtml = outputFiles.get('index.server.html')?.contents;
+              const rawHtml = outputFiles.get('/index.server.html')?.contents;
               if (!rawHtml) {
                 next();
 
@@ -569,16 +640,18 @@ export async function setupServer(
                   document: html,
                   route,
                   serverContext: 'ssr',
-                  loadBundle: (path: string) =>
+                  loadBundle: (uri: string) =>
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    server.ssrLoadModule(path.slice(1)) as any,
+                    server.ssrLoadModule(uri.slice(1)) as any,
                   // Files here are only needed for critical CSS inlining.
                   outputFiles: {},
                   // TODO: add support for critical css inlining.
                   inlineCriticalCss: false,
                 });
 
-                return content;
+                return indexHtmlTransformer && content
+                  ? await indexHtmlTransformer(content)
+                  : content;
               });
             }
 
@@ -600,7 +673,13 @@ export async function setupServer(
               if (pathname === '/' || pathname === `/index.html`) {
                 const rawHtml = outputFiles.get('/index.html')?.contents;
                 if (rawHtml) {
-                  transformIndexHtmlAndAddHeaders(req.url, rawHtml, res, next);
+                  transformIndexHtmlAndAddHeaders(
+                    req.url,
+                    rawHtml,
+                    res,
+                    next,
+                    indexHtmlTransformer,
+                  );
 
                   return;
                 }
@@ -645,35 +724,18 @@ export async function setupServer(
         },
       },
     ],
-    optimizeDeps: {
+    // Browser only optimizeDeps. (This does not run for SSR dependencies).
+    optimizeDeps: getDepOptimizationConfig({
       // Only enable with caching since it causes prebundle dependencies to be cached
       disabled: !serverOptions.cacheOptions.enabled,
       // Exclude any explicitly defined dependencies (currently build defined externals)
       exclude: externalMetadata.explicit,
       // Include all implict dependencies from the external packages internal option
-      include: externalMetadata.implicit,
-      // Skip automatic file-based entry point discovery
-      entries: [],
-      // Add an esbuild plugin to run the Angular linker on dependencies
-      esbuildOptions: {
-        // Set esbuild supported targets.
-        target,
-        supported: getFeatureSupport(target),
-        plugins: [
-          {
-            name: 'angular-vite-optimize-deps',
-            setup(build) {
-              build.onLoad({ filter: /\.[cm]?js$/ }, async (args) => {
-                return {
-                  contents: await prebundleTransformer.transformFile(args.path),
-                  loader: 'js',
-                };
-              });
-            },
-          },
-        ],
-      },
-    },
+      include: externalMetadata.implicitBrowser,
+      ssr: false,
+      prebundleTransformer,
+      target,
+    }),
   };
 
   if (serverOptions.ssl) {
@@ -727,4 +789,58 @@ function pathnameWithoutServePath(url: string, serverOptions: NormalizedDevServe
   }
 
   return pathname;
+}
+
+type ViteEsBuildPlugin = NonNullable<
+  NonNullable<DepOptimizationConfig['esbuildOptions']>['plugins']
+>[0];
+
+function getDepOptimizationConfig({
+  disabled,
+  exclude,
+  include,
+  target,
+  prebundleTransformer,
+  ssr,
+}: {
+  disabled: boolean;
+  exclude: string[];
+  include: string[];
+  target: string[];
+  prebundleTransformer: JavaScriptTransformer;
+  ssr: boolean;
+}): DepOptimizationConfig {
+  const plugins: ViteEsBuildPlugin[] = [
+    {
+      name: `angular-vite-optimize-deps${ssr ? '-ssr' : ''}`,
+      setup(build) {
+        build.onLoad({ filter: /\.[cm]?js$/ }, async (args) => {
+          return {
+            contents: await prebundleTransformer.transformFile(args.path),
+            loader: 'js',
+          };
+        });
+      },
+    },
+  ];
+
+  if (ssr) {
+    plugins.unshift(createRxjsEsmResolutionPlugin() as ViteEsBuildPlugin);
+  }
+
+  return {
+    // Only enable with caching since it causes prebundle dependencies to be cached
+    disabled,
+    // Exclude any explicitly defined dependencies (currently build defined externals)
+    exclude,
+    // Include all implict dependencies from the external packages internal option
+    include,
+    // Add an esbuild plugin to run the Angular linker on dependencies
+    esbuildOptions: {
+      // Set esbuild supported targets.
+      target,
+      supported: getFeatureSupport(target),
+      plugins,
+    },
+  };
 }
