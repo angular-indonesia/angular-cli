@@ -68,11 +68,13 @@ export async function* serveWithVite(
     builderName,
   )) as json.JsonObject & BrowserBuilderOptions;
 
-  if (browserOptions.prerender) {
+  if (browserOptions.prerender || browserOptions.ssr) {
     // Disable prerendering if enabled and force SSR.
     // This is so instead of prerendering all the routes for every change, the page is "prerendered" when it is requested.
-    browserOptions.ssr = true;
     browserOptions.prerender = false;
+
+    // Avoid bundling and processing the ssr entry-point as this is not used by the dev-server.
+    browserOptions.ssr = true;
 
     // https://nodejs.org/api/process.html#processsetsourcemapsenabledval
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -106,7 +108,7 @@ export async function* serveWithVite(
     // Always enable JIT linking to support applications built with and without AOT.
     // In a development environment the additional scope information does not
     // have a negative effect unlike production where final output size is relevant.
-    { sourcemap: true, jit: true },
+    { sourcemap: true, jit: true, thirdPartySourcemaps: true },
     1,
     true,
   );
