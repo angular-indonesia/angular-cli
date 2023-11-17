@@ -22,6 +22,7 @@ import { JavaScriptTransformer } from '../../tools/esbuild/javascript-transforme
 import { createRxjsEsmResolutionPlugin } from '../../tools/esbuild/rxjs-esm-resolution-plugin';
 import { getFeatureSupport, transformSupportedBrowsersToTargets } from '../../tools/esbuild/utils';
 import { createAngularLocaleDataPlugin } from '../../tools/vite/i18n-locale-plugin';
+import { loadEsmModule } from '../../utils/load-esm';
 import { renderPage } from '../../utils/server-rendering/render-page';
 import { getSupportedBrowsers } from '../../utils/supported-browsers';
 import { getIndexOutputFile } from '../../utils/webpack-browser-config';
@@ -119,7 +120,7 @@ export async function* serveWithVite(
   const htmlIndexPath = getIndexOutputFile(browserOptions.index as any);
 
   // dynamically import Vite for ESM compatibility
-  const { createServer, normalizePath } = await import('vite');
+  const { createServer, normalizePath } = await loadEsmModule<typeof import('vite')>('vite');
 
   let server: ViteDevServer | undefined;
   let serverUrl: URL | undefined;
@@ -233,6 +234,7 @@ export async function* serveWithVite(
         !!browserOptions.ssr,
         prebundleTransformer,
         target,
+        browserOptions.loader as EsbuildLoaderOption | undefined,
         extensions?.middleware,
         transformers?.indexHtml,
       );
@@ -400,6 +402,7 @@ export async function setupServer(
   ssr: boolean,
   prebundleTransformer: JavaScriptTransformer,
   target: string[],
+  prebundleLoaderExtensions: EsbuildLoaderOption | undefined,
   extensionMiddleware?: Connect.NextHandleFunction[],
   indexHtmlTransformer?: (content: string) => Promise<string>,
 ): Promise<InlineConfig> {
@@ -410,7 +413,7 @@ export async function setupServer(
   );
 
   // dynamically import Vite for ESM compatibility
-  const { normalizePath } = await import('vite');
+  const { normalizePath } = await loadEsmModule<typeof import('vite')>('vite');
 
   // Path will not exist on disk and only used to provide separate path for Vite requests
   const virtualProjectRoot = normalizePath(
@@ -480,6 +483,7 @@ export async function setupServer(
         ssr: true,
         prebundleTransformer,
         target,
+        loader: prebundleLoaderExtensions,
       }),
     },
     plugins: [
@@ -546,7 +550,7 @@ export async function setupServer(
             );
 
             // Set the sourcemap root to the workspace root. This is needed since we set a virtual path as root.
-            remappedMap.sourceRoot = serverOptions.workspaceRoot + '/';
+            remappedMap.sourceRoot = normalizePath(serverOptions.workspaceRoot) + '/';
 
             return {
               ...result,
@@ -735,6 +739,7 @@ export async function setupServer(
       ssr: false,
       prebundleTransformer,
       target,
+      loader: prebundleLoaderExtensions,
     }),
   };
 
@@ -795,6 +800,8 @@ type ViteEsBuildPlugin = NonNullable<
   NonNullable<DepOptimizationConfig['esbuildOptions']>['plugins']
 >[0];
 
+type EsbuildLoaderOption = Exclude<DepOptimizationConfig['esbuildOptions'], undefined>['loader'];
+
 function getDepOptimizationConfig({
   disabled,
   exclude,
@@ -802,6 +809,7 @@ function getDepOptimizationConfig({
   target,
   prebundleTransformer,
   ssr,
+  loader,
 }: {
   disabled: boolean;
   exclude: string[];
@@ -809,6 +817,7 @@ function getDepOptimizationConfig({
   target: string[];
   prebundleTransformer: JavaScriptTransformer;
   ssr: boolean;
+  loader?: EsbuildLoaderOption;
 }): DepOptimizationConfig {
   const plugins: ViteEsBuildPlugin[] = [
     {
@@ -841,6 +850,7 @@ function getDepOptimizationConfig({
       target,
       supported: getFeatureSupport(target),
       plugins,
+      loader,
     },
   };
 }
