@@ -22,6 +22,7 @@ import { JavaScriptTransformer } from '../../tools/esbuild/javascript-transforme
 import { createRxjsEsmResolutionPlugin } from '../../tools/esbuild/rxjs-esm-resolution-plugin';
 import { getFeatureSupport, transformSupportedBrowsersToTargets } from '../../tools/esbuild/utils';
 import { createAngularLocaleDataPlugin } from '../../tools/vite/i18n-locale-plugin';
+import { normalizeSourceMaps } from '../../utils';
 import { loadEsmModule } from '../../utils/load-esm';
 import { renderPage } from '../../utils/server-rendering/render-page';
 import { getSupportedBrowsers } from '../../utils/supported-browsers';
@@ -104,12 +105,14 @@ export async function* serveWithVite(
     browserOptions.forceI18nFlatOutput = true;
   }
 
+  const { vendor: thirdPartySourcemaps } = normalizeSourceMaps(browserOptions.sourceMap ?? false);
+
   // Setup the prebundling transformer that will be shared across Vite prebundling requests
   const prebundleTransformer = new JavaScriptTransformer(
     // Always enable JIT linking to support applications built with and without AOT.
     // In a development environment the additional scope information does not
     // have a negative effect unlike production where final output size is relevant.
-    { sourcemap: true, jit: true, thirdPartySourcemaps: true },
+    { sourcemap: true, jit: true, thirdPartySourcemaps },
     1,
     true,
   );
@@ -142,9 +145,9 @@ export async function* serveWithVite(
   });
 
   const build =
-    builderName === '@angular-devkit/build-angular:application'
-      ? buildApplicationInternal
-      : buildEsbuildBrowser;
+    builderName === '@angular-devkit/build-angular:browser-esbuild'
+      ? buildEsbuildBrowser
+      : buildApplicationInternal;
 
   // TODO: Switch this to an architect schedule call when infrastructure settings are supported
   for await (const result of build(
@@ -237,6 +240,7 @@ export async function* serveWithVite(
         browserOptions.loader as EsbuildLoaderOption | undefined,
         extensions?.middleware,
         transformers?.indexHtml,
+        thirdPartySourcemaps,
       );
 
       server = await createServer(serverConfiguration);
@@ -405,6 +409,7 @@ export async function setupServer(
   prebundleLoaderExtensions: EsbuildLoaderOption | undefined,
   extensionMiddleware?: Connect.NextHandleFunction[],
   indexHtmlTransformer?: (content: string) => Promise<string>,
+  thirdPartySourcemaps = false,
 ): Promise<InlineConfig> {
   const proxy = await loadProxyConfiguration(
     serverOptions.workspaceRoot,
@@ -449,10 +454,8 @@ export async function setupServer(
       open: serverOptions.open,
       headers: serverOptions.headers,
       proxy,
-      // Currently does not appear to be a way to disable file watching directly so ignore all files
-      watch: {
-        ignored: ['**/*'],
-      },
+      // File watching is handled by the build directly. `null` disables file watching for Vite.
+      watch: null,
       // This is needed when `externalDependencies` is used to prevent Vite load errors.
       // NOTE: If Vite adds direct support for externals, this can be removed.
       preTransformRequests: externalMetadata.explicit.length === 0,
@@ -484,6 +487,7 @@ export async function setupServer(
         prebundleTransformer,
         target,
         loader: prebundleLoaderExtensions,
+        thirdPartySourcemaps,
       }),
     },
     plugins: [
@@ -740,6 +744,7 @@ export async function setupServer(
       prebundleTransformer,
       target,
       loader: prebundleLoaderExtensions,
+      thirdPartySourcemaps,
     }),
   };
 
@@ -810,6 +815,7 @@ function getDepOptimizationConfig({
   prebundleTransformer,
   ssr,
   loader,
+  thirdPartySourcemaps,
 }: {
   disabled: boolean;
   exclude: string[];
@@ -818,10 +824,13 @@ function getDepOptimizationConfig({
   prebundleTransformer: JavaScriptTransformer;
   ssr: boolean;
   loader?: EsbuildLoaderOption;
+  thirdPartySourcemaps: boolean;
 }): DepOptimizationConfig {
   const plugins: ViteEsBuildPlugin[] = [
     {
-      name: `angular-vite-optimize-deps${ssr ? '-ssr' : ''}`,
+      name: `angular-vite-optimize-deps${ssr ? '-ssr' : ''}${
+        thirdPartySourcemaps ? '-vendor-sourcemap' : ''
+      }`,
       setup(build) {
         build.onLoad({ filter: /\.[cm]?js$/ }, async (args) => {
           return {
