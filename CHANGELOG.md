@@ -1,3 +1,52 @@
+<a name="17.0.5"></a>
+
+# 17.0.5 (2023-11-29)
+
+Rolling back [bbbe13d67](https://github.com/angular/angular-cli/commit/bbbe13d6782ba9d1b80473a98ea95bc301c48597) which appears to break file watching on Mac devices.
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="17.1.0-next.0"></a>
+
+# 17.1.0-next.0 (2023-11-29)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                                 |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------------------- |
+| [e0b274b8f](https://github.com/angular/angular-cli/commit/e0b274b8ff4d164061ca7b60248bb85ceee8f65d) | feat | add option to retain CSS special comments in global styles                  |
+| [4784155bd](https://github.com/angular/angular-cli/commit/4784155bd62cfac9b29327167093e70c9c6bee41) | feat | add wildcard option for `allowedCommonJsDependencies`                       |
+| [3b93df42d](https://github.com/angular/angular-cli/commit/3b93df42daf9eda9215ea65d8ed0efd1ef203a09) | feat | allow configuring loaders for custom file extensions in application builder |
+| [ccba849e4](https://github.com/angular/angular-cli/commit/ccba849e48287805bd8253a03f88d5f44b2b23ae) | feat | support keyboard command shortcuts in application dev server                |
+| [6473b0160](https://github.com/angular/angular-cli/commit/6473b01603b55d265489840cbf32697ad663aeeb) | fix  | ensure all configured assets can be served by dev server                    |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="17.0.4"></a>
+
+# 17.0.4 (2023-11-29)
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                           |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------- |
+| [7a2823080](https://github.com/angular/angular-cli/commit/7a2823080c61df3515d85f7aa35ee83f57e80e2d) | fix  | remove CommonModule import from standalone components |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                             |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------------------- |
+| [0634a4e40](https://github.com/angular/angular-cli/commit/0634a4e40f1b2e4c0a076814f3e1b242ccf1a588) | fix  | avoid native realpath in application builder                            |
+| [22880d9cb](https://github.com/angular/angular-cli/commit/22880d9cbf70fffb6cc685b3a9ad82ca741a56fe) | fix  | correct set locale when using esbuild based builders                    |
+| [a0680672f](https://github.com/angular/angular-cli/commit/a0680672fd369dc6fba2433441d086e53bebb0a2) | fix  | correctly watch files when app is in a directory that starts with a dot |
+| [bbbe13d67](https://github.com/angular/angular-cli/commit/bbbe13d6782ba9d1b80473a98ea95bc301c48597) | fix  | improve file watching on Windows when using certain IDEs                |
+| [27e7c2e1b](https://github.com/angular/angular-cli/commit/27e7c2e1b4f514843c2c505b7fe1b3cef126a101) | fix  | propagate localize errors to full build result                          |
+| [7455fdca0](https://github.com/angular/angular-cli/commit/7455fdca01bd4af00248bb1769945dc088c59063) | fix  | serve assets from the provided `serve-path`                             |
+| [657a07bd6](https://github.com/angular/angular-cli/commit/657a07bd6ba138a209c2a1540ea4d200c60e0f66) | fix  | treeshake unused class that use custom decorators                       |
+| [77474951b](https://github.com/angular/angular-cli/commit/77474951b59605a2c36a8bd890376f9e28131ee4) | fix  | use workspace real path when not preserving symlinks                    |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="17.0.3"></a>
 
 # 17.0.3 (2023-11-21)
