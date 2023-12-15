@@ -22,7 +22,7 @@ import { JavaScriptTransformer } from '../../tools/esbuild/javascript-transforme
 import { createRxjsEsmResolutionPlugin } from '../../tools/esbuild/rxjs-esm-resolution-plugin';
 import { getFeatureSupport, transformSupportedBrowsersToTargets } from '../../tools/esbuild/utils';
 import { createAngularLocaleDataPlugin } from '../../tools/vite/i18n-locale-plugin';
-import { normalizeSourceMaps } from '../../utils';
+import { loadProxyConfiguration, normalizeSourceMaps } from '../../utils';
 import { loadEsmModule } from '../../utils/load-esm';
 import { renderPage } from '../../utils/server-rendering/render-page';
 import { getSupportedBrowsers } from '../../utils/supported-browsers';
@@ -30,7 +30,6 @@ import { getIndexOutputFile } from '../../utils/webpack-browser-config';
 import { buildApplicationInternal } from '../application';
 import { buildEsbuildBrowser } from '../browser-esbuild';
 import { Schema as BrowserBuilderOptions } from '../browser-esbuild/schema';
-import { loadProxyConfiguration } from './load-proxy-config';
 import type { NormalizedDevServerOptions } from './options';
 import type { DevServerBuilderOutput } from './webpack-server';
 
@@ -609,6 +608,11 @@ export async function setupServer(
             // Rewrite all build assets to a vite raw fs URL
             const assetSourcePath = assets.get(pathname);
             if (assetSourcePath !== undefined) {
+              // Workaround to disable Vite transformer middleware.
+              // See: https://github.com/vitejs/vite/blob/746a1daab0395f98f0afbdee8f364cb6cf2f3b3f/packages/vite/src/node/server/middlewares/transform.ts#L201 and
+              // https://github.com/vitejs/vite/blob/746a1daab0395f98f0afbdee8f364cb6cf2f3b3f/packages/vite/src/node/server/transformRequest.ts#L204-L206
+              req.headers.accept = 'text/html';
+
               // The encoding needs to match what happens in the vite static middleware.
               // ref: https://github.com/vitejs/vite/blob/d4f13bd81468961c8c926438e815ab6b1c82735e/packages/vite/src/node/server/middlewares/static.ts#L163
               req.url = `${server.config.base}@fs/${encodeURI(assetSourcePath)}`;
@@ -675,11 +679,9 @@ export async function setupServer(
               }
 
               transformIndexHtmlAndAddHeaders(url, rawHtml, res, next, async (html) => {
-                const protocol = serverOptions.ssl ? 'https' : 'http';
-                const route = `${protocol}://${req.headers.host}${req.originalUrl}`;
                 const { content } = await renderPage({
                   document: html,
-                  route,
+                  route: new URL(req.originalUrl ?? '/', server.resolvedUrls?.local[0]).toString(),
                   serverContext: 'ssr',
                   loadBundle: (uri: string) =>
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any

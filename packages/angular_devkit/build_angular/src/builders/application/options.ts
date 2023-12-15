@@ -18,13 +18,25 @@ import {
 } from '../../tools/webpack/utils/helpers';
 import { normalizeAssetPatterns, normalizeOptimization, normalizeSourceMaps } from '../../utils';
 import { I18nOptions, createI18nOptions } from '../../utils/i18n-options';
+import { IndexHtmlTransform } from '../../utils/index-file/index-html-generator';
 import { normalizeCacheOptions } from '../../utils/normalize-cache';
 import { generateEntryPoints } from '../../utils/package-chunk-sort';
 import { findTailwindConfigurationFile } from '../../utils/tailwind';
 import { getIndexInputFile, getIndexOutputFile } from '../../utils/webpack-browser-config';
-import { Schema as ApplicationBuilderOptions, I18NTranslation, OutputHashing } from './schema';
+import {
+  Schema as ApplicationBuilderOptions,
+  I18NTranslation,
+  OutputHashing,
+  OutputPathClass,
+} from './schema';
 
+export type NormalizedOutputOptions = Required<OutputPathClass>;
 export type NormalizedApplicationBuildOptions = Awaited<ReturnType<typeof normalizeOptions>>;
+
+export interface ApplicationBuilderExtensions {
+  codePlugins?: Plugin[];
+  indexHtmlTransformer?: IndexHtmlTransform;
+}
 
 /** Internal options hidden from builder schema but available when invoked programmatically. */
 interface InternalOptions {
@@ -82,7 +94,7 @@ export async function normalizeOptions(
   context: BuilderContext,
   projectName: string,
   options: ApplicationBuilderInternalOptions,
-  plugins?: Plugin[],
+  extensions?: ApplicationBuilderExtensions,
 ) {
   // If not explicitly set, default to the Node.js process argument
   const preserveSymlinks =
@@ -119,12 +131,22 @@ export async function normalizeOptions(
 
   const entryPoints = normalizeEntryPoints(workspaceRoot, options.browser, options.entryPoints);
   const tsconfig = path.join(workspaceRoot, options.tsConfig);
-  const outputPath = normalizeDirectoryPath(path.join(workspaceRoot, options.outputPath));
   const optimizationOptions = normalizeOptimization(options.optimization);
   const sourcemapOptions = normalizeSourceMaps(options.sourceMap ?? false);
   const assets = options.assets?.length
     ? normalizeAssetPatterns(options.assets, workspaceRoot, projectRoot, projectSourceRoot)
     : undefined;
+
+  const outputPath = options.outputPath;
+  const outputOptions: NormalizedOutputOptions = {
+    browser: 'browser',
+    server: 'server',
+    media: 'media',
+    ...(typeof outputPath === 'string' ? undefined : outputPath),
+    base: normalizeDirectoryPath(
+      path.join(workspaceRoot, typeof outputPath === 'string' ? outputPath : outputPath.base),
+    ),
+  };
 
   const outputNames = {
     bundles:
@@ -132,10 +154,10 @@ export async function normalizeOptions(
         ? '[name]-[hash]'
         : '[name]',
     media:
-      'media/' +
+      outputOptions.media +
       (options.outputHashing === OutputHashing.All || options.outputHashing === OutputHashing.Media
-        ? '[name]-[hash]'
-        : '[name]'),
+        ? '/[name]-[hash]'
+        : '/[name]'),
   };
 
   let fileReplacements: Record<string, string> | undefined;
@@ -185,26 +207,6 @@ export async function normalizeOptions(
     }
   }
 
-  let tailwindConfiguration: { file: string; package: string } | undefined;
-  const tailwindConfigurationPath = await findTailwindConfigurationFile(workspaceRoot, projectRoot);
-  if (tailwindConfigurationPath) {
-    // Create a node resolver at the project root as a directory
-    const resolver = createRequire(projectRoot + '/');
-    try {
-      tailwindConfiguration = {
-        file: tailwindConfigurationPath,
-        package: resolver.resolve('tailwindcss'),
-      };
-    } catch {
-      const relativeTailwindConfigPath = path.relative(workspaceRoot, tailwindConfigurationPath);
-      context.logger.warn(
-        `Tailwind CSS configuration file found (${relativeTailwindConfigPath})` +
-          ` but the 'tailwindcss' package is not installed.` +
-          ` To enable Tailwind CSS, please install the 'tailwindcss' package.`,
-      );
-    }
-  }
-
   let indexHtmlOptions;
   // index can never have a value of `true` but in the schema it's of type `boolean`.
   if (typeof options.index !== 'boolean') {
@@ -217,6 +219,7 @@ export async function normalizeOptions(
         scripts: options.scripts ?? [],
         styles: options.styles ?? [],
       }),
+      transformer: extensions?.indexHtmlTransformer,
     };
   }
 
@@ -311,7 +314,7 @@ export async function normalizeOptions(
     workspaceRoot,
     entryPoints,
     optimizationOptions,
-    outputPath,
+    outputOptions,
     outExtension,
     sourcemapOptions,
     tsconfig,
@@ -324,14 +327,44 @@ export async function normalizeOptions(
     serviceWorker:
       typeof serviceWorker === 'string' ? path.join(workspaceRoot, serviceWorker) : undefined,
     indexHtmlOptions,
-    tailwindConfiguration,
+    tailwindConfiguration: await getTailwindConfig(workspaceRoot, projectRoot, context),
     i18nOptions,
     namedChunks,
     budgets: budgets?.length ? budgets : undefined,
     publicPath: deployUrl ? deployUrl : undefined,
-    plugins: plugins?.length ? plugins : undefined,
+    plugins: extensions?.codePlugins?.length ? extensions?.codePlugins : undefined,
     loaderExtensions,
   };
+}
+
+async function getTailwindConfig(
+  workspaceRoot: string,
+  projectRoot: string,
+  context: BuilderContext,
+): Promise<{ file: string; package: string } | undefined> {
+  const tailwindConfigurationPath = await findTailwindConfigurationFile(workspaceRoot, projectRoot);
+
+  if (!tailwindConfigurationPath) {
+    return undefined;
+  }
+
+  // Create a node resolver at the project root as a directory
+  const resolver = createRequire(projectRoot + '/');
+  try {
+    return {
+      file: tailwindConfigurationPath,
+      package: resolver.resolve('tailwindcss'),
+    };
+  } catch {
+    const relativeTailwindConfigPath = path.relative(workspaceRoot, tailwindConfigurationPath);
+    context.logger.warn(
+      `Tailwind CSS configuration file found (${relativeTailwindConfigPath})` +
+        ` but the 'tailwindcss' package is not installed.` +
+        ` To enable Tailwind CSS, please install the 'tailwindcss' package.`,
+    );
+  }
+
+  return undefined;
 }
 
 /**

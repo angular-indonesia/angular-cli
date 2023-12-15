@@ -1,3 +1,49 @@
+<a name="17.1.0-next.2"></a>
+
+# 17.1.0-next.2 (2023-12-13)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                                                      |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------ |
+| [204794c4f](https://github.com/angular/angular-cli/commit/204794c4f8e87882af974144fff642762930b4d3) | feat | add support for `--no-browsers` in karma builder                                                 |
+| [f6e67df1c](https://github.com/angular/angular-cli/commit/f6e67df1c4f286fb1fe195b75cdaab4339ad7604) | feat | inline Google and Adobe fonts located in stylesheets                                             |
+| [4b3a96542](https://github.com/angular/angular-cli/commit/4b3a965429bfaa6559693b2a3b69565455a75866) | fix  | `baseHref` with trailing slash causes server not to be accessible without trailing slash         |
+| [72bd0ab9d](https://github.com/angular/angular-cli/commit/72bd0ab9d069ad726c389d860ac5f11f34370214) | fix  | allow vite to serve JavaScript and TypeScript assets                                             |
+| [12f4433af](https://github.com/angular/angular-cli/commit/12f4433afb8d0145259a37774296199a25d45e0c) | fix  | cache loading of component resources in JIT mode                                                 |
+| [d07ef2f0b](https://github.com/angular/angular-cli/commit/d07ef2f0b9d6bbbbe0a97b3f1551ecfaa73ba983) | fix  | ensure browser-esbuild is used in dev server with browser builder and forceEsbuild               |
+| [5b8e2d5e5](https://github.com/angular/angular-cli/commit/5b8e2d5e57d1c0b07f015eec1bd8fb889dfa8a78) | fix  | ensure port 0 uses random port with Vite development server                                      |
+| [0f253a1fc](https://github.com/angular/angular-cli/commit/0f253a1fc696bdf15a0cf99daff876d7bb3727ea) | fix  | file is missing from the TypeScript compilation with JIT                                         |
+| [2909daf61](https://github.com/angular/angular-cli/commit/2909daf6180f4471e914c3833df53961e33e022c) | fix  | handle updates of an `npm link` library from another workspace when `preserveSymlinks` is `true` |
+| [bf5fbddd4](https://github.com/angular/angular-cli/commit/bf5fbddd45cdf2e9ee3e7360f8b872d7d71105b3) | fix  | inlining of fonts results in jagged fonts for Windows users                                      |
+| [6a44989f5](https://github.com/angular/angular-cli/commit/6a44989f54ce4ef798079196949f2ea878f5efd6) | fix  | retain symlinks to output platform directories on builds                                         |
+| [4e1f0e44d](https://github.com/angular/angular-cli/commit/4e1f0e44dca106fa299b5dd0e4145c2c3a99ab4f) | fix  | the request url "..." is outside of Vite serving allow list for all assets                       |
+| [7a50df5c0](https://github.com/angular/angular-cli/commit/7a50df5c046b65bb196408dd2c4771d5deccd034) | fix  | update ESM loader to work with Node.js 18.19.0                                                   |
+| [125fb779f](https://github.com/angular/angular-cli/commit/125fb779ff394f388c2d027c1dda4a33bd8caa62) | perf | reduce TypeScript JSDoc parsing in application builder                                           |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="17.0.7"></a>
+
+# 17.0.7 (2023-12-13)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                                                      |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------ |
+| [3df3e583c](https://github.com/angular/angular-cli/commit/3df3e583c8788511598bbe406012196a2882ee49) | fix  | `baseHref` with trailing slash causes server not to be accessible without trailing slash         |
+| [ef1178188](https://github.com/angular/angular-cli/commit/ef1178188a145a1277197a33a304910e1024c365) | fix  | allow vite to serve JavaScript and TypeScript assets                                             |
+| [385eb77d2](https://github.com/angular/angular-cli/commit/385eb77d2645a1407dbc7528e90a506f9bb2952f) | fix  | cache loading of component resources in JIT mode                                                 |
+| [4b3af73ac](https://github.com/angular/angular-cli/commit/4b3af73ac934a24dd2b022604bc01f00389d87a1) | fix  | ensure browser-esbuild is used in dev server with browser builder and forceEsbuild               |
+| [d1b27e53e](https://github.com/angular/angular-cli/commit/d1b27e53ed9e23a0c08c13c22fc0b4c00f3998b2) | fix  | ensure port 0 uses random port with Vite development server                                      |
+| [f2f7d7c70](https://github.com/angular/angular-cli/commit/f2f7d7c7073e5564ddd8a196b6fcaab7db55b110) | fix  | file is missing from the TypeScript compilation with JIT                                         |
+| [7b8d6cddd](https://github.com/angular/angular-cli/commit/7b8d6cddd0daa637a5fecdea627f4154fafe23fa) | fix  | handle updates of an `npm link` library from another workspace when `preserveSymlinks` is `true` |
+| [c08c78cb8](https://github.com/angular/angular-cli/commit/c08c78cb8965a52887f697e12633391908a3b434) | fix  | inlining of fonts results in jagged fonts for Windows users                                      |
+| [930024811](https://github.com/angular/angular-cli/commit/9300248114282a2a425b722482fdf9676b000b94) | fix  | retain symlinks to output platform directories on builds                                         |
+| [3623fe911](https://github.com/angular/angular-cli/commit/3623fe9118be14eedd1a04351df5e15b3d7a289a) | fix  | update ESM loader to work with Node.js 18.19.0                                                   |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="17.1.0-next.1"></a>
 
 # 17.1.0-next.1 (2023-12-06)

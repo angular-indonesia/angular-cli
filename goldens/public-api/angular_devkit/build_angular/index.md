@@ -46,7 +46,7 @@ export interface ApplicationBuilderOptions {
     namedChunks?: boolean;
     optimization?: OptimizationUnion_2;
     outputHashing?: OutputHashing_2;
-    outputPath: string;
+    outputPath: OutputPathUnion;
     poll?: number;
     polyfills?: string[];
     prerender?: PrerenderUnion;
@@ -149,13 +149,10 @@ export interface Budget {
 }
 
 // @public
-export function buildApplication(options: ApplicationBuilderOptions, context: BuilderContext, plugins?: Plugin_2[]): AsyncIterable<BuilderOutput & {
-    outputFiles?: BuildOutputFile[];
-    assetFiles?: {
-        source: string;
-        destination: string;
-    }[];
-}>;
+export function buildApplication(options: ApplicationBuilderOptions, context: BuilderContext, plugins?: Plugin_2[]): AsyncIterable<ApplicationBuilderOutput>;
+
+// @public
+export function buildApplication(options: ApplicationBuilderOptions, context: BuilderContext, extensions?: ApplicationBuilderExtensions): AsyncIterable<ApplicationBuilderOutput>;
 
 // @public
 export enum CrossOrigin {
