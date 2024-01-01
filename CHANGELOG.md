@@ -1,3 +1,78 @@
+<a name="17.1.0-next.3"></a>
+
+# 17.1.0-next.3 (2023-12-21)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                                                     |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------- |
+| [a391b5f0c](https://github.com/angular/angular-cli/commit/a391b5f0c21782f69ec8c79c71d195b10b7849a6) | fix  | `ng e2e` and `ng lint` prompt requires to hit Enter twice to proceed on Windows |
+| [f7d538903](https://github.com/angular/angular-cli/commit/f7d538903aa912ead7a13cbd7b23b79044257110) | fix  | re-add `-d` alias for `--dry-run`                                               |
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                                                           |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------- |
+| [a708dccff](https://github.com/angular/angular-cli/commit/a708dccff34f62b625332555005bbd8f41380ec2) | feat | update SSR and application builder migration schematics to work with new `outputPath` |
+| [aec581daf](https://github.com/angular/angular-cli/commit/aec581daf03b7d83592eb6464dd54c3da57daca7) | fix  | add missing property "buildTarget" to interface "ServeBuilderOptions"                 |
+| [a1f3ae579](https://github.com/angular/angular-cli/commit/a1f3ae5799b3184a71647cf4d0f0f84b64986c4a) | fix  | do not generate standalone component when using `ng generate module`                  |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                  |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ |
+| [cc246d50e](https://github.com/angular/angular-cli/commit/cc246d50ea8d92289c8be8dc58b376358a899ad6) | feat | allow customization of output locations                      |
+| [15a669c1e](https://github.com/angular/angular-cli/commit/15a669c1efdc8ac18507232d6cb29794c82b94cc) | feat | allowing control of index HTML initial preload generation    |
+| [47a064b14](https://github.com/angular/angular-cli/commit/47a064b146d06ee7498e3aacb2f17a6283be4504) | feat | emit external sourcemaps for component styles                |
+| [b3c1991a2](https://github.com/angular/angular-cli/commit/b3c1991a2e4c5d6476fdb94a57b80893cd78f4ff) | fix  | add missing tailwind `@screen` directive in matcher          |
+| [a5d4735b8](https://github.com/angular/angular-cli/commit/a5d4735b804b30da1aeccdacf09c0dd05a359d3c) | fix  | construct SSR request URL using server resolvedUrls          |
+| [0fa1e3419](https://github.com/angular/angular-cli/commit/0fa1e3419ffba573156791a39ad5d9b6b0bb656b) | fix  | ensure empty optimized Sass stylesheets stay empty           |
+| [efe3bda48](https://github.com/angular/angular-cli/commit/efe3bda483b5776b2097ab68ea0b134d13d1a589) | fix  | ensure external dependencies are used by Web Worker bundling |
+| [ceffafe1a](https://github.com/angular/angular-cli/commit/ceffafe1a3c8cad469b718e466e771e1d396ab14) | fix  | provide better error messages for failed file reads          |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="17.0.8"></a>
+
+# 17.0.8 (2023-12-21)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                                                     |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------- |
+| [6dba26a0b](https://github.com/angular/angular-cli/commit/6dba26a0b33ee867923c4505decd86f183e0e098) | fix  | `ng e2e` and `ng lint` prompt requires to hit Enter twice to proceed on Windows |
+| [0b48acc4e](https://github.com/angular/angular-cli/commit/0b48acc4eaa15460175368fdc86e3dd8484ed18b) | fix  | re-add `-d` alias for `--dry-run`                                               |
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                                           |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------------- |
+| [99b026ede](https://github.com/angular/angular-cli/commit/99b026edece990e7f420718fd4967e21db838453) | fix  | add missing property "buildTarget" to interface "ServeBuilderOptions" |
+| [313004311](https://github.com/angular/angular-cli/commit/3130043114d3321b1304f99a4209d9da14055673) | fix  | do not generate standalone component when using `ng generate module`  |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                  |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ |
+| [cf11cdf6c](https://github.com/angular/angular-cli/commit/cf11cdf6ce7569e2da5fa3bc76e20d19c719ce4c) | fix  | add missing tailwind `@screen` directive in matcher          |
+| [aa6c757d7](https://github.com/angular/angular-cli/commit/aa6c757d701b7f95896c8f1643968ee030b179af) | fix  | construct SSR request URL using server resolvedUrls          |
+| [0662048d4](https://github.com/angular/angular-cli/commit/0662048d4abbcdc36ff74d647bb7d3056dff42a8) | fix  | ensure empty optimized Sass stylesheets stay empty           |
+| [d1923a66d](https://github.com/angular/angular-cli/commit/d1923a66d9d2ab39831ac4cd012fa0d2df66124b) | fix  | ensure external dependencies are used by Web Worker bundling |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="16.2.11"></a>
+
+# 16.2.11 (2023-12-21)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type  | Description                      |
+| --------------------------------------------------------------------------------------------------- | ----- | -------------------------------- |
+| [e0e011fc4](https://github.com/angular/angular-cli/commit/e0e011fc47f2383f9be0b432066c1438ddab7103) | build | update dependency vite to v4.5.1 |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="17.1.0-next.2"></a>
 
 # 17.1.0-next.2 (2023-12-13)
