@@ -77,6 +77,11 @@ ts_json_schema(
     src = "src/builders/prerender/schema.json",
 )
 
+ts_json_schema(
+    name = "web_test_runner_schema",
+    src = "src/builders/web-test-runner/schema.json",
+)
+
 ts_library(
     name = "build_angular",
     package_name = "@angular-devkit/build-angular",
@@ -106,6 +111,7 @@ ts_library(
         "//packages/angular_devkit/build_angular:src/builders/protractor/schema.ts",
         "//packages/angular_devkit/build_angular:src/builders/server/schema.ts",
         "//packages/angular_devkit/build_angular:src/builders/ssr-dev-server/schema.ts",
+        "//packages/angular_devkit/build_angular:src/builders/web-test-runner/schema.ts",
     ],
     data = glob(
         include = [
@@ -156,6 +162,7 @@ ts_library(
         "@npm//@types/text-table",
         "@npm//@types/watchpack",
         "@npm//@vitejs/plugin-basic-ssl",
+        "@npm//@web/test-runner",
         "@npm//ajv",
         "@npm//ansi-colors",
         "@npm//autoprefixer",
@@ -228,6 +235,7 @@ ts_library(
         ":build_angular_test_utils",
         "//packages/angular_devkit/architect/testing",
         "//packages/angular_devkit/core",
+        "@npm//fast-glob",
         "@npm//prettier",
         "@npm//typescript",
         "@npm//webpack",
@@ -367,11 +375,6 @@ LARGE_SPECS = {
     },
     "prerender": {},
     "browser-esbuild": {},
-    "jest": {
-        "extra_deps": [
-            "@npm//fast-glob",
-        ],
-    },
     "ssr-dev-server": {
         "extra_deps": [
             "@npm//@types/browser-sync",
