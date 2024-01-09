@@ -8,26 +8,12 @@
 
 import { BuilderContext } from '@angular-devkit/architect';
 import { SourceFileCache } from '../../tools/esbuild/angular/source-file-cache';
-import {
-  createBrowserCodeBundleOptions,
-  createBrowserPolyfillBundleOptions,
-  createServerCodeBundleOptions,
-  createServerPolyfillBundleOptions,
-} from '../../tools/esbuild/application-code-bundle';
 import { generateBudgetStats } from '../../tools/esbuild/budget-stats';
 import { BuildOutputFileType, BundlerContext } from '../../tools/esbuild/bundler-context';
 import { ExecutionResult, RebuildState } from '../../tools/esbuild/bundler-execution-result';
 import { checkCommonJSModules } from '../../tools/esbuild/commonjs-checker';
-import { createGlobalScriptsBundleOptions } from '../../tools/esbuild/global-scripts';
-import { createGlobalStylesBundleOptions } from '../../tools/esbuild/global-styles';
 import { extractLicenses } from '../../tools/esbuild/license-extractor';
-import {
-  calculateEstimatedTransferSizes,
-  getSupportedNodeTargets,
-  logBuildStats,
-  logMessages,
-  transformSupportedBrowsersToTargets,
-} from '../../tools/esbuild/utils';
+import { calculateEstimatedTransferSizes, logBuildStats } from '../../tools/esbuild/utils';
 import { BudgetCalculatorResult, checkBudgets } from '../../utils/bundle-calculator';
 import { colors } from '../../utils/color';
 import { copyAssets } from '../../utils/copy-assets';
@@ -35,8 +21,8 @@ import { getSupportedBrowsers } from '../../utils/supported-browsers';
 import { executePostBundleSteps } from './execute-post-bundle';
 import { inlineI18n, loadActiveTranslations } from './i18n';
 import { NormalizedApplicationBuildOptions } from './options';
+import { setupBundlerContexts } from './setup-bundling';
 
-// eslint-disable-next-line max-lines-per-function
 export async function executeBuild(
   options: NormalizedApplicationBuildOptions,
   context: BuilderContext,
@@ -47,16 +33,13 @@ export async function executeBuild(
     workspaceRoot,
     i18nOptions,
     optimizationOptions,
-    serverEntryPoint,
     assets,
     cacheOptions,
     prerenderOptions,
-    appShellOptions,
-    ssrOptions,
   } = options;
 
+  // TODO: Consider integrating into watch mode. Would require full rebuild on target changes.
   const browsers = getSupportedBrowsers(projectRoot, context.logger);
-  const target = transformSupportedBrowsersToTargets(browsers);
 
   // Load active translations if inlining
   // TODO: Integrate into watch mode and only load changed translations
@@ -70,93 +53,7 @@ export async function executeBuild(
     rebuildState?.codeBundleCache ??
     new SourceFileCache(cacheOptions.enabled ? cacheOptions.path : undefined);
   if (bundlerContexts === undefined) {
-    bundlerContexts = [];
-
-    // Browser application code
-    bundlerContexts.push(
-      new BundlerContext(
-        workspaceRoot,
-        !!options.watch,
-        createBrowserCodeBundleOptions(options, target, codeBundleCache),
-      ),
-    );
-
-    // Browser polyfills code
-    const browserPolyfillBundleOptions = createBrowserPolyfillBundleOptions(
-      options,
-      target,
-      codeBundleCache,
-    );
-    if (browserPolyfillBundleOptions) {
-      bundlerContexts.push(
-        new BundlerContext(workspaceRoot, !!options.watch, browserPolyfillBundleOptions),
-      );
-    }
-
-    // Global Stylesheets
-    if (options.globalStyles.length > 0) {
-      for (const initial of [true, false]) {
-        const bundleOptions = createGlobalStylesBundleOptions(options, target, initial);
-        if (bundleOptions) {
-          bundlerContexts.push(
-            new BundlerContext(workspaceRoot, !!options.watch, bundleOptions, () => initial),
-          );
-        }
-      }
-    }
-
-    // Global Scripts
-    if (options.globalScripts.length > 0) {
-      for (const initial of [true, false]) {
-        const bundleOptions = createGlobalScriptsBundleOptions(options, target, initial);
-        if (bundleOptions) {
-          bundlerContexts.push(
-            new BundlerContext(workspaceRoot, !!options.watch, bundleOptions, () => initial),
-          );
-        }
-      }
-    }
-
-    // Skip server build when none of the features are enabled.
-    if (serverEntryPoint && (prerenderOptions || appShellOptions || ssrOptions)) {
-      const nodeTargets = [...target, ...getSupportedNodeTargets()];
-      // Server application code
-      bundlerContexts.push(
-        new BundlerContext(
-          workspaceRoot,
-          !!options.watch,
-          createServerCodeBundleOptions(
-            {
-              ...options,
-              // Disable external deps for server bundles.
-              // This is because it breaks Vite 'optimizeDeps' for SSR.
-              externalPackages: false,
-            },
-            nodeTargets,
-            codeBundleCache,
-          ),
-          () => false,
-        ),
-      );
-
-      // Server polyfills code
-      const serverPolyfillBundleOptions = createServerPolyfillBundleOptions(
-        options,
-        nodeTargets,
-        codeBundleCache,
-      );
-
-      if (serverPolyfillBundleOptions) {
-        bundlerContexts.push(
-          new BundlerContext(
-            workspaceRoot,
-            !!options.watch,
-            serverPolyfillBundleOptions,
-            () => false,
-          ),
-        );
-      }
-    }
+    bundlerContexts = setupBundlerContexts(options, browsers, codeBundleCache);
   }
 
   const bundlingResult = await BundlerContext.bundleAll(
@@ -164,10 +61,8 @@ export async function executeBuild(
     rebuildState?.fileChanges.all,
   );
 
-  // Log all warnings and errors generated during bundling
-  await logMessages(context, bundlingResult);
-
   const executionResult = new ExecutionResult(bundlerContexts, codeBundleCache);
+  executionResult.addWarnings(bundlingResult.warnings);
 
   // Return if the bundling has errors
   if (bundlingResult.errors) {
@@ -208,20 +103,12 @@ export async function executeBuild(
   if (options.budgets) {
     const compatStats = generateBudgetStats(metafile, initialFiles);
     budgetFailures = [...checkBudgets(options.budgets, compatStats, true)];
-    if (budgetFailures.length > 0) {
-      const errors = budgetFailures
-        .filter((failure) => failure.severity === 'error')
-        .map(({ message }) => message);
-      const warnings = budgetFailures
-        .filter((failure) => failure.severity !== 'error')
-        .map(({ message }) => message);
-
-      await printWarningsAndErrorsToConsoleAndAddToResult(
-        context,
-        executionResult,
-        warnings,
-        errors,
-      );
+    for (const { message, severity } of budgetFailures) {
+      if (severity === 'error') {
+        executionResult.addError(message);
+      } else {
+        executionResult.addWarning(message);
+      }
     }
   }
 
@@ -234,7 +121,7 @@ export async function executeBuild(
   // Check metafile for CommonJS module usage if optimizing scripts
   if (optimizationOptions.scripts) {
     const messages = checkCommonJSModules(metafile, options.allowedCommonJsDependencies);
-    await logMessages(context, { warnings: messages });
+    executionResult.addWarnings(messages);
   }
 
   // Copy assets
@@ -255,12 +142,10 @@ export async function executeBuild(
 
   // Perform i18n translation inlining if enabled
   let prerenderedRoutes: string[];
-  let errors: string[];
-  let warnings: string[];
   if (i18nOptions.shouldInline) {
     const result = await inlineI18n(options, executionResult, initialFiles);
-    errors = result.errors;
-    warnings = result.warnings;
+    executionResult.addErrors(result.errors);
+    executionResult.addWarnings(result.warnings);
     prerenderedRoutes = result.prerenderedRoutes;
   } else {
     const result = await executePostBundleSteps(
@@ -272,14 +157,12 @@ export async function executeBuild(
       i18nOptions.hasDefinedSourceLocale ? i18nOptions.sourceLocale : undefined,
     );
 
-    errors = result.errors;
-    warnings = result.warnings;
+    executionResult.addErrors(result.errors);
+    executionResult.addWarnings(result.warnings);
     prerenderedRoutes = result.prerenderedRoutes;
     executionResult.outputFiles.push(...result.additionalOutputFiles);
     executionResult.assetFiles.push(...result.additionalAssets);
   }
-
-  await printWarningsAndErrorsToConsoleAndAddToResult(context, executionResult, warnings, errors);
 
   if (prerenderOptions) {
     executionResult.addOutputFile(
@@ -299,7 +182,7 @@ export async function executeBuild(
   }
 
   logBuildStats(
-    context,
+    context.logger,
     metafile,
     initialFiles,
     budgetFailures,
@@ -317,21 +200,4 @@ export async function executeBuild(
   }
 
   return executionResult;
-}
-
-async function printWarningsAndErrorsToConsoleAndAddToResult(
-  context: BuilderContext,
-  executionResult: ExecutionResult,
-  warnings: string[],
-  errors: string[],
-): Promise<void> {
-  const errorMessages = errors.map((text) => ({ text, location: null }));
-  if (errorMessages.length) {
-    executionResult.addErrors(errorMessages);
-  }
-
-  await logMessages(context, {
-    errors: errorMessages,
-    warnings: warnings.map((text) => ({ text, location: null })),
-  });
 }
