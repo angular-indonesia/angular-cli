@@ -207,7 +207,7 @@ export class BundlerContext {
       this.watchFiles.clear();
     }
 
-    let result;
+    let result: BuildResult<{ metafile: true; write: false }>;
     try {
       if (this.#esbuildContext) {
         // Rebuild using the existing incremental build context
@@ -331,7 +331,9 @@ export class BundlerContext {
       for (const importData of imports) {
         if (
           !importData.external ||
-          (importData.kind !== 'import-statement' && importData.kind !== 'dynamic-import')
+          (importData.kind !== 'import-statement' &&
+            importData.kind !== 'dynamic-import' &&
+            importData.kind !== 'require-call')
         ) {
           continue;
         }
