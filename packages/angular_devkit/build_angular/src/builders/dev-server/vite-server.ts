@@ -76,8 +76,7 @@ export async function* serveWithVite(
     browserOptions.ssr = true;
 
     // https://nodejs.org/api/process.html#processsetsourcemapsenabledval
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (process as any).setSourceMapsEnabled(true);
+    process.setSourceMapsEnabled(true);
   }
 
   // Set all packages as external to support Vite's prebundle caching
@@ -87,7 +86,7 @@ export async function* serveWithVite(
   if (serverOptions.servePath === undefined && baseHref !== undefined) {
     // Remove trailing slash
     serverOptions.servePath =
-      baseHref[baseHref.length - 1] === '/' ? baseHref.slice(0, -1) : baseHref;
+      baseHref !== './' && baseHref[baseHref.length - 1] === '/' ? baseHref.slice(0, -1) : baseHref;
   }
 
   // The development server currently only supports a single locale when localizing.
