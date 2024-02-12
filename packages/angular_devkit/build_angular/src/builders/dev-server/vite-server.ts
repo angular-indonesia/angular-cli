@@ -206,8 +206,13 @@ export async function* serveWithVite(
       externalMetadata.implicitBrowser.length = 0;
 
       externalMetadata.explicit.push(...explicit);
-      externalMetadata.implicitServer.push(...implicitServer);
-      externalMetadata.implicitBrowser.push(...implicitBrowser);
+      // Remove any absolute URLs (http://, https://, //) to avoid Vite's prebundling from processing them as files
+      externalMetadata.implicitServer.push(
+        ...(implicitServer as string[]).filter((value) => !/^(?:https?:)?\/\//.test(value)),
+      );
+      externalMetadata.implicitBrowser.push(
+        ...(implicitBrowser as string[]).filter((value) => !/^(?:https?:)?\/\//.test(value)),
+      );
 
       // The below needs to be sorted as Vite uses these options are part of the hashing invalidation algorithm.
       // See: https://github.com/vitejs/vite/blob/0873bae0cfe0f0718ad2f5743dd34a17e4ab563d/packages/vite/src/node/optimizer/index.ts#L1203-L1239
@@ -491,6 +496,11 @@ export async function setupServer(
         // the Vite client-side code for browser reloading. These would be available by default but when
         // the `allow` option is explicitly configured, they must be included manually.
         allow: [cacheDir, join(serverOptions.workspaceRoot, 'node_modules'), ...assets.values()],
+
+        // Temporary disable cached FS checks.
+        // This is because we configure `config.base` to a virtual directory which causes `getRealPath` to fail.
+        // See: https://github.com/vitejs/vite/blob/b2873ac3936de25ca8784327cb9ef16bd4881805/packages/vite/src/node/fsUtils.ts#L45-L67
+        cachedChecks: false,
       },
       // This is needed when `externalDependencies` is used to prevent Vite load errors.
       // NOTE: If Vite adds direct support for externals, this can be removed.
