@@ -1,3 +1,35 @@
+<a name="17.3.0-rc.0"></a>
+
+# 17.3.0-rc.0 (2024-03-06)
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                                    |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------- |
+| [5ab71fc92](https://github.com/angular/angular-cli/commit/5ab71fc92ba26f6255e5a5c00e374709ff58d19d) | feat | update CSS/Sass import/use specifiers in application migration |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                            |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------- |
+| [9ca3a5450](https://github.com/angular/angular-cli/commit/9ca3a54503574674eb107d4d2b507be7ecd727ee) | feat | add `deployUrl` to application builder |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="17.2.3"></a>
+
+# 17.2.3 (2024-03-06)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                            |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------- |
+| [7cc8261fd](https://github.com/angular/angular-cli/commit/7cc8261fd2eb0ef1665faebec43cba447a64fd33) | fix  | avoid implicit CSS file extensions when resolving                      |
+| [259ec72d5](https://github.com/angular/angular-cli/commit/259ec72d521b3a660c54ec33aaf8bf7c838281e7) | fix  | avoid marking component styles as media with no output media directory |
+| [faffdfdce](https://github.com/angular/angular-cli/commit/faffdfdcebb3f71f7ef64b02114561985c592add) | fix  | disable `deployUrl` when using vite dev-server                         |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="17.2.2"></a>
 
 # 17.2.2 (2024-02-28)
