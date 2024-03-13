@@ -17,8 +17,8 @@ describeServeBuilder(
   executeDevServer,
   DEV_SERVER_BUILDER_INFO,
   (harness, setupTarget, isViteRun) => {
-    // TODO(fix-vite): currently this is broken in vite.
-    (isViteRun ? xdescribe : describe)('option: "publicHost"', () => {
+    // This option is not used when using vite.
+    (isViteRun ? xdescribe : xdescribe)('option: "publicHost"', () => {
       beforeEach(async () => {
         setupTarget(harness);
 

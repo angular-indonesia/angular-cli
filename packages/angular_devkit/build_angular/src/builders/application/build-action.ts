@@ -6,14 +6,18 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import { BuilderOutput } from '@angular-devkit/architect';
-import type { logging } from '@angular-devkit/core';
+import { BuilderContext, BuilderOutput } from '@angular-devkit/architect';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { BuildOutputFile } from '../../tools/esbuild/bundler-context';
 import { ExecutionResult, RebuildState } from '../../tools/esbuild/bundler-execution-result';
 import { shutdownSassWorkerPool } from '../../tools/esbuild/stylesheets/sass-language';
-import { withNoProgress, withSpinner, writeResultFiles } from '../../tools/esbuild/utils';
+import {
+  logMessages,
+  withNoProgress,
+  withSpinner,
+  writeResultFiles,
+} from '../../tools/esbuild/utils';
 import { deleteOutputDir } from '../../utils/delete-output-dir';
 import { shouldWatchRoot } from '../../utils/environment-options';
 import { NormalizedCachedOptions } from '../../utils/normalize-cache';
@@ -34,12 +38,12 @@ const packageWatchFiles = [
 ];
 
 export async function* runEsBuildBuildAction(
-  action: (rebuildState?: RebuildState) => ExecutionResult | Promise<ExecutionResult>,
+  action: (rebuildState?: RebuildState) => Promise<ExecutionResult>,
   options: {
     workspaceRoot: string;
     projectRoot: string;
     outputOptions: NormalizedOutputOptions;
-    logger: logging.LoggerApi;
+    logger: BuilderContext['logger'];
     cacheOptions: NormalizedCachedOptions;
     writeToFileSystem: boolean;
     writeToFileSystemFilter: ((file: BuildOutputFile) => boolean) | undefined;
@@ -51,6 +55,8 @@ export async function* runEsBuildBuildAction(
     signal?: AbortSignal;
     preserveSymlinks?: boolean;
     clearScreen?: boolean;
+    colors?: boolean;
+    jsonLogs?: boolean;
   },
 ): AsyncIterable<(ExecutionResult['outputWithFiles'] | ExecutionResult['output']) & BuilderOutput> {
   const {
@@ -68,6 +74,8 @@ export async function* runEsBuildBuildAction(
     workspaceRoot,
     progress,
     preserveSymlinks,
+    colors,
+    jsonLogs,
   } = options;
 
   if (deleteOutputPath && writeToFileSystem) {
@@ -84,6 +92,9 @@ export async function* runEsBuildBuildAction(
   try {
     // Perform the build action
     result = await withProgress('Building...', () => action());
+
+    // Log all diagnostic (error/warning/logs) messages
+    await logMessages(logger, result, colors, jsonLogs);
   } finally {
     // Ensure Sass workers are shutdown if not watching
     if (!watch) {
@@ -178,6 +189,9 @@ export async function* runEsBuildBuildAction(
       result = await withProgress('Changes detected. Rebuilding...', () =>
         action(result.createRebuildState(changes)),
       );
+
+      // Log all diagnostic (error/warning/logs) messages
+      await logMessages(logger, result, colors, jsonLogs);
 
       // Update watched locations provided by the new build result.
       // Keep watching all previous files if there are any errors; otherwise consider all

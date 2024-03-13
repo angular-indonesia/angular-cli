@@ -17,8 +17,8 @@ describeServeBuilder(
   executeDevServer,
   DEV_SERVER_BUILDER_INFO,
   (harness, setupTarget, isViteRun) => {
-    // TODO(fix-vite): currently this is broken in vite.
-    (isViteRun ? xdescribe : describe)('option: "disableHostCheck"', () => {
+    // This option is not used when using vite.
+    (isViteRun ? xdescribe : xdescribe)('option: "disableHostCheck"', () => {
       beforeEach(async () => {
         setupTarget(harness);
 

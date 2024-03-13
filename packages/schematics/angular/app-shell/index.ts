@@ -6,7 +6,6 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import { dirname, join, normalize } from '@angular-devkit/core';
 import {
   Rule,
   SchematicsException,
@@ -15,7 +14,8 @@ import {
   noop,
   schematic,
 } from '@angular-devkit/schematics';
-import * as ts from '../third_party/github.com/Microsoft/TypeScript/lib/typescript';
+import { dirname, join } from 'node:path/posix';
+import ts from '../third_party/github.com/Microsoft/TypeScript/lib/typescript';
 import {
   addImportToModule,
   addSymbolToNgModuleMetadata,
@@ -28,7 +28,6 @@ import {
 } from '../utility/ast-utils';
 import { applyToUpdateRecorder } from '../utility/change';
 import { getAppModulePath, isStandaloneApp } from '../utility/ng-ast-utils';
-import { findAppConfig } from '../utility/standalone/app_config';
 import { findBootstrapApplicationCall, getMainFilePath } from '../utility/standalone/util';
 import { getWorkspace, updateWorkspace } from '../utility/workspace';
 import { Builders } from '../utility/workspace-models';
@@ -44,14 +43,14 @@ function getSourceFile(host: Tree, path: string): ts.SourceFile {
 }
 
 function getServerModulePath(host: Tree, sourceRoot: string, mainPath: string): string | null {
-  const mainSource = getSourceFile(host, join(normalize(sourceRoot), mainPath));
+  const mainSource = getSourceFile(host, join(sourceRoot, mainPath));
   const allNodes = getSourceNodes(mainSource);
   const expNode = allNodes.find((node) => ts.isExportDeclaration(node));
   if (!expNode) {
     return null;
   }
   const relativePath = (expNode as ts.ExportDeclaration).moduleSpecifier as ts.StringLiteral;
-  const modulePath = normalize(`/${sourceRoot}/${relativePath.text}.ts`);
+  const modulePath = join(sourceRoot, `${relativePath.text}.ts`);
 
   return modulePath;
 }
@@ -78,7 +77,7 @@ function getComponentTemplate(host: Tree, compPath: string, tmplInfo: TemplateIn
     template = tmplInfo.templateProp.getFullText();
   } else if (tmplInfo.templateUrlProp) {
     const templateUrl = (tmplInfo.templateUrlProp.initializer as ts.StringLiteral).text;
-    const dir = dirname(normalize(compPath));
+    const dir = dirname(compPath);
     const templatePath = join(dir, templateUrl);
     try {
       template = host.readText(templatePath);
@@ -122,7 +121,7 @@ function getBootstrapComponentPath(host: Tree, mainPath: string): string {
       return pathStringLiteral.text;
     })[0];
 
-  return join(dirname(normalize(bootstrappingFilePath)), componentRelativeFilePath + '.ts');
+  return join(dirname(bootstrappingFilePath), componentRelativeFilePath + '.ts');
 }
 // end helper functions.
 
@@ -309,7 +308,7 @@ function addStandaloneServerRoute(options: AppShellOptions): Rule {
       throw new SchematicsException(`Project name "${options.project}" doesn't not exist.`);
     }
 
-    const configFilePath = join(normalize(project.sourceRoot ?? 'src'), 'app/app.config.server.ts');
+    const configFilePath = join(project.sourceRoot ?? 'src', 'app/app.config.server.ts');
     if (!host.exists(configFilePath)) {
       throw new SchematicsException(`Cannot find "${configFilePath}".`);
     }

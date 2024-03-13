@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import { logging } from '@angular-devkit/core';
+import { BuilderContext } from '@angular-devkit/architect';
 import { BuildOptions, Metafile, OutputFile, formatMessages } from 'esbuild';
 import { createHash } from 'node:crypto';
 import { constants as fsConstants } from 'node:fs';
@@ -429,46 +429,53 @@ interface BuildManifest {
   prerenderedRoutes?: string[];
 }
 
-export async function logMessages(
-  logger: logging.LoggerApi,
-  executionResult: ExecutionResult,
-  options: NormalizedApplicationBuildOptions,
-): Promise<void> {
+export async function createJsonBuildManifest(
+  result: ExecutionResult,
+  normalizedOptions: NormalizedApplicationBuildOptions,
+): Promise<string> {
   const {
+    colors: color,
     outputOptions: { base, server, browser },
     ssrOptions,
-    jsonLogs,
-    colors: color,
-  } = options;
-  const { warnings, errors, prerenderedRoutes } = executionResult;
-  const warningMessages = warnings.length
-    ? await formatMessages(warnings, { kind: 'warning', color })
-    : [];
-  const errorMessages = errors.length ? await formatMessages(errors, { kind: 'error', color }) : [];
+  } = normalizedOptions;
+
+  const { warnings, errors, prerenderedRoutes } = result;
+
+  const manifest: BuildManifest = {
+    errors: errors.length ? await formatMessages(errors, { kind: 'error', color }) : [],
+    warnings: warnings.length ? await formatMessages(warnings, { kind: 'warning', color }) : [],
+    outputPaths: {
+      root: pathToFileURL(base),
+      browser: pathToFileURL(join(base, browser)),
+      server: ssrOptions ? pathToFileURL(join(base, server)) : undefined,
+    },
+    prerenderedRoutes,
+  };
+
+  return JSON.stringify(manifest, undefined, 2);
+}
+
+export async function logMessages(
+  logger: BuilderContext['logger'],
+  executionResult: ExecutionResult,
+  color?: boolean,
+  jsonLogs?: boolean,
+): Promise<void> {
+  const { warnings, errors, logs } = executionResult;
+
+  if (logs.length) {
+    logger.info(logs.join('\n'));
+  }
 
   if (jsonLogs) {
-    // JSON format output
-    const manifest: BuildManifest = {
-      errors: errorMessages,
-      warnings: warningMessages,
-      outputPaths: {
-        root: pathToFileURL(base),
-        browser: pathToFileURL(join(base, browser)),
-        server: ssrOptions ? pathToFileURL(join(base, server)) : undefined,
-      },
-      prerenderedRoutes,
-    };
-
-    logger.info(JSON.stringify(manifest, undefined, 2));
-
     return;
   }
 
-  if (warningMessages.length) {
-    logger.warn(warningMessages.join('\n'));
+  if (warnings.length) {
+    logger.warn((await formatMessages(warnings, { kind: 'warning', color })).join('\n'));
   }
 
-  if (errorMessages.length) {
-    logger.error(errorMessages.join('\n'));
+  if (errors.length) {
+    logger.error((await formatMessages(errors, { kind: 'error', color })).join('\n'));
   }
 }
