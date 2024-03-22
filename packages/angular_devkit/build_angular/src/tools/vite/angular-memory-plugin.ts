@@ -219,9 +219,12 @@ export function createAngularMemoryPlugin(options: AngularMemoryPluginOptions): 
           }
 
           transformIndexHtmlAndAddHeaders(req.url, rawHtml, res, next, async (html) => {
+            const resolvedUrls = server.resolvedUrls;
+            const baseUrl = resolvedUrls?.local[0] ?? resolvedUrls?.network[0];
+
             const { content } = await renderPage({
               document: html,
-              route: new URL(req.originalUrl ?? '/', server.resolvedUrls?.local[0]).toString(),
+              route: new URL(req.originalUrl ?? '/', baseUrl).toString(),
               serverContext: 'ssr',
               loadBundle: (uri: string) =>
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -306,19 +309,17 @@ export function createAngularMemoryPlugin(options: AngularMemoryPluginOptions): 
  * @param file The absolute path to the Vite client code.
  * @returns
  */
-async function loadViteClientCode(file: string) {
+async function loadViteClientCode(file: string): Promise<string> {
   const originalContents = await readFile(file, 'utf-8');
-  const firstUpdate = originalContents.replace('You can also disable this overlay by setting', '');
-  assert(originalContents !== firstUpdate, 'Failed to update Vite client error overlay text. (1)');
-
-  const secondUpdate = firstUpdate.replace(
-    // eslint-disable-next-line max-len
-    '<code part="config-option-name">server.hmr.overlay</code> to <code part="config-option-value">false</code> in <code part="config-file-name">${hmrConfigName}.</code>',
+  const updatedContents = originalContents.replace(
+    `h('br'), 'You can also disable this overlay by setting ', ` +
+      `h('code', { part: 'config-option-name' }, 'server.hmr.overlay'), '` +
+      ` to ', h('code', { part: 'config-option-value' }, 'false'), ' in ', h('code', { part: 'config-file-name' }, hmrConfigName), '.'`,
     '',
   );
-  assert(firstUpdate !== secondUpdate, 'Failed to update Vite client error overlay text. (2)');
+  assert(originalContents !== updatedContents, 'Failed to update Vite client error overlay text.');
 
-  return secondUpdate;
+  return updatedContents;
 }
 
 function pathnameWithoutBasePath(url: string, basePath: string): string {
