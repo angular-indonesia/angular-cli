@@ -6,15 +6,15 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import { basename, dirname, extname } from 'path';
-import { Compilation, Compiler, sources } from 'webpack';
-import { assertIsError } from '../../../utils/error';
-import { FileInfo } from '../../../utils/index-file/augment-index-html';
 import {
+  FileInfo,
   IndexHtmlGenerator,
   IndexHtmlGeneratorOptions,
   IndexHtmlGeneratorProcessOptions,
-} from '../../../utils/index-file/index-html-generator';
+} from '@angular/build/private';
+import { basename, dirname, extname } from 'path';
+import { Compilation, Compiler, sources } from 'webpack';
+import { assertIsError } from '../../../utils/error';
 import { addError, addWarning } from '../../../utils/webpack-diagnostics';
 
 export interface IndexHtmlWebpackPluginOptions
@@ -67,7 +67,11 @@ export class IndexHtmlWebpackPlugin extends IndexHtmlGenerator {
           }
         }
 
-        const { content, warnings, errors } = await this.process({
+        const {
+          csrContent: content,
+          warnings,
+          errors,
+        } = await this.process({
           files,
           outputPath: dirname(this.options.outputPath),
           baseHref: this.options.baseHref,

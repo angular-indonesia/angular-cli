@@ -6,11 +6,12 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
+import { purgeStaleBuildCache } from '@angular/build/private';
 import { BuilderContext, BuilderOutput, createBuilder } from '@angular-devkit/architect';
-import { join, resolve } from 'path';
-import { Observable, catchError, from, mapTo, of, switchMap } from 'rxjs';
+import type { NgPackagrOptions } from 'ng-packagr';
+import { join, resolve } from 'node:path';
+import { Observable, catchError, from, map, of, switchMap } from 'rxjs';
 import { normalizeCacheOptions } from '../../utils/normalize-cache';
-import { purgeStaleBuildCache } from '../../utils/purge-cache';
 import { Schema as NgPackagrBuilderOptions } from './schema';
 
 /**
@@ -45,8 +46,9 @@ export function execute(
         context.workspaceRoot,
       );
 
-      const ngPackagrOptions = {
+      const ngPackagrOptions: NgPackagrOptions = {
         cacheEnabled,
+        poll: options.poll,
         cacheDirectory: join(cacheDirectory, 'ng-packagr'),
       };
 
@@ -56,7 +58,7 @@ export function execute(
     switchMap(({ packager, ngPackagrOptions }) =>
       options.watch ? packager.watch(ngPackagrOptions) : packager.build(ngPackagrOptions),
     ),
-    mapTo({ success: true }),
+    map(() => ({ success: true })),
     catchError((err) => of({ success: false, error: err.message })),
   );
 }

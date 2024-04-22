@@ -6,6 +6,18 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
+import { BuildOutputFile, BuildOutputFileType } from '@angular/build';
+import {
+  type ApplicationBuilderInternalOptions,
+  type ExternalResultMetadata,
+  JavaScriptTransformer,
+  buildApplicationInternal,
+  createRxjsEsmResolutionPlugin,
+  getFeatureSupport,
+  getSupportedBrowsers,
+  isZonelessApp,
+  transformSupportedBrowsersToTargets,
+} from '@angular/build/private';
 import type { BuilderContext } from '@angular-devkit/architect';
 import type { json } from '@angular-devkit/core';
 import type { Plugin } from 'esbuild';
@@ -13,19 +25,11 @@ import assert from 'node:assert';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Connect, DepOptimizationConfig, InlineConfig, ViteDevServer } from 'vite';
-import { BuildOutputFile, BuildOutputFileType } from '../../tools/esbuild/bundler-context';
-import { ExternalResultMetadata } from '../../tools/esbuild/bundler-execution-result';
-import { JavaScriptTransformer } from '../../tools/esbuild/javascript-transformer';
-import { createRxjsEsmResolutionPlugin } from '../../tools/esbuild/rxjs-esm-resolution-plugin';
-import { getFeatureSupport, transformSupportedBrowsersToTargets } from '../../tools/esbuild/utils';
 import { createAngularMemoryPlugin } from '../../tools/vite/angular-memory-plugin';
 import { createAngularLocaleDataPlugin } from '../../tools/vite/i18n-locale-plugin';
 import { loadProxyConfiguration, normalizeSourceMaps } from '../../utils';
 import { loadEsmModule } from '../../utils/load-esm';
-import { getSupportedBrowsers } from '../../utils/supported-browsers';
 import { getIndexOutputFile } from '../../utils/webpack-browser-config';
-import { buildApplicationInternal } from '../application';
-import { ApplicationBuilderInternalOptions } from '../application/options';
 import { buildEsbuildBrowser } from '../browser-esbuild';
 import { Schema as BrowserBuilderOptions } from '../browser-esbuild/schema';
 import type { NormalizedDevServerOptions } from './options';
@@ -248,6 +252,9 @@ export async function* serveWithVite(
       const projectRoot = join(context.workspaceRoot, root as string);
       const browsers = getSupportedBrowsers(projectRoot, context.logger);
       const target = transformSupportedBrowsersToTargets(browsers);
+      const polyfills = Array.isArray((browserOptions.polyfills ??= []))
+        ? browserOptions.polyfills
+        : [browserOptions.polyfills];
 
       // Setup server and start listening
       const serverConfiguration = await setupServer(
@@ -259,6 +266,7 @@ export async function* serveWithVite(
         !!browserOptions.ssr,
         prebundleTransformer,
         target,
+        isZonelessApp(polyfills),
         browserOptions.loader as EsbuildLoaderOption | undefined,
         extensions?.middleware,
         transformers?.indexHtml,
@@ -443,6 +451,7 @@ export async function setupServer(
   ssr: boolean,
   prebundleTransformer: JavaScriptTransformer,
   target: string[],
+  zoneless: boolean,
   prebundleLoaderExtensions: EsbuildLoaderOption | undefined,
   extensionMiddleware?: Connect.NextHandleFunction[],
   indexHtmlTransformer?: (content: string) => Promise<string>,
@@ -540,6 +549,7 @@ export async function setupServer(
         include: externalMetadata.implicitServer,
         ssr: true,
         prebundleTransformer,
+        zoneless,
         target,
         loader: prebundleLoaderExtensions,
         thirdPartySourcemaps,
@@ -570,6 +580,7 @@ export async function setupServer(
       ssr: false,
       prebundleTransformer,
       target,
+      zoneless,
       loader: prebundleLoaderExtensions,
       thirdPartySourcemaps,
     }),
@@ -605,6 +616,7 @@ function getDepOptimizationConfig({
   exclude,
   include,
   target,
+  zoneless,
   prebundleTransformer,
   ssr,
   loader,
@@ -616,6 +628,7 @@ function getDepOptimizationConfig({
   target: string[];
   prebundleTransformer: JavaScriptTransformer;
   ssr: boolean;
+  zoneless: boolean;
   loader?: EsbuildLoaderOption;
   thirdPartySourcemaps: boolean;
 }): DepOptimizationConfig {
@@ -650,7 +663,7 @@ function getDepOptimizationConfig({
     esbuildOptions: {
       // Set esbuild supported targets.
       target,
-      supported: getFeatureSupport(target),
+      supported: getFeatureSupport(target, zoneless),
       plugins,
       loader,
     },
