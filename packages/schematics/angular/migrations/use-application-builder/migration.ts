@@ -16,8 +16,21 @@ import {
   externalSchematic,
 } from '@angular-devkit/schematics';
 import { basename, dirname, extname, join } from 'node:path/posix';
+import { removePackageJsonDependency } from '../../utility/dependencies';
+import {
+  DependencyType,
+  ExistingBehavior,
+  InstallBehavior,
+  addDependency,
+} from '../../utility/dependency';
 import { JSONFile } from '../../utility/json-file';
-import { TargetDefinition, allTargetOptions, updateWorkspace } from '../../utility/workspace';
+import { latestVersions } from '../../utility/latest-versions';
+import {
+  TargetDefinition,
+  allTargetOptions,
+  allWorkspaceTargets,
+  updateWorkspace,
+} from '../../utility/workspace';
 import { Builders, ProjectType } from '../../utility/workspace-models';
 import { findImports } from './css-import-lexer';
 
@@ -32,11 +45,6 @@ function* updateBuildTarget(
   buildTarget.builder = Builders.Application;
 
   for (const [, options] of allTargetOptions(buildTarget, false)) {
-    // Show warnings for using no longer supported options
-    if (usesNoLongerSupportedOptions(options, context, projectName)) {
-      continue;
-    }
-
     if (options['index'] === '') {
       options['index'] = false;
     }
@@ -82,7 +90,6 @@ function* updateBuildTarget(
     }
 
     // Delete removed options
-    delete options['deployUrl'];
     delete options['vendorChunk'];
     delete options['commonChunk'];
     delete options['resourcesOutputPath'];
@@ -200,8 +207,94 @@ function updateProjects(tree: Tree, context: SchematicContext) {
       updateStyleImports(tree, projectSourceRoot, buildTarget);
     }
 
+    // Check for @angular-devkit/build-angular Webpack usage
+    let hasAngularDevkitUsage = false;
+    for (const [, target] of allWorkspaceTargets(workspace)) {
+      switch (target.builder) {
+        case Builders.Application:
+        case Builders.DevServer:
+        case Builders.ExtractI18n:
+          // Ignore application, dev server, and i18n extraction for devkit usage check.
+          // Both will be replaced if no other usage is found.
+          continue;
+      }
+
+      if (target.builder.startsWith('@angular-devkit/build-angular:')) {
+        hasAngularDevkitUsage = true;
+        break;
+      }
+    }
+
+    // Use @angular/build directly if there is no devkit package usage
+    if (!hasAngularDevkitUsage) {
+      for (const [, target] of allWorkspaceTargets(workspace)) {
+        switch (target.builder) {
+          case Builders.Application:
+            target.builder = '@angular/build:application';
+            break;
+          case Builders.DevServer:
+            target.builder = '@angular/build:dev-server';
+            break;
+          case Builders.ExtractI18n:
+            target.builder = '@angular/build:extract-i18n';
+            break;
+        }
+      }
+
+      // Add direct @angular/build dependencies and remove @angular-devkit/build-angular
+      rules.push(
+        addDependency('@angular/build', latestVersions.DevkitBuildAngular, {
+          type: DependencyType.Dev,
+          // Always is set here since removePackageJsonDependency below does not automatically
+          // trigger the package manager execution.
+          install: InstallBehavior.Always,
+          existing: ExistingBehavior.Replace,
+        }),
+      );
+      removePackageJsonDependency(tree, '@angular-devkit/build-angular');
+
+      // Add less dependency if any projects contain a Less stylesheet file.
+      // This check does not consider Node.js packages due to the performance
+      // cost of searching such a large directory structure. A build time error
+      // will provide instructions to install the package in this case.
+      if (hasLessStylesheets(tree)) {
+        rules.push(
+          addDependency('less', latestVersions['less'], {
+            type: DependencyType.Dev,
+            existing: ExistingBehavior.Skip,
+          }),
+        );
+      }
+    }
+
     return chain(rules);
   });
+}
+
+/**
+ * Searches the schematic tree for files that have a `.less` extension.
+ *
+ * @param tree A Schematics tree instance to search
+ * @returns true if Less stylesheet files are found; otherwise, false
+ */
+function hasLessStylesheets(tree: Tree) {
+  const directories = [tree.getDir('/')];
+
+  let current;
+  while ((current = directories.pop())) {
+    for (const path of current.subfiles) {
+      if (path.endsWith('.less')) {
+        return true;
+      }
+    }
+
+    for (const path of current.subdirs) {
+      if (path === 'node_modules' || path.startsWith('.')) {
+        continue;
+      }
+      directories.push(current.dir(path));
+    }
+  }
 }
 
 function* visit(
@@ -346,20 +439,4 @@ export default function (): Rule {
       rootJson.modify(['compilerOptions', 'allowSyntheticDefaultImports'], undefined);
     }),
   ]);
-}
-
-function usesNoLongerSupportedOptions(
-  { deployUrl }: Record<string, unknown>,
-  context: SchematicContext,
-  projectName: string,
-): boolean {
-  let hasUsage = false;
-  if (typeof deployUrl === 'string') {
-    hasUsage = true;
-    context.logger.warn(
-      `Skipping migration for project "${projectName}". "deployUrl" option is not available in the application builder.`,
-    );
-  }
-
-  return hasUsage;
 }

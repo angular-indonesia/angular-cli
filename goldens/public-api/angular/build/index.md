@@ -8,6 +8,7 @@
 
 import { BuilderContext } from '@angular-devkit/architect';
 import { BuilderOutput } from '@angular-devkit/architect';
+import type http from 'node:http';
 import { OutputFile } from 'esbuild';
 import type { Plugin as Plugin_2 } from 'esbuild';
 
@@ -105,6 +106,57 @@ export enum BuildOutputFileType {
     Root = 4,
     // (undocumented)
     Server = 3
+}
+
+// @public
+export interface DevServerBuilderOptions {
+    buildTarget: string;
+    headers?: {
+        [key: string]: string;
+    };
+    hmr?: boolean;
+    host?: string;
+    liveReload?: boolean;
+    open?: boolean;
+    poll?: number;
+    port?: number;
+    prebundle?: PrebundleUnion;
+    proxyConfig?: string;
+    servePath?: string;
+    ssl?: boolean;
+    sslCert?: string;
+    sslKey?: string;
+    verbose?: boolean;
+    watch?: boolean;
+}
+
+// @public
+export interface DevServerBuilderOutput extends BuilderOutput {
+    // (undocumented)
+    address?: string;
+    // (undocumented)
+    baseUrl: string;
+    // (undocumented)
+    port?: number;
+}
+
+// @public
+export function executeDevServerBuilder(options: DevServerBuilderOptions, context: BuilderContext, extensions?: {
+    buildPlugins?: Plugin_2[];
+    middleware?: ((req: http.IncomingMessage, res: http.ServerResponse, next: (err?: unknown) => void) => void)[];
+    indexHtmlTransformer?: IndexHtmlTransform;
+}): AsyncIterable<DevServerBuilderOutput>;
+
+// @public
+export function executeExtractI18nBuilder(options: ExtractI18nBuilderOptions, context: BuilderContext, extensions?: ApplicationBuilderExtensions): Promise<BuilderOutput>;
+
+// @public
+export interface ExtractI18nBuilderOptions {
+    buildTarget?: string;
+    format?: Format;
+    outFile?: string;
+    outputPath?: string;
+    progress?: boolean;
 }
 
 // (No @packageDocumentation comment for this package)

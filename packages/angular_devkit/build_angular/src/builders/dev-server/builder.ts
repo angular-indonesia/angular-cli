@@ -6,16 +6,15 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import { type IndexHtmlTransform, purgeStaleBuildCache } from '@angular/build/private';
+import type { DevServerBuilderOutput } from '@angular/build';
+import { type IndexHtmlTransform, checkPort, purgeStaleBuildCache } from '@angular/build/private';
 import type { BuilderContext } from '@angular-devkit/architect';
 import type { Plugin } from 'esbuild';
 import type http from 'node:http';
 import { EMPTY, Observable, defer, switchMap } from 'rxjs';
 import type { ExecutionTransformer } from '../../transforms';
-import { checkPort } from '../../utils/check-port';
 import { normalizeOptions } from './options';
 import type { Schema as DevServerBuilderOptions } from './schema';
-import type { DevServerBuilderOutput } from './webpack-server';
 
 /**
  * A Builder that executes a development server based on the provided browser target option.
@@ -68,13 +67,6 @@ export function execute(
           );
         }
 
-        // Warn if the initial options provided by the user enable prebundling but caching is disabled
-        if (options.prebundle && !normalizedOptions.cacheOptions.enabled) {
-          context.logger.warn(
-            `Prebundling has been configured but will not be used because caching has been disabled.`,
-          );
-        }
-
         if (options.allowedHosts?.length) {
           context.logger.warn(
             `The "allowedHosts" option will not be used because it is not supported by the "${builderName}" builder.`,
@@ -93,9 +85,23 @@ export function execute(
           );
         }
 
-        return defer(() => import('./vite-server')).pipe(
-          switchMap(({ serveWithVite }) =>
-            serveWithVite(normalizedOptions, builderName, context, transforms, extensions),
+        return defer(() =>
+          Promise.all([import('@angular/build/private'), import('../browser-esbuild')]),
+        ).pipe(
+          switchMap(([{ serveWithVite, buildApplicationInternal }, { buildEsbuildBrowser }]) =>
+            serveWithVite(
+              normalizedOptions,
+              builderName,
+              (options, context, codePlugins) => {
+                return builderName === '@angular-devkit/build-angular:browser-esbuild'
+                  ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    buildEsbuildBrowser(options as any, context, { write: false }, codePlugins)
+                  : buildApplicationInternal(options, context, { write: false }, { codePlugins });
+              },
+              context,
+              transforms,
+              extensions,
+            ),
           ),
         );
       }
@@ -175,12 +181,14 @@ case.
   };
 }
 
-function isEsbuildBased(
+export function isEsbuildBased(
   builderName: string,
 ): builderName is
+  | '@angular/build:application'
   | '@angular-devkit/build-angular:application'
   | '@angular-devkit/build-angular:browser-esbuild' {
   if (
+    builderName === '@angular/build:application' ||
     builderName === '@angular-devkit/build-angular:application' ||
     builderName === '@angular-devkit/build-angular:browser-esbuild'
   ) {
