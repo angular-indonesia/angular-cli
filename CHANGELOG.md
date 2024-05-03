@@ -1,3 +1,65 @@
+<a name="18.0.0-rc.1"></a>
+
+# 18.0.0-rc.1 (2024-05-02)
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                               |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------- |
+| [c46aa084f](https://github.com/angular/angular-cli/commit/c46aa084f53be7ebdb8cc450bd81907222d00275) | fix  | add postcss dependency in application migration if needed |
+
+### @angular-devkit/architect
+
+| Commit                                                                                              | Type | Description                                     |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------- |
+| [ddd08efef](https://github.com/angular/angular-cli/commit/ddd08efefecfe9b74db6a866a1bed0216380a28a) | fix  | resolve builder aliases from containing package |
+
+### @angular-devkit/schematics
+
+| Commit                                                                                              | Type | Description                                   |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------- |
+| [80fa03069](https://github.com/angular/angular-cli/commit/80fa0306945616ac99818db4a7364114ebd8cb64) | fix  | use web standard error check for Deno support |
+
+### @angular/build
+
+| Commit                                                                                              | Type | Description                                           |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------- |
+| [b7a0792b3](https://github.com/angular/angular-cli/commit/b7a0792b3286fc98d1343f55b5df89ddf13e36bc) | fix  | add a maximum rendering timeout for SSG               |
+| [2085365e0](https://github.com/angular/angular-cli/commit/2085365e04c9b08dbf2024036b93609046f2f458) | fix  | only generate shallow preload links for initial files |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="18.0.0-rc.0"></a>
+
+# 18.0.0-rc.0 (2024-05-01)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                       |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------- |
+| [df4dde95d](https://github.com/angular/angular-cli/commit/df4dde95daa12d5b08b3c4e937f4b4048d645254) | fix  | add `@angular/build` package to update group list |
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                            |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------ |
+| [95a4d6ee5](https://github.com/angular/angular-cli/commit/95a4d6ee56d80dce012cf2306422bb7fd8e0e32d) | fix  | add less dependency in application migration if needed |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                    |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------- |
+| [37fc7f0cc](https://github.com/angular/angular-cli/commit/37fc7f0ccf3b8e6f31a0c5b2eaf4aee52f439472) | fix  | disable Vite prebundling when script optimizations are enabled |
+
+### @angular/build
+
+| Commit                                                                                              | Type | Description                                                    |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------- |
+| [940e382db](https://github.com/angular/angular-cli/commit/940e382db27474dba6479f57e4ffefee04cfca66) | fix  | disable Vite prebundling when script optimizations are enabled |
+| [44b401747](https://github.com/angular/angular-cli/commit/44b401747f78bab208ce863f9c08e7a12f01fe27) | fix  | ensure input index HTML file triggers rebuilds when changed    |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="18.0.0-next.5"></a>
 
 # 18.0.0-next.5 (2024-04-26)

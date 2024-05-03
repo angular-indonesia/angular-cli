@@ -34,7 +34,7 @@
     "npm-package-arg": "11.0.2",
     "npm-pick-manifest": "9.0.0",
     "ora": "5.4.1",
-    "pacote": "18.0.2",
+    "pacote": "18.0.3",
     "resolve": "1.22.8",
     "semver": "7.6.0",
     "symbol-observable": "4.0.0",
@@ -43,6 +43,7 @@
   "ng-update": {
     "migrations": "@schematics/angular/migrations/migration-collection.json",
     "packageGroup": {
+      "@angular/build": "0.0.0-PLACEHOLDER",
       "@angular/cli": "0.0.0-PLACEHOLDER",
       "@angular/ssr": "0.0.0-PLACEHOLDER",
       "@angular-devkit/architect": "0.0.0-EXPERIMENTAL-PLACEHOLDER",
