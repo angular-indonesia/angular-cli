@@ -1,3 +1,34 @@
+<a name="18.0.0-rc.2"></a>
+
+# 18.0.0-rc.2 (2024-05-08)
+
+### @angular/build
+
+| Commit                                                                                              | Type | Description                                        |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------- |
+| [57f448a0f](https://github.com/angular/angular-cli/commit/57f448a0f70c76c1a0ebbe941f82eec1d698e7d4) | fix  | decode URL pathname decoding during SSG fetch      |
+| [17931166d](https://github.com/angular/angular-cli/commit/17931166d83a4b18d2f4eb81f8a445b2365c71aa) | fix  | format sizes using decimal byte units consistently |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="17.3.7"></a>
+
+# 17.3.7 (2024-05-08)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                   |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------- |
+| [998c72036](https://github.com/angular/angular-cli/commit/998c720363087f3f0b1748d3f875e5b536a3119d) | fix  | decode URL pathname decoding during SSG fetch |
+
+### @angular-devkit/schematics
+
+| Commit                                                                                              | Type | Description                                   |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------- |
+| [1ab1c6c9e](https://github.com/angular/angular-cli/commit/1ab1c6c9e10ce938402355afed4602b76ac08a0e) | fix  | use web standard error check for Deno support |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="18.0.0-rc.1"></a>
 
 # 18.0.0-rc.1 (2024-05-02)
