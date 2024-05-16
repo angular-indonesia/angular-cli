@@ -18,8 +18,6 @@ import {
   virtualFs,
 } from '@angular-devkit/core';
 import { ParseError, parse as jsoncParse, printParseErrorCode } from 'jsonc-parser';
-import { EMPTY, Observable, concatMap, map, mergeMap } from 'rxjs';
-import { TextDecoder } from 'util';
 import {
   ContentHasMutatedException,
   FileAlreadyExistException,
@@ -304,7 +302,12 @@ export class HostTree implements Tree {
       // With the `fatal` option enabled, invalid data will throw a TypeError
       return decoder.decode(data);
     } catch (e) {
-      if (e instanceof TypeError) {
+      // The second part should not be needed. But Jest does not support instanceof correctly.
+      // See: https://github.com/jestjs/jest/issues/2549
+      if (
+        e instanceof TypeError ||
+        (e as NodeJS.ErrnoException).code === 'ERR_ENCODING_INVALID_ENCODED_DATA'
+      ) {
         throw new Error(`Failed to decode "${path}" as UTF-8 text.`);
       }
       throw e;
@@ -491,38 +494,39 @@ export class FilterHostTree extends HostTree {
     // cast to allow access
     const originalBackend = (tree as FilterHostTree)._backend;
 
-    const recurse: (base: Path) => Observable<void> = (base) => {
-      return originalBackend.list(base).pipe(
-        mergeMap((x) => x),
-        map((path) => join(base, path)),
-        concatMap((path) => {
-          let isDirectory = false;
-          originalBackend.isDirectory(path).subscribe((val) => (isDirectory = val));
-          if (isDirectory) {
-            return recurse(path);
-          }
+    // Walk the original backend and add files that match the filter to the new backend
+    const pendingPaths: Path[] = ['/' as Path];
+    while (pendingPaths.length > 0) {
+      const currentPath = pendingPaths.pop();
+      if (currentPath === undefined) {
+        break;
+      }
 
-          let isFile = false;
-          originalBackend.isFile(path).subscribe((val) => (isFile = val));
-          if (!isFile || !filter(path)) {
-            return EMPTY;
-          }
+      let isDirectory = false;
+      originalBackend.isDirectory(currentPath).subscribe((val) => (isDirectory = val));
+      if (isDirectory) {
+        originalBackend
+          .list(currentPath)
+          .subscribe((val) => pendingPaths.push(...val.map((p) => join(currentPath, p))));
+        continue;
+      }
 
-          let content: ArrayBuffer | null = null;
-          originalBackend.read(path).subscribe((val) => (content = val));
-          if (!content) {
-            return EMPTY;
-          }
+      let isFile = false;
+      originalBackend.isFile(currentPath).subscribe((val) => (isFile = val));
+      if (!isFile || !filter(currentPath)) {
+        continue;
+      }
 
-          return newBackend.write(path, content as {} as virtualFs.FileBuffer);
-        }),
-      );
-    };
-
-    recurse(normalize('/')).subscribe();
+      let content = null;
+      originalBackend.read(currentPath).subscribe((val) => (content = val));
+      if (content !== null) {
+        newBackend.write(currentPath, content).subscribe();
+      }
+    }
 
     super(newBackend);
 
+    // Add actions that match the filter to new tree
     for (const action of tree.actions) {
       if (!filter(action.path)) {
         continue;
