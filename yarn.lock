@@ -66,9 +66,10 @@
     "@angular/core" "^13.0.0 || ^14.0.0-0"
     reflect-metadata "^0.1.13"
 
-"@angular/build-tooling@https://github.com/angular/dev-infra-private-build-tooling-builds.git#8b5a56554a0f7024fc2d0f4abf7260bf37e28150":
-  version "0.0.0-239d56b71911f9fa1eeefb6e4505dbe7b0cd81a7"
-  resolved "https://github.com/angular/dev-infra-private-build-tooling-builds.git#8b5a56554a0f7024fc2d0f4abf7260bf37e28150"
+"@angular/build-tooling@https://github.com/angular/dev-infra-private-build-tooling-builds.git#6dc56eace09095d66cfdb614f66514e4d1af1cfc":
+  version "0.0.0-e805b4cfbbf04cf922ca279de2c49e2f778545ff"
+  uid "6dc56eace09095d66cfdb614f66514e4d1af1cfc"
+  resolved "https://github.com/angular/dev-infra-private-build-tooling-builds.git#6dc56eace09095d66cfdb614f66514e4d1af1cfc"
   dependencies:
     "@angular/benchpress" "0.3.0"
     "@angular/build" "18.0.0-rc.2"
@@ -84,6 +85,7 @@
     "@bazel/typescript" "5.8.1"
     "@microsoft/api-extractor" "7.43.7"
     "@types/browser-sync" "^2.26.3"
+    "@types/minimatch" "^5.1.2"
     "@types/node" "^18.19.21"
     "@types/selenium-webdriver" "^4.1.21"
     "@types/send" "^0.17.1"
@@ -141,10 +143,10 @@
     vite "5.2.11"
     watchpack "2.4.1"
 
-"@angular/cdk@18.0.0":
-  version "18.0.0"
-  resolved "https://registry.yarnpkg.com/@angular/cdk/-/cdk-18.0.0.tgz#6358f553d54969b18a2efa9305e1aa08449d6021"
-  integrity sha512-V0i1SAiT2PTNyugBW0E4fev8G/4XP5FdyX2YD6oc5sNyt3GFcoDNHcz+oEne8+aYVnQ3Ax9Zutq/SQincDHIbw==
+"@angular/cdk@18.0.1":
+  version "18.0.1"
+  resolved "https://registry.yarnpkg.com/@angular/cdk/-/cdk-18.0.1.tgz#7338c85ac88aa57633eb0b55ba5b6deea508a86b"
+  integrity sha512-2fCqX1sz5cM+LncO6ak4EU2ZBm8MWitv5V53go3Iz5dOVOdrvysBt8smEkWZ4nvEKkFYHEPpQo0YlxEWbuTEmA==
   dependencies:
     tslib "^2.3.0"
   optionalDependencies:
@@ -209,10 +211,10 @@
     fast-glob "3.3.2"
     yargs "^17.2.1"
 
-"@angular/material@18.0.0":
-  version "18.0.0"
-  resolved "https://registry.yarnpkg.com/@angular/material/-/material-18.0.0.tgz#8e235d6fd263381b2b3319447cb1efbb0221543a"
-  integrity sha512-4WfMcr4cX3cF7dKz+cXf9YIvhWOJGTP24rbMF5C6eC5K20IK6zgA//Qn0VSTwZkm54Tu9C7kF+CfNLeLy6i5uQ==
+"@angular/material@18.0.1":
+  version "18.0.1"
+  resolved "https://registry.yarnpkg.com/@angular/material/-/material-18.0.1.tgz#83b8e6a7998e0c5c0579b26527dfc183e798b01e"
+  integrity sha512-y8OaESXw32P74Jh2FEr3n7QjqjTlo2Jf+XdgOvp5dd1yxpJ20vnK7ZCEQqCpxdxGAzXqR+2DccKk9tebB9egZw==
   dependencies:
     "@material/animation" "15.0.0-canary.7f224ddd4.0"
     "@material/auto-init" "15.0.0-canary.7f224ddd4.0"
@@ -264,9 +266,10 @@
     "@material/typography" "15.0.0-canary.7f224ddd4.0"
     tslib "^2.3.0"
 
-"@angular/ng-dev@https://github.com/angular/dev-infra-private-ng-dev-builds.git#c44d21e50aad681b895171cb3b3d773c73b3af4b":
-  version "0.0.0-239d56b71911f9fa1eeefb6e4505dbe7b0cd81a7"
-  resolved "https://github.com/angular/dev-infra-private-ng-dev-builds.git#c44d21e50aad681b895171cb3b3d773c73b3af4b"
+"@angular/ng-dev@https://github.com/angular/dev-infra-private-ng-dev-builds.git#68feef74970fb464f94ab21be85a314924499aa3":
+  version "0.0.0-e805b4cfbbf04cf922ca279de2c49e2f778545ff"
+  uid "68feef74970fb464f94ab21be85a314924499aa3"
+  resolved "https://github.com/angular/dev-infra-private-ng-dev-builds.git#68feef74970fb464f94ab21be85a314924499aa3"
   dependencies:
     "@octokit/rest" "20.1.1"
     "@types/semver" "^7.3.6"
@@ -4375,7 +4378,7 @@
   resolved "https://registry.yarnpkg.com/@types/mime/-/mime-1.3.5.tgz#1ef302e01cf7d2b5a0fa526790c9123bf1d06690"
   integrity sha512-/pyBZWSLD2n0dcHE3hq8s8ZvcETHtEuF+3E7XVt0Ig2nvsVQXdghHVcEkIWjy9A0wKfTn97a/PSDYohKIlnP/w==
 
-"@types/minimatch@*":
+"@types/minimatch@*", "@types/minimatch@^5.1.2":
   version "5.1.2"
   resolved "https://registry.yarnpkg.com/@types/minimatch/-/minimatch-5.1.2.tgz#07508b45797cb81ec3f273011b054cd0755eddca"
   integrity sha512-K0VQKziLUWkVKiRVrx4a40iPaxTUefQmjtkQofBkYRcoaaL/8rhwDWww9qWbrgicNOgnpIsMxyNIUM4+n6dUIA==
@@ -10116,10 +10119,10 @@ loader-runner@^4.2.0:
   resolved "https://registry.yarnpkg.com/loader-runner/-/loader-runner-4.3.0.tgz#c1b4a163b99f614830353b16755e7149ac2314e1"
   integrity sha512-3R/1M+yS3j5ou80Me59j7F9IMs4PXs3VqRrm0TU3AbKPxlmpoY1TNscJV/oGJXo8qCatFGTfDbY6W6ipGOYXfg==
 
-loader-utils@3.2.1:
-  version "3.2.1"
-  resolved "https://registry.yarnpkg.com/loader-utils/-/loader-utils-3.2.1.tgz#4fb104b599daafd82ef3e1a41fb9265f87e1f576"
-  integrity sha512-ZvFw1KWS3GVyYBYb7qkmRM/WwL2TQQBxgCK62rlvm4WpVQ23Nb4tYjApUlfjrEGvOs7KHEsmyUn75OHZrJMWPw==
+loader-utils@3.2.2:
+  version "3.2.2"
+  resolved "https://registry.yarnpkg.com/loader-utils/-/loader-utils-3.2.2.tgz#dc154c005c65974dab413195c16cd246f545aecb"
+  integrity sha512-vjJi4vQDasD8t0kMpxe+9URAcgbSuASqoj/Wuk3MawTk97LYa2KfdHreAkd1G/pmPLMvzZEw7/OsydADNemerQ==
 
 loader-utils@^2.0.0:
   version "2.0.4"
@@ -12775,10 +12778,10 @@ sass@1.77.0:
     immutable "^4.0.0"
     source-map-js ">=0.6.2 <2.0.0"
 
-sass@1.77.2:
-  version "1.77.2"
-  resolved "https://registry.yarnpkg.com/sass/-/sass-1.77.2.tgz#18d4ed2eefc260cdc8099c5439ec1303fd5863aa"
-  integrity sha512-eb4GZt1C3avsX3heBNlrc7I09nyT00IUuo4eFhAbeXWU2fvA7oXI53SxODVAA+zgZCk9aunAZgO+losjR3fAwA==
+sass@1.77.3:
+  version "1.77.3"
+  resolved "https://registry.yarnpkg.com/sass/-/sass-1.77.3.tgz#4e93f6197786c05cab2c795c3f0f243470d94836"
+  integrity sha512-WJHo+jmFp0dwRuymPmIovuxHaBntcCyja5hCB0yYY9wWrViEp4kF5Cdai98P72v6FzroPuABqu+ddLMbQWmwzA==
   dependencies:
     chokidar ">=3.0.0 <4.0.0"
     immutable "^4.0.0"
@@ -14025,6 +14028,11 @@ typescript@5.4.5:
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.4.5.tgz#42ccef2c571fdbd0f6718b1d1f5e6e5ef006f611"
   integrity sha512-vcI4UpRgg81oIRUFwR0WSIHKt11nJ7SAVlYNIu+QpqeyXP+gpQJy/Z4+F0aGxSE4MqwjyXvW/TzgkLAx2AGHwQ==
 
+typescript@5.5.0-beta:
+  version "5.5.0-beta"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.5.0-beta.tgz#ae6a2e3aa277f74478f1743e8771676cddfcdbec"
+  integrity sha512-FRg3e/aQg3olEG3ff8YjHOERsO4IM0m4qGrsE4UMvILaq4TdDZ6gQX4+2Rq9SjTpfSe/ebwiHcsjm/7FfWWQ6Q==
+
 typescript@~4.9.0:
   version "4.9.5"
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.9.5.tgz#095979f9bcc0d09da324d58d03ce8f8374cbe65a"
@@ -14083,10 +14091,10 @@ undici@6.16.0:
   resolved "https://registry.yarnpkg.com/undici/-/undici-6.16.0.tgz#3b2e3dc617c6bd51b6885f15d58c172cc8b6fc40"
   integrity sha512-HQfVddOTb5PJtfLnJ1Px8bNGyIg/z7WTj1hjUSna1Itsv59Oca9JdclIU08ToNqvWWXjFLRzc9rqjnpfw5UWcQ==
 
-undici@6.18.1:
-  version "6.18.1"
-  resolved "https://registry.yarnpkg.com/undici/-/undici-6.18.1.tgz#8390af4c4bed00fc32cb5f77f1c5e03e3271b8f2"
-  integrity sha512-/0BWqR8rJNRysS5lqVmfc7eeOErcOP4tZpATVjJOojjHZ71gSYVAtFhEmadcIjwMIUehh5NFyKGsXCnXIajtbA==
+undici@6.18.2:
+  version "6.18.2"
+  resolved "https://registry.yarnpkg.com/undici/-/undici-6.18.2.tgz#f662a5dc33cf654fc412a9912e5a07b138d75c97"
+  integrity sha512-o/MQLTwRm9IVhOqhZ0NQ9oXax1ygPjw6Vs+Vq/4QRjbOAC3B1GCHy7TYxxbExKlb7bzDRzt9vBWU6BDz0RFfYg==
 
 unicode-canonical-property-names-ecmascript@^2.0.0:
   version "2.0.0"
