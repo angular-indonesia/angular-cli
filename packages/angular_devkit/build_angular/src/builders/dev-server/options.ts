@@ -3,7 +3,7 @@
  * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
- * found in the LICENSE file at https://angular.io/license
+ * found in the LICENSE file at https://angular.dev/license
  */
 
 import { BuilderContext, targetFromTargetString } from '@angular-devkit/architect';
@@ -61,6 +61,29 @@ export async function normalizeOptions(
     }
   }
 
+  let inspect: false | { host?: string; port?: number } = false;
+  const inspectRaw = options.inspect;
+  if (inspectRaw === true || inspectRaw === '' || inspectRaw === 'true') {
+    inspect = {
+      host: undefined,
+      port: undefined,
+    };
+  } else if (typeof inspectRaw === 'string' && inspectRaw !== 'false') {
+    const port = +inspectRaw;
+    if (isFinite(port)) {
+      inspect = {
+        host: undefined,
+        port,
+      };
+    } else {
+      const [host, port] = inspectRaw.split(':');
+      inspect = {
+        host,
+        port: isNaN(+port) ? undefined : +port,
+      };
+    }
+  }
+
   // Initial options to keep
   const {
     host,
@@ -110,5 +133,6 @@ export async function normalizeOptions(
     forceEsbuild,
     // Prebundling defaults to true but requires caching to function
     prebundle: cacheOptions.enabled && !optimization.scripts && (prebundle ?? true),
+    inspect,
   };
 }

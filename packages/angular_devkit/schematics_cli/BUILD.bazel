@@ -5,7 +5,7 @@ load("//tools:ts_json_schema.bzl", "ts_json_schema")
 # Copyright Google Inc. All Rights Reserved.
 #
 # Use of this source code is governed by an MIT-style license that can be
-# found in the LICENSE file at https://angular.io/license
+# found in the LICENSE file at https://angular.dev/license
 licenses(["notice"])
 
 package(default_visibility = ["//visibility:public"])
@@ -31,14 +31,15 @@ ts_library(
         "//packages/angular_devkit/schematics_cli:schematic/schema.ts",
         # @external_end
     ],
-    data = glob(
+    data = [
+        "blank/schema.json",
+        "collection.json",
+        "package.json",
+        "schematic/schema.json",
+    ] + glob(
         include = [
-            "collection.json",
-            "package.json",
-            "blank/schema.json",
             "blank/project-files/**/*",
             "blank/schematic-files/**/*",
-            "schematic/schema.json",
             "schematic/files/**/*",
         ],
     ),

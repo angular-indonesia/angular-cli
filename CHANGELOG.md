@@ -1,3 +1,52 @@
+<a name="18.1.0-next.1"></a>
+
+# 18.1.0-next.1 (2024-06-05)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                                                                                |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------- |
+| [ce8b5a3a7](https://github.com/angular/angular-cli/commit/ce8b5a3a745062f926491d5a299df728b7de8790) | fix  | add `schema.json` options to parsed command, also when a version is passed to `ng add <package>@<version>` |
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                                         |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------- |
+| [22e05dcb4](https://github.com/angular/angular-cli/commit/22e05dcb4a9ae963997c58fad86125ca51b19a36) | fix  | generate new projects with ECMAScript standard class field behavior |
+
+### @angular/build
+
+| Commit                                                                                              | Type | Description                                               |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------- |
+| [687a6c7ec](https://github.com/angular/angular-cli/commit/687a6c7eca740a98129196908689a44c181b33a5) | feat | add `--inspect` option to the dev-server                  |
+| [86a07237e](https://github.com/angular/angular-cli/commit/86a07237e60734686c80e2e231e6238619a04106) | fix  | disable JS transformer persistent cache on web containers |
+| [a5fc020e6](https://github.com/angular/angular-cli/commit/a5fc020e6a616d6a39940f1d616547a911b07781) | fix  | watch all related files during a Sass error               |
+| [dd94a831b](https://github.com/angular/angular-cli/commit/dd94a831b4ce1ca55289fca1818aa26195e81dbc) | perf | enable dependency prebundling for server dependencies     |
+| [3acb77683](https://github.com/angular/angular-cli/commit/3acb7768317bb05a9cd73fa64e081b5ca0326189) | perf | use direct transpilation with isolated modules            |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="18.0.3"></a>
+
+# 18.0.3 (2024-06-05)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                                                                                |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------- |
+| [b709d2a24](https://github.com/angular/angular-cli/commit/b709d2a243926f1ab01e8c8a78d68fc57ab4cab3) | fix  | add `schema.json` options to parsed command, also when a version is passed to `ng add <package>@<version>` |
+
+### @angular/build
+
+| Commit                                                                                              | Type | Description                                               |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------- |
+| [43a2a7d13](https://github.com/angular/angular-cli/commit/43a2a7d137328c1f6f865b76585a92f4e5058b13) | fix  | avoid escaping rebased Sass URL values                    |
+| [9acb5c7ca](https://github.com/angular/angular-cli/commit/9acb5c7ca8e6d14379e39f56d2498c0276214210) | fix  | disable JS transformer persistent cache on web containers |
+| [346df4909](https://github.com/angular/angular-cli/commit/346df490976e39d791db5ecfa14eab6a5ad8d99d) | fix  | improve Sass rebaser ident token detection                |
+| [6526a5f59](https://github.com/angular/angular-cli/commit/6526a5f590fbc7f26b9e613af3b5c497e30603b5) | fix  | watch all related files during a Sass error               |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="18.1.0-next.0"></a>
 
 # 18.1.0-next.0 (2024-05-29)
@@ -4054,7 +4103,7 @@ Charles Lyding and Doug Parker
 
 ### @schematics/angular
 
-- `classlist.js` and `web-animations-js` are removed from application polyfills and uninstalled from the package. These were only needed for compatibility with Internet Explorer, which is no longer needed now that Angular only supports evergreen browsers. See: https://angular.io/guide/browser-support.
+- `classlist.js` and `web-animations-js` are removed from application polyfills and uninstalled from the package. These were only needed for compatibility with Internet Explorer, which is no longer needed now that Angular only supports evergreen browsers. See: https://angular.dev/reference/versions#browser-support.
 
 Add the following to the polyfills file for an app to re-add these packages:
 
@@ -10968,7 +11017,7 @@ The following options which were used to support the above syntax were removed w
 </h3>
 Critical CSS inlining is now enabled by default. If you wish to turn this off set `inlineCritical` to `false`.
 
-See: https://angular.io/guide/workspace-config#optimization-configuration
+See: https://angular.dev/reference/configs/workspace-config#optimization-configuration
 
 <h3>
     @angular-devkit/build-angular: drop support for zone.js 0.10 (<a href="https://github.com/angular/angular-cli/commit/f309516bcdcee711fc5693b5f14d6fef1cfa5dba">f309516</a>)
@@ -13564,7 +13613,7 @@ Alan Agius, Charles Lyding, Renovate Bot, Joey Perrott
 </h3>
 Critical CSS inlining is now enabled by default. If you wish to turn this off set `inlineCritical` to `false`.
 
-See: https://angular.io/guide/workspace-config#optimization-configuration
+See: https://angular.dev/reference/configs/workspace-config#optimization-configuration
 
 ---
 

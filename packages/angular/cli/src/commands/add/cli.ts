@@ -3,7 +3,7 @@
  * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
- * found in the LICENSE file at https://angular.io/license
+ * found in the LICENSE file at https://angular.dev/license
  */
 
 import { NodePackageDoesNotSupportSchematics } from '@angular-devkit/schematics/tools';
@@ -346,7 +346,17 @@ export default class AddCommandModule
   }
 
   private async getCollectionName(): Promise<string> {
-    const [, collectionName] = this.context.args.positional;
+    let [, collectionName] = this.context.args.positional;
+
+    // The CLI argument may specify also a version, like `ng add @my/lib@13.0.0`,
+    // but here we need only the name of the package, like `@my/lib`
+    try {
+      const packageIdentifier = npa(collectionName);
+      collectionName = packageIdentifier.name ?? collectionName;
+    } catch (e) {
+      assertIsError(e);
+      this.context.logger.error(e.message);
+    }
 
     return collectionName;
   }

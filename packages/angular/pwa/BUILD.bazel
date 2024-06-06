@@ -1,7 +1,7 @@
 # Copyright Google Inc. All Rights Reserved.
 #
 # Use of this source code is governed by an MIT-style license that can be
-# found in the LICENSE file at https://angular.io/license
+# found in the LICENSE file at https://angular.dev/license
 
 load("@npm//@bazel/jasmine:index.bzl", "jasmine_node_test")
 load("//tools:defaults.bzl", "pkg_npm", "ts_library")
@@ -18,10 +18,11 @@ ts_library(
         "pwa/index.ts",
         "//packages/angular/pwa:pwa/schema.ts",
     ],
-    data = glob(
+    data = [
+        "collection.json",
+        "pwa/schema.json",
+    ] + glob(
         include = [
-            "collection.json",
-            "pwa/schema.json",
             "pwa/files/**/*",
         ],
     ),
