@@ -1,0 +1,29 @@
+diff --git a/internal/build_defs.bzl b/internal/build_defs.bzl
+index 9e5cda684f0456b61d1b6c0f9c56ae021594713f..6c45196bda5880531d32618dfca0dee44c035cb9 100755
+--- a/internal/build_defs.bzl
++++ b/internal/build_defs.bzl
+@@ -76,7 +76,7 @@ _TYPESCRIPT_TYPINGS = Label(
+     "//typescript:typescript__typings",
+ )
+ 
+-_TYPESCRIPT_SCRIPT_TARGETS = ["es3", "es5", "es2015", "es2016", "es2017", "es2018", "es2019", "es2020", "esnext"]
++_TYPESCRIPT_SCRIPT_TARGETS = ["es3", "es5", "es2015", "es2016", "es2017", "es2018", "es2019", "es2020", "es2022", "esnext"]
+ _TYPESCRIPT_MODULE_KINDS = ["none", "commonjs", "amd", "umd", "system", "es2015", "esnext"]
+ 
+ _DEVMODE_TARGET_DEFAULT = "es2015"
+diff --git a/internal/common/tsconfig.bzl b/internal/common/tsconfig.bzl
+index b01c999f5e02b388f51a508b0b608cf69db9b664..ec3e4ccb321fa230546e34c1c2ea87f7457fa108 100755
+--- a/internal/common/tsconfig.bzl
++++ b/internal/common/tsconfig.bzl
+@@ -278,11 +278,6 @@ def create_tsconfig(
+         "declarationDir": "/".join([workspace_path, outdir_path]),
+         "stripInternal": True,
+ 
+-        # Embed source maps and sources in .js outputs
+-        "inlineSourceMap": True,
+-        "inlineSources": True,
+-        # Implied by inlineSourceMap: True
+-        "sourceMap": False,
+     }
+ 
+     # "node_modules" still checked for backward compat for ng_module
