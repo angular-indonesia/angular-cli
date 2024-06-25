@@ -1,3 +1,92 @@
+<a name="18.1.0-next.3"></a>
+
+# 18.1.0-next.3 (2024-06-20)
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                                          |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------------- |
+| [e3b8b780b](https://github.com/angular/angular-cli/commit/e3b8b780be72d8a0c6247a25e4e1e1ccfbdea67c) | fix  | update schematics to use RouterModule when --routing flag is present |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                  |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ |
+| [fb2981dc4](https://github.com/angular/angular-cli/commit/fb2981dc4e0ac21f5389bb3b36d5853f8580e5a6) | fix  | use istanbul-lib-instrument directly for karma code coverage |
+
+### @angular/build
+
+| Commit                                                                                              | Type | Description                                                |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------- |
+| [c0ceddf78](https://github.com/angular/angular-cli/commit/c0ceddf78c7ad661419e56517738de526425ca3d) | fix  | add CSP nonce to script with src tags                      |
+| [2324d5a2e](https://github.com/angular/angular-cli/commit/2324d5a2ecedad4330a9cb0e9e66909f95d2ea98) | fix  | automatically resolve `.mjs` files when using Vite         |
+| [dd0704927](https://github.com/angular/angular-cli/commit/dd07049277f5be165825e38015b2bf6ff22620aa) | fix  | use Node.js available parallelism for default worker count |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="18.0.5"></a>
+
+# 18.0.5 (2024-06-20)
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                                          |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------------- |
+| [5c705e800](https://github.com/angular/angular-cli/commit/5c705e800c17237d82bc9065f22e30b720ddcec0) | fix  | update schematics to use RouterModule when --routing flag is present |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                  |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ |
+| [86e031dc7](https://github.com/angular/angular-cli/commit/86e031dc7ef6c736e431caf973aca1233d912060) | fix  | use istanbul-lib-instrument directly for karma code coverage |
+
+### @angular/build
+
+| Commit                                                                                              | Type | Description                                                |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------- |
+| [bdd168f37](https://github.com/angular/angular-cli/commit/bdd168f37f7757e0c02971e21e90479555a6e703) | fix  | add CSP nonce to script with src tags                      |
+| [405c14809](https://github.com/angular/angular-cli/commit/405c1480917d50c677be178c817b845f30cc8cce) | fix  | automatically resolve `.mjs` files when using Vite         |
+| [7360a346e](https://github.com/angular/angular-cli/commit/7360a346ed1b329c0620301ce0e0464d5569a42f) | fix  | use Node.js available parallelism for default worker count |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="18.1.0-next.2"></a>
+
+# 18.1.0-next.2 (2024-06-13)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                    |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------- |
+| [6d266c146](https://github.com/angular/angular-cli/commit/6d266c146c9e141396236b93f2bfafcb261fd7aa) | fix  | add fallbacks for migration package resolution |
+
+### @angular/build
+
+| Commit                                                                                              | Type | Description                                                                                             |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------- |
+| [4ff914a16](https://github.com/angular/angular-cli/commit/4ff914a16525350050c5e8359fb59f9d6f243d27) | fix  | allow additional module preloads up to limit                                                            |
+| [8c379269e](https://github.com/angular/angular-cli/commit/8c379269e0e96a958d7bc93cf065a0ff36be9601) | fix  | do not reference sourcemaps in web workers and global stylesheet bundles when hidden setting is enabled |
+| [461e78f3e](https://github.com/angular/angular-cli/commit/461e78f3ee15e7097bd7f2c975dc460d844f277f) | fix  | generate module preloads next to script elements in index HTML                                          |
+| [f102f815e](https://github.com/angular/angular-cli/commit/f102f815e404bcc2f627b7a52e92b3385eb9be5f) | fix  | Initiate PostCSS only once                                                                              |
+| [fbc6eb322](https://github.com/angular/angular-cli/commit/fbc6eb3225e4b02c62baf3be4274b46e80ba62a4) | fix  | issue warning when auto adding `@angular/localize/init`                                                 |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="18.0.4"></a>
+
+# 18.0.4 (2024-06-13)
+
+### @angular/build
+
+| Commit                                                                                              | Type | Description                                                                                             |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------- |
+| [791ef809d](https://github.com/angular/angular-cli/commit/791ef809d8dfec8fde844e916973a05b2eb5c9d9) | fix  | do not reference sourcemaps in web workers and global stylesheet bundles when hidden setting is enabled |
+| [20fc6ca05](https://github.com/angular/angular-cli/commit/20fc6ca057e5190155474e7377bf9f22aab597dd) | fix  | generate module preloads next to script elements in index HTML                                          |
+| [3a1bf5c8a](https://github.com/angular/angular-cli/commit/3a1bf5c8a52d6ec1eb337f0937bf073de2ea0b62) | fix  | Initiate PostCSS only once                                                                              |
+| [78c611754](https://github.com/angular/angular-cli/commit/78c6117544afa1aa69ef5485f1c3b77b1207f6f1) | fix  | issue warning when auto adding `@angular/localize/init`                                                 |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="18.1.0-next.1"></a>
 
 # 18.1.0-next.1 (2024-06-05)

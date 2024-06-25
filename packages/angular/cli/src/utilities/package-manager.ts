@@ -14,7 +14,6 @@ import { join } from 'path';
 import { PackageManager } from '../../lib/config/workspace-schema';
 import { AngularWorkspace, getProjectByCwd } from './config';
 import { memoize } from './memoize';
-import { Spinner } from './spinner';
 
 interface PackageManagerOptions {
   saveDev: string;
@@ -166,9 +165,6 @@ export class PackageManagerUtils {
   ): Promise<boolean> {
     const { cwd = process.cwd(), silent = false } = options;
 
-    const spinner = new Spinner();
-    spinner.start('Installing packages...');
-
     return new Promise((resolve) => {
       const bufferedOutput: { stream: NodeJS.WriteStream; data: Buffer }[] = [];
 
@@ -179,12 +175,9 @@ export class PackageManagerUtils {
         cwd,
       }).on('close', (code: number) => {
         if (code === 0) {
-          spinner.succeed('Packages successfully installed.');
           resolve(true);
         } else {
-          spinner.stop();
           bufferedOutput.forEach(({ stream, data }) => stream.write(data));
-          spinner.fail('Packages installation failed, see above.');
           resolve(false);
         }
       });

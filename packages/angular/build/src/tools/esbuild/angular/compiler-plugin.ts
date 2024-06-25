@@ -18,17 +18,17 @@ import type {
 import assert from 'node:assert';
 import * as path from 'node:path';
 import { maxWorkers, useTypeChecking } from '../../../utils/environment-options';
-import { JavaScriptTransformer } from '../javascript-transformer';
-import { LoadResultCache, createCachedLoad } from '../load-result-cache';
-import { logCumulativeDurations, profileAsync, resetCumulativeDurations } from '../profiling';
-import { BundleStylesheetOptions } from '../stylesheets/bundle-options';
-import { AngularHostOptions } from './angular-host';
+import { AngularHostOptions } from '../../angular/angular-host';
 import {
   AngularCompilation,
   DiagnosticModes,
   NoopCompilation,
   createAngularCompilation,
-} from './compilation';
+} from '../../angular/compilation';
+import { JavaScriptTransformer } from '../javascript-transformer';
+import { LoadResultCache, createCachedLoad } from '../load-result-cache';
+import { logCumulativeDurations, profileAsync, resetCumulativeDurations } from '../profiling';
+import { BundleStylesheetOptions } from '../stylesheets/bundle-options';
 import { SharedTSCompilationState, getSharedCompilationState } from './compilation-state';
 import { ComponentStylesheetBundler } from './component-stylesheets';
 import { FileReferenceTracker } from './file-reference-tracker';
@@ -36,7 +36,7 @@ import { setupJitPluginCallbacks } from './jit-plugin-callbacks';
 import { SourceFileCache } from './source-file-cache';
 
 export interface CompilerPluginOptions {
-  sourcemap: boolean;
+  sourcemap: boolean | 'external';
   tsconfig: string;
   jit?: boolean;
   /** Skip TypeScript compilation setup. This is useful to re-use the TypeScript compilation from another plugin. */
@@ -65,13 +65,32 @@ export function createCompilerPlugin(
       // Webcontainers currently do not support this persistent cache store.
       let cacheStore: import('../lmdb-cache-store').LmbdCacheStore | undefined;
       if (pluginOptions.sourceFileCache?.persistentCachePath && !process.versions.webcontainer) {
-        const { LmbdCacheStore } = await import('../lmdb-cache-store');
-        cacheStore = new LmbdCacheStore(
-          path.join(pluginOptions.sourceFileCache.persistentCachePath, 'angular-compiler.db'),
-        );
+        try {
+          const { LmbdCacheStore } = await import('../lmdb-cache-store');
+          cacheStore = new LmbdCacheStore(
+            path.join(pluginOptions.sourceFileCache.persistentCachePath, 'angular-compiler.db'),
+          );
+        } catch (e) {
+          setupWarnings.push({
+            text: 'Unable to initialize JavaScript cache storage.',
+            location: null,
+            notes: [
+              // Only show first line of lmdb load error which has platform support listed
+              { text: (e as Error)?.message.split('\n')[0] ?? `${e}` },
+              {
+                text: 'This will not affect the build output content but may result in slower builds.',
+              },
+            ],
+          });
+        }
       }
       const javascriptTransformer = new JavaScriptTransformer(
-        pluginOptions,
+        {
+          sourcemap: !!pluginOptions.sourcemap,
+          thirdPartySourcemaps: pluginOptions.thirdPartySourcemaps,
+          advancedOptimizations: pluginOptions.advancedOptimizations,
+          jit: pluginOptions.jit,
+        },
         maxWorkers,
         cacheStore?.createCache('jstransformer'),
       );
@@ -541,8 +560,8 @@ function createCompilerOptionsTransformer(
     return {
       ...compilerOptions,
       noEmitOnError: false,
-      inlineSources: pluginOptions.sourcemap,
-      inlineSourceMap: pluginOptions.sourcemap,
+      inlineSources: !!pluginOptions.sourcemap,
+      inlineSourceMap: !!pluginOptions.sourcemap,
       mapRoot: undefined,
       sourceRoot: undefined,
       preserveSymlinks,

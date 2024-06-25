@@ -8,6 +8,7 @@
     "experimentalDecorators": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
+    "isolatedModules": true,
     "outDir": "./dist",
     "skipLibCheck": true,
     "strict": true,
@@ -30,14 +31,7 @@
       "@angular/build/private": ["./packages/angular/build/src/private"],
       "@ngtools/webpack": ["./packages/ngtools/webpack/src"],
       "@schematics/angular": ["./packages/schematics/angular"]
-    },
-    "plugins": [
-      {
-        "name": "@bazel/tsetse",
-        // must-use-promises is handled by the eslint @typescript-eslint/no-floating-promises rule
-        "disabledRules": ["must-type-assert-json-parse", "must-use-promises"]
-      }
-    ]
+    }
   },
   "bazelOptions": {
     "suppressTsconfigOverrideWarnings": true

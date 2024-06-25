@@ -12,9 +12,10 @@ import {
   FileSystemSchematicDescription,
   NodeWorkflow,
 } from '@angular-devkit/schematics/tools';
-import { SpawnSyncReturns, execSync, spawnSync } from 'child_process';
-import { existsSync, promises as fs } from 'fs';
-import { createRequire } from 'module';
+import { Listr } from 'listr2';
+import { SpawnSyncReturns, execSync, spawnSync } from 'node:child_process';
+import { existsSync, promises as fs } from 'node:fs';
+import { createRequire } from 'node:module';
 import npa from 'npm-package-arg';
 import pickManifest from 'npm-pick-manifest';
 import * as path from 'path';
@@ -30,7 +31,7 @@ import {
 } from '../../command-builder/command-module';
 import { SchematicEngineHost } from '../../command-builder/utilities/schematic-engine-host';
 import { subscribeToWorkflow } from '../../command-builder/utilities/schematic-workflow';
-import { colors } from '../../utilities/color';
+import { colors, figures } from '../../utilities/color';
 import { disableVersionCheck } from '../../utilities/environment-options';
 import { assertIsError } from '../../utilities/error';
 import { writeErrorToLogFile } from '../../utilities/log-file';
@@ -73,6 +74,8 @@ interface MigrationSchematicDescription
 interface MigrationSchematicDescriptionWithVersion extends MigrationSchematicDescription {
   version: string;
 }
+
+class CommandError extends Error {}
 
 const ANGULAR_PACKAGES_REGEXP = /^@(?:angular|nguniversal)\//;
 const UPDATE_SCHEMATIC_COLLECTION = path.join(__dirname, 'schematic/collection.json');
@@ -241,7 +244,7 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
       }
     }
 
-    logger.info(`Using package manager: ${colors.grey(packageManager.name)}`);
+    logger.info(`Using package manager: ${colors.gray(packageManager.name)}`);
     logger.info('Collecting installed dependencies...');
 
     const rootDependencies = await getProjectDependencies(this.context.root);
@@ -303,12 +306,12 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
       return { success: !workflowSubscription.error, files: workflowSubscription.files };
     } catch (e) {
       if (e instanceof UnsuccessfulWorkflowExecution) {
-        logger.error(`${colors.symbols.cross} Migration failed. See above for further details.\n`);
+        logger.error(`${figures.cross} Migration failed. See above for further details.\n`);
       } else {
         assertIsError(e);
         const logPath = writeErrorToLogFile(e);
         logger.fatal(
-          `${colors.symbols.cross} Migration failed: ${e.message}\n` +
+          `${figures.cross} Migration failed: ${e.message}\n` +
             `  See "${logPath}" for further details.\n`,
         );
       }
@@ -438,7 +441,7 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
     for (const migration of migrations) {
       const { title, description } = getMigrationTitleAndDescription(migration);
 
-      logger.info(colors.cyan(colors.symbols.pointer) + ' ' + colors.bold(title));
+      logger.info(colors.cyan(figures.pointer) + ' ' + colors.bold(title));
 
       if (description) {
         logger.info('  ' + description);
@@ -756,21 +759,46 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
     );
 
     if (success) {
+      const { root: commandRoot, packageManager } = this.context;
+      const installArgs = this.packageManagerForce(options.verbose) ? ['--force'] : [];
+      const tasks = new Listr([
+        {
+          title: 'Cleaning node modules directory',
+          async task(_, task) {
+            try {
+              await fs.rm(path.join(commandRoot, 'node_modules'), {
+                force: true,
+                recursive: true,
+                maxRetries: 3,
+              });
+            } catch (e) {
+              assertIsError(e);
+              if (e.code === 'ENOENT') {
+                task.skip('Cleaning not required. Node modules directory not found.');
+              }
+            }
+          },
+        },
+        {
+          title: 'Installing packages',
+          async task() {
+            const installationSuccess = await packageManager.installAll(installArgs, commandRoot);
+
+            if (!installationSuccess) {
+              throw new CommandError('Unable to install packages');
+            }
+          },
+        },
+      ]);
+
       try {
-        await fs.rm(path.join(this.context.root, 'node_modules'), {
-          force: true,
-          recursive: true,
-          maxRetries: 3,
-        });
-      } catch {}
+        await tasks.run();
+      } catch (e) {
+        if (e instanceof CommandError) {
+          return 1;
+        }
 
-      const installationSuccess = await this.context.packageManager.installAll(
-        this.packageManagerForce(options.verbose) ? ['--force'] : [],
-        this.context.root,
-      );
-
-      if (!installationSuccess) {
-        return 1;
+        throw e;
       }
     }
 
@@ -1017,7 +1045,7 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
     if (existsSync(packageJsonPath)) {
       const content = await fs.readFile(packageJsonPath, 'utf-8');
       if (content) {
-        const { bin = {} } = JSON.parse(content);
+        const { bin = {} } = JSON.parse(content) as { bin: Record<string, string> };
         const binKeys = Object.keys(bin);
 
         if (binKeys.length) {
@@ -1088,7 +1116,7 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
     if (!isTTY()) {
       for (const migration of optionalMigrations) {
         const { title } = getMigrationTitleAndDescription(migration);
-        logger.info(colors.cyan(colors.symbols.pointer) + ' ' + colors.bold(title));
+        logger.info(colors.cyan(figures.pointer) + ' ' + colors.bold(title));
         logger.info(colors.gray(`  ng update ${packageName} --name ${migration.name}`));
         logger.info(''); // Extra trailing newline.
       }
