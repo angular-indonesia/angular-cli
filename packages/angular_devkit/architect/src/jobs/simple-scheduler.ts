@@ -147,7 +147,7 @@ export class SimpleScheduler<
 
         const description: JobDescription = {
           // Make a copy of it to be sure it's proper JSON.
-          ...JSON.parse(JSON.stringify(handler.jobDescription)),
+          ...(JSON.parse(JSON.stringify(handler.jobDescription)) as JobDescription),
           name: handler.jobDescription.name || name,
           argument: handler.jobDescription.argument || true,
           input: handler.jobDescription.input || true,
@@ -418,7 +418,7 @@ export class SimpleScheduler<
 
     const output = outboundBus.pipe(
       filter((x) => x.kind == JobOutboundMessageKind.Output),
-      map((x) => (x as JobOutboundMessageOutput<O>).value),
+      map((x) => x.value),
       shareReplay(1),
     );
 

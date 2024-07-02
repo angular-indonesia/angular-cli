@@ -5,7 +5,6 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "noEmitOnError": true,
-    "experimentalDecorators": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
     "isolatedModules": true,
@@ -32,9 +31,6 @@
       "@ngtools/webpack": ["./packages/ngtools/webpack/src"],
       "@schematics/angular": ["./packages/schematics/angular"]
     }
-  },
-  "bazelOptions": {
-    "suppressTsconfigOverrideWarnings": true
   },
   "exclude": [
     "packages/angular_devkit/build_angular/src/babel-bazel.d.ts",

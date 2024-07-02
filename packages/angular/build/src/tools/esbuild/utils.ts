@@ -27,6 +27,7 @@ import { BuildOutputAsset, ExecutionResult } from './bundler-execution-result';
 
 export function logBuildStats(
   metafile: Metafile,
+  outputFiles: BuildOutputFile[],
   initial: Map<string, InitialFileRecord>,
   budgetFailures: BudgetCalculatorResult[] | undefined,
   colors: boolean,
@@ -39,15 +40,9 @@ export function logBuildStats(
   const serverStats: BundleStats[] = [];
   let unchangedCount = 0;
 
-  for (const [file, output] of Object.entries(metafile.outputs)) {
+  for (const { path: file, size, type } of outputFiles) {
     // Only display JavaScript and CSS files
     if (!/\.(?:css|m?js)$/.test(file)) {
-      continue;
-    }
-
-    // Skip internal component resources
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((output as any)['ng-component']) {
       continue;
     }
 
@@ -57,23 +52,16 @@ export function logBuildStats(
       continue;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const isPlatformServer = (output as any)['ng-platform-server'];
+    const isPlatformServer = type === BuildOutputFileType.Server;
     if (isPlatformServer && !ssrOutputEnabled) {
       // Only log server build stats when SSR is enabled.
       continue;
     }
 
-    let name = initial.get(file)?.name;
-    if (name === undefined && output.entryPoint) {
-      name = basename(output.entryPoint)
-        .replace(/\.[cm]?[jt]s$/, '')
-        .replace(/[\\/.]/g, '-');
-    }
-
+    const name = initial.get(file)?.name ?? getChunkNameFromMetafile(metafile, file);
     const stat: BundleStats = {
       initial: initial.has(file),
-      stats: [file, name ?? '-', output.bytes, estimatedTransferSizes?.get(file) ?? '-'],
+      stats: [file, name ?? '-', size, estimatedTransferSizes?.get(file) ?? '-'],
     };
 
     if (isPlatformServer) {
@@ -102,6 +90,12 @@ export function logBuildStats(
   }
 
   return '';
+}
+
+export function getChunkNameFromMetafile(metafile: Metafile, file: string): string | undefined {
+  if (metafile.outputs[file]?.entryPoint) {
+    return getEntryPointName(metafile.outputs[file].entryPoint);
+  }
 }
 
 export async function calculateEstimatedTransferSizes(
@@ -186,8 +180,6 @@ export function getFeatureSupport(
     // will be used instead which provides a workaround for the performance issue.
     // For more details: https://bugs.chromium.org/p/v8/issues/detail?id=11536
     'object-rest-spread': false,
-    // Using top-level-await is not guaranteed to be safe with some code optimizations.
-    'top-level-await': false,
   };
 
   // Detect Safari browser versions that have a class field behavior bug
@@ -294,64 +286,104 @@ export async function emitFilesToDisk<T = BuildOutputAsset | BuildOutputFile>(
   }
 }
 
-export function createOutputFileFromText(
+export function createOutputFile(
   path: string,
-  text: string,
+  data: string | Uint8Array,
   type: BuildOutputFileType,
 ): BuildOutputFile {
-  return {
-    path,
-    text,
-    type,
-    get hash() {
-      return createHash('sha256').update(this.text).digest('hex');
-    },
-    get contents() {
-      return Buffer.from(this.text, 'utf-8');
-    },
-    clone(): BuildOutputFile {
-      return createOutputFileFromText(this.path, this.text, this.type);
-    },
-  };
-}
+  if (typeof data === 'string') {
+    let cachedContents: Uint8Array | null = null;
+    let cachedText: string | null = data;
+    let cachedHash: string | null = null;
 
-export function createOutputFileFromData(
-  path: string,
-  data: Uint8Array,
-  type: BuildOutputFileType,
-): BuildOutputFile {
-  return {
-    path,
-    type,
-    get text() {
-      return Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString('utf-8');
-    },
-    get hash() {
-      return createHash('sha256').update(this.text).digest('hex');
-    },
-    get contents() {
-      return data;
-    },
-    clone(): BuildOutputFile {
-      return createOutputFileFromData(this.path, this.contents, this.type);
-    },
-  };
+    return {
+      path,
+      type,
+      get contents(): Uint8Array {
+        cachedContents ??= new TextEncoder().encode(data);
+
+        return cachedContents;
+      },
+      set contents(value: Uint8Array) {
+        cachedContents = value;
+        cachedText = null;
+      },
+      get text(): string {
+        cachedText ??= new TextDecoder('utf-8').decode(this.contents);
+
+        return cachedText;
+      },
+      get size(): number {
+        return this.contents.byteLength;
+      },
+      get hash(): string {
+        cachedHash ??= createHash('sha256')
+          .update(cachedText ?? this.contents)
+          .digest('hex');
+
+        return cachedHash;
+      },
+      clone(): BuildOutputFile {
+        return createOutputFile(this.path, cachedText ?? this.contents, this.type);
+      },
+    };
+  } else {
+    let cachedContents = data;
+    let cachedText: string | null = null;
+    let cachedHash: string | null = null;
+
+    return {
+      get contents(): Uint8Array {
+        return cachedContents;
+      },
+      set contents(value: Uint8Array) {
+        cachedContents = value;
+        cachedText = null;
+      },
+      path,
+      type,
+      get size(): number {
+        return this.contents.byteLength;
+      },
+      get text(): string {
+        cachedText ??= new TextDecoder('utf-8').decode(this.contents);
+
+        return cachedText;
+      },
+      get hash(): string {
+        cachedHash ??= createHash('sha256').update(this.contents).digest('hex');
+
+        return cachedHash;
+      },
+      clone(): BuildOutputFile {
+        return createOutputFile(this.path, this.contents, this.type);
+      },
+    };
+  }
 }
 
 export function convertOutputFile(file: OutputFile, type: BuildOutputFileType): BuildOutputFile {
-  const { path, contents, hash } = file;
+  let { contents: cachedContents } = file;
+  let cachedText: string | null = null;
 
   return {
-    contents,
-    hash,
-    path,
+    get contents(): Uint8Array {
+      return cachedContents;
+    },
+    set contents(value: Uint8Array) {
+      cachedContents = value;
+      cachedText = null;
+    },
+    hash: file.hash,
+    path: file.path,
     type,
-    get text() {
-      return Buffer.from(
-        this.contents.buffer,
-        this.contents.byteOffset,
-        this.contents.byteLength,
-      ).toString('utf-8');
+    get size(): number {
+      return this.contents.byteLength;
+    },
+    get text(): string {
+      cachedText ??= new TextDecoder('utf-8').decode(this.contents);
+
+      return cachedText;
     },
     clone(): BuildOutputFile {
       return convertOutputFile(this, this.type);
@@ -495,4 +527,11 @@ export async function logMessages(
 export function isZonelessApp(polyfills: string[] | undefined): boolean {
   // TODO: Instead, we should rely on the presence of zone.js in the polyfills build metadata.
   return !polyfills?.some((p) => p === 'zone.js' || /\.[mc]?[jt]s$/.test(p));
+}
+
+export function getEntryPointName(entryPoint: string): string {
+  return basename(entryPoint)
+    .replace(/(.*:)/, '') // global:bundle.css  -> bundle.css
+    .replace(/\.[cm]?[jt]s$/, '')
+    .replace(/[\\/.]/g, '-');
 }

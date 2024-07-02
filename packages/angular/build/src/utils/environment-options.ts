@@ -78,7 +78,7 @@ export const allowMinify = debugOptimize.minify;
 const maxWorkersVariable = process.env['NG_BUILD_MAX_WORKERS'];
 export const maxWorkers = isPresent(maxWorkersVariable)
   ? +maxWorkersVariable
-  : Math.min(4, availableParallelism());
+  : Math.min(4, Math.max(availableParallelism() - 1, 1));
 
 const parallelTsVariable = process.env['NG_BUILD_PARALLEL_TS'];
 export const useParallelTs = !isPresent(parallelTsVariable) || !isDisabled(parallelTsVariable);
@@ -96,3 +96,7 @@ export const useTypeChecking =
 const buildLogsJsonVariable = process.env['NG_BUILD_LOGS_JSON'];
 export const useJSONBuildLogs =
   isPresent(buildLogsJsonVariable) && isEnabled(buildLogsJsonVariable);
+
+const optimizeChunksVariable = process.env['NG_BUILD_OPTIMIZE_CHUNKS'];
+export const shouldOptimizeChunks =
+  isPresent(optimizeChunksVariable) && isEnabled(optimizeChunksVariable);
