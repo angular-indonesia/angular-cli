@@ -100,9 +100,6 @@
     ],
 
     /* TODO: evaluate usage of these rules and fix issues as needed */
-    "no-case-declarations": "off",
-    "no-fallthrough": "off",
-    "no-underscore-dangle": "off",
     "@typescript-eslint/ban-types": "off",
     "@typescript-eslint/no-implied-eval": "off",
     "@typescript-eslint/no-var-requires": "off",
@@ -112,7 +109,6 @@
     "@typescript-eslint/no-unsafe-member-access": "off",
     "@typescript-eslint/no-unsafe-return": "off",
     "@typescript-eslint/no-unused-vars": "off",
-    "@typescript-eslint/prefer-regexp-exec": "off",
     "@typescript-eslint/require-await": "off",
     "@typescript-eslint/restrict-plus-operands": "off",
     "@typescript-eslint/restrict-template-expressions": "off",
@@ -127,6 +123,7 @@
       "rules": {
         "import/no-extraneous-dependencies": ["error", { "devDependencies": true }],
         "max-lines-per-function": "off",
+        "no-case-declarations": "off",
         "no-console": "off"
       }
     }

@@ -1,13 +1,73 @@
-<a name="18.1.0-rc.0"></a>
+<a name="18.2.0-next.0"></a>
 
-# 18.1.0-rc.0 (2024-06-26)
+# 18.2.0-next.0 (2024-07-10)
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                              |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------- |
+| [4da922e4f](https://github.com/angular/angular-cli/commit/4da922e4f4e905a1274e70adca1d875c025b8b46) | feat | use isolatedModules in generated project |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="18.1.0"></a>
+
+# 18.1.0 (2024-07-10)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                    |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------- |
+| [6d266c146](https://github.com/angular/angular-cli/commit/6d266c146c9e141396236b93f2bfafcb261fd7aa) | fix  | add fallbacks for migration package resolution |
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                                         |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------- |
+| [22e05dcb4](https://github.com/angular/angular-cli/commit/22e05dcb4a9ae963997c58fad86125ca51b19a36) | fix  | generate new projects with ECMAScript standard class field behavior |
 
 ### @angular/build
 
-| Commit                                                                                              | Type | Description                                          |
-| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------- |
-| [3e359da8d](https://github.com/angular/angular-cli/commit/3e359da8dfdbfdb99be13f5c52a7e429c106d4ad) | fix  | address rxjs undefined issues during SSR prebundling |
-| [1e8fd70c6](https://github.com/angular/angular-cli/commit/1e8fd70c6f1bf2735474fcac0f109bd2bafa980e) | fix  | show JavaScript cache store initialization warning   |
+| Commit                                                                                              | Type | Description                                                     |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------- |
+| [687a6c7ec](https://github.com/angular/angular-cli/commit/687a6c7eca740a98129196908689a44c181b33a5) | feat | add `--inspect` option to the dev-server                        |
+| [628d87a94](https://github.com/angular/angular-cli/commit/628d87a9474ad2792b69bfbc501a2c5960b27db9) | feat | support WASM/ES Module integration proposal                     |
+| [3e359da8d](https://github.com/angular/angular-cli/commit/3e359da8dfdbfdb99be13f5c52a7e429c106d4ad) | fix  | address rxjs undefined issues during SSR prebundling            |
+| [4ff914a16](https://github.com/angular/angular-cli/commit/4ff914a16525350050c5e8359fb59f9d6f243d27) | fix  | allow additional module preloads up to limit                    |
+| [fb8e3c39a](https://github.com/angular/angular-cli/commit/fb8e3c39a8b265003e98c8c6b5a9ec898223249f) | fix  | allow top-level await in zoneless applications                  |
+| [83b75af9f](https://github.com/angular/angular-cli/commit/83b75af9f74af0742a6a78cf7531866b7ba434b6) | fix  | check inlineSourceMap option with isolated modules optimization |
+| [cd97134a6](https://github.com/angular/angular-cli/commit/cd97134a6e1468c6806c2bd753c934ec91bc3927) | fix  | normalize paths during module resolution in Vite                |
+| [13d2100dd](https://github.com/angular/angular-cli/commit/13d2100ddcc670d69f2d7754890b80eae2e7649a) | fix  | read WASM file from script location on Node.js                  |
+| [3091956f5](https://github.com/angular/angular-cli/commit/3091956f503754f313dbf98a8de6d21d3d01ebe3) | fix  | support import attributes in JavaScript transformer             |
+| [dd94a831b](https://github.com/angular/angular-cli/commit/dd94a831b4ce1ca55289fca1818aa26195e81dbc) | perf | enable dependency prebundling for server dependencies           |
+| [3acb77683](https://github.com/angular/angular-cli/commit/3acb7768317bb05a9cd73fa64e081b5ca0326189) | perf | use direct transpilation with isolated modules                  |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="18.0.7"></a>
+
+# 18.0.7 (2024-07-03)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                                 |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------- |
+| [67bf90131](https://github.com/angular/angular-cli/commit/67bf9013151c4e6a13c91ecf4afd78c863d9e33f) | fix  | make `ng update` to keep newline at the end of package.json |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                  |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ |
+| [9b43ecbd0](https://github.com/angular/angular-cli/commit/9b43ecbd0395027548781a19345fbcd82261d4f4) | fix  | reduce the number of max workers to available CPUs minus one |
+| [03dad6806](https://github.com/angular/angular-cli/commit/03dad680676c4b2272b65a51dd62d74360e20b78) | fix  | rollback terser to `5.29.2`                                  |
+
+### @angular/build
+
+| Commit                                                                                              | Type | Description                                                  |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ |
+| [fc928f638](https://github.com/angular/angular-cli/commit/fc928f6386061f34f7cd3ef6bb6d25aa4a33a800) | fix  | correctly name entry points to match budgets                 |
+| [2d51e8607](https://github.com/angular/angular-cli/commit/2d51e86077c4687224e931f49c82a907f5229ae5) | fix  | redirect to path with trailing slash for asset directories   |
+| [16f1c1e01](https://github.com/angular/angular-cli/commit/16f1c1e010090596b7d7c3911f01728e3feecc4d) | fix  | reduce the number of max workers to available CPUs minus one |
 
 <!-- CHANGELOG SPLIT MARKER -->
 
@@ -20,32 +80,6 @@
 | Commit                                                                                              | Type | Description                                        |
 | --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------- |
 | [98a8a8a78](https://github.com/angular/angular-cli/commit/98a8a8a781fd7901f2e1c1d2eb22975ac65f0329) | fix  | show JavaScript cache store initialization warning |
-
-<!-- CHANGELOG SPLIT MARKER -->
-
-<a name="18.1.0-next.3"></a>
-
-# 18.1.0-next.3 (2024-06-20)
-
-### @schematics/angular
-
-| Commit                                                                                              | Type | Description                                                          |
-| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------------- |
-| [e3b8b780b](https://github.com/angular/angular-cli/commit/e3b8b780be72d8a0c6247a25e4e1e1ccfbdea67c) | fix  | update schematics to use RouterModule when --routing flag is present |
-
-### @angular-devkit/build-angular
-
-| Commit                                                                                              | Type | Description                                                  |
-| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ |
-| [fb2981dc4](https://github.com/angular/angular-cli/commit/fb2981dc4e0ac21f5389bb3b36d5853f8580e5a6) | fix  | use istanbul-lib-instrument directly for karma code coverage |
-
-### @angular/build
-
-| Commit                                                                                              | Type | Description                                                |
-| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------- |
-| [c0ceddf78](https://github.com/angular/angular-cli/commit/c0ceddf78c7ad661419e56517738de526425ca3d) | fix  | add CSP nonce to script with src tags                      |
-| [2324d5a2e](https://github.com/angular/angular-cli/commit/2324d5a2ecedad4330a9cb0e9e66909f95d2ea98) | fix  | automatically resolve `.mjs` files when using Vite         |
-| [dd0704927](https://github.com/angular/angular-cli/commit/dd07049277f5be165825e38015b2bf6ff22620aa) | fix  | use Node.js available parallelism for default worker count |
 
 <!-- CHANGELOG SPLIT MARKER -->
 
@@ -75,28 +109,6 @@
 
 <!-- CHANGELOG SPLIT MARKER -->
 
-<a name="18.1.0-next.2"></a>
-
-# 18.1.0-next.2 (2024-06-13)
-
-### @angular/cli
-
-| Commit                                                                                              | Type | Description                                    |
-| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------- |
-| [6d266c146](https://github.com/angular/angular-cli/commit/6d266c146c9e141396236b93f2bfafcb261fd7aa) | fix  | add fallbacks for migration package resolution |
-
-### @angular/build
-
-| Commit                                                                                              | Type | Description                                                                                             |
-| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------- |
-| [4ff914a16](https://github.com/angular/angular-cli/commit/4ff914a16525350050c5e8359fb59f9d6f243d27) | fix  | allow additional module preloads up to limit                                                            |
-| [8c379269e](https://github.com/angular/angular-cli/commit/8c379269e0e96a958d7bc93cf065a0ff36be9601) | fix  | do not reference sourcemaps in web workers and global stylesheet bundles when hidden setting is enabled |
-| [461e78f3e](https://github.com/angular/angular-cli/commit/461e78f3ee15e7097bd7f2c975dc460d844f277f) | fix  | generate module preloads next to script elements in index HTML                                          |
-| [f102f815e](https://github.com/angular/angular-cli/commit/f102f815e404bcc2f627b7a52e92b3385eb9be5f) | fix  | Initiate PostCSS only once                                                                              |
-| [fbc6eb322](https://github.com/angular/angular-cli/commit/fbc6eb3225e4b02c62baf3be4274b46e80ba62a4) | fix  | issue warning when auto adding `@angular/localize/init`                                                 |
-
-<!-- CHANGELOG SPLIT MARKER -->
-
 <a name="18.0.4"></a>
 
 # 18.0.4 (2024-06-13)
@@ -109,34 +121,6 @@
 | [20fc6ca05](https://github.com/angular/angular-cli/commit/20fc6ca057e5190155474e7377bf9f22aab597dd) | fix  | generate module preloads next to script elements in index HTML                                          |
 | [3a1bf5c8a](https://github.com/angular/angular-cli/commit/3a1bf5c8a52d6ec1eb337f0937bf073de2ea0b62) | fix  | Initiate PostCSS only once                                                                              |
 | [78c611754](https://github.com/angular/angular-cli/commit/78c6117544afa1aa69ef5485f1c3b77b1207f6f1) | fix  | issue warning when auto adding `@angular/localize/init`                                                 |
-
-<!-- CHANGELOG SPLIT MARKER -->
-
-<a name="18.1.0-next.1"></a>
-
-# 18.1.0-next.1 (2024-06-05)
-
-### @angular/cli
-
-| Commit                                                                                              | Type | Description                                                                                                |
-| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------- |
-| [ce8b5a3a7](https://github.com/angular/angular-cli/commit/ce8b5a3a745062f926491d5a299df728b7de8790) | fix  | add `schema.json` options to parsed command, also when a version is passed to `ng add <package>@<version>` |
-
-### @schematics/angular
-
-| Commit                                                                                              | Type | Description                                                         |
-| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------- |
-| [22e05dcb4](https://github.com/angular/angular-cli/commit/22e05dcb4a9ae963997c58fad86125ca51b19a36) | fix  | generate new projects with ECMAScript standard class field behavior |
-
-### @angular/build
-
-| Commit                                                                                              | Type | Description                                               |
-| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------- |
-| [687a6c7ec](https://github.com/angular/angular-cli/commit/687a6c7eca740a98129196908689a44c181b33a5) | feat | add `--inspect` option to the dev-server                  |
-| [86a07237e](https://github.com/angular/angular-cli/commit/86a07237e60734686c80e2e231e6238619a04106) | fix  | disable JS transformer persistent cache on web containers |
-| [a5fc020e6](https://github.com/angular/angular-cli/commit/a5fc020e6a616d6a39940f1d616547a911b07781) | fix  | watch all related files during a Sass error               |
-| [dd94a831b](https://github.com/angular/angular-cli/commit/dd94a831b4ce1ca55289fca1818aa26195e81dbc) | perf | enable dependency prebundling for server dependencies     |
-| [3acb77683](https://github.com/angular/angular-cli/commit/3acb7768317bb05a9cd73fa64e081b5ca0326189) | perf | use direct transpilation with isolated modules            |
 
 <!-- CHANGELOG SPLIT MARKER -->
 
@@ -158,19 +142,6 @@
 | [9acb5c7ca](https://github.com/angular/angular-cli/commit/9acb5c7ca8e6d14379e39f56d2498c0276214210) | fix  | disable JS transformer persistent cache on web containers |
 | [346df4909](https://github.com/angular/angular-cli/commit/346df490976e39d791db5ecfa14eab6a5ad8d99d) | fix  | improve Sass rebaser ident token detection                |
 | [6526a5f59](https://github.com/angular/angular-cli/commit/6526a5f590fbc7f26b9e613af3b5c497e30603b5) | fix  | watch all related files during a Sass error               |
-
-<!-- CHANGELOG SPLIT MARKER -->
-
-<a name="18.1.0-next.0"></a>
-
-# 18.1.0-next.0 (2024-05-29)
-
-### @angular/build
-
-| Commit                                                                                              | Type | Description                                |
-| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------ |
-| [721d50bae](https://github.com/angular/angular-cli/commit/721d50bae9549811a0b065e296f071a3af7745c9) | fix  | avoid escaping rebased Sass URL values     |
-| [f17b78de7](https://github.com/angular/angular-cli/commit/f17b78de7efabd788a315902174700caa1a1eed8) | fix  | improve Sass rebaser ident token detection |
 
 <!-- CHANGELOG SPLIT MARKER -->
 
