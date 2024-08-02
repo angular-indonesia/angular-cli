@@ -1,3 +1,31 @@
+<a name="18.2.0-next.3"></a>
+
+# 18.2.0-next.3 (2024-07-31)
+
+### @angular/build
+
+| Commit                                                                                              | Type | Description                                                                   |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------- |
+| [636cb6932](https://github.com/angular/angular-cli/commit/636cb6932425b838ccd14ae6ce8b51663e6ded47) | fix  | add CSP `nonce` attribute to script tags when inline critical CSS is disabled |
+| [7d52941a2](https://github.com/angular/angular-cli/commit/7d52941a2e36b1e08001d7042c9d3e258d8e8b34) | fix  | prevent build failures with remote CSS imports when Tailwind is configured    |
+| [0466fb74a](https://github.com/angular/angular-cli/commit/0466fb74a2559e2b3cbcf0828de5b5e10b729ddb) | fix  | resolve error with `extract-i18n` builder for libraries                       |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="18.1.3"></a>
+
+# 18.1.3 (2024-07-31)
+
+### @angular/build
+
+| Commit                                                                                              | Type | Description                                                                   |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------- |
+| [a28615d7d](https://github.com/angular/angular-cli/commit/a28615d7dd3f6503f257756058fe182ce6f6b052) | fix  | add CSP `nonce` attribute to script tags when inline critical CSS is disabled |
+| [747a1447c](https://github.com/angular/angular-cli/commit/747a1447c1855a1bb918e5f55e4ba4182235f88a) | fix  | prevent build failures with remote CSS imports when Tailwind is configured    |
+| [c0933f2c0](https://github.com/angular/angular-cli/commit/c0933f2c0354a13ba3f752f29b24054177697faa) | fix  | resolve error with `extract-i18n` builder for libraries                       |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="18.2.0-next.2"></a>
 
 # 18.2.0-next.2 (2024-07-24)
