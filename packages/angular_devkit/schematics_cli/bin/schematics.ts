@@ -9,7 +9,7 @@
 
 // symbol polyfill must go first
 import 'symbol-observable';
-import type { JsonValue, logging, schema } from '@angular-devkit/core';
+import { JsonValue, logging, schema } from '@angular-devkit/core';
 import { ProcessOutput, createConsoleLogger } from '@angular-devkit/core/node';
 import { UnsuccessfulWorkflowExecution } from '@angular-devkit/schematics';
 import { NodeWorkflow } from '@angular-devkit/schematics/tools';
@@ -96,6 +96,13 @@ function _createPromptProvider(): schema.PromptProvider {
           )({
             message: definition.message,
             default: definition.default,
+            validate: (values) => {
+              if (!definition.validator) {
+                return true;
+              }
+
+              return definition.validator(Object.values(values).map(({ value }) => value));
+            },
             choices: definition.items.map((item) =>
               typeof item == 'string'
                 ? {
@@ -330,6 +337,8 @@ export async function main({
       error = false;
     }
   });
+
+  workflow.registry.addPostTransform(schema.transforms.addUndefinedDefaults);
 
   // Show usage of deprecated options
   workflow.registry.useXDeprecatedProvider((msg) => logger.warn(msg));

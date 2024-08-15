@@ -34,16 +34,12 @@
     }
   },
   "exclude": [
-    "packages/angular_devkit/build_angular/src/babel-bazel.d.ts",
     "dist/**/*",
     "dist-schema/**",
-    "goldens/**/*",
     "**/node_modules/**/*",
     "**/third_party/**/*",
-    "packages/angular_devkit/schematics_cli/blank/*-files/**/*",
     "packages/angular_devkit/schematics_cli/schematic/files/**/*",
     "packages/angular_devkit/*/test/**/*",
-    "tests/**/*",
-    ".ng-dev/**/*"
+    "tests/**/*"
   ]
 }
