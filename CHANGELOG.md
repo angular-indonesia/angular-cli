@@ -1,3 +1,89 @@
+<a name="19.0.0-next.1"></a>
+
+# 19.0.0-next.1 (2024-08-22)
+
+## Breaking Changes
+
+### @angular-devkit/build-angular
+
+- The `browserTarget` option has been removed from the DevServer and ExtractI18n builders. `buildTarget` is to be used instead.
+
+### @angular-devkit/core
+
+- The deprecated `fileBuffer` function is no longer available. Update your code to use `stringToFileBuffer` instead to maintain compatibility.
+
+  **Note:** that this change does not affect application developers.
+
+### @angular/build
+
+- The `@angular/localize/init` polyfill will no longer be added automatically to projects. To prevent runtime issues, ensure that this polyfill is manually included in the "polyfills" section of your "angular.json" file if your application relies on Angular localization features.
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                                                |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------- |
+| [7992218a9](https://github.com/angular/angular-cli/commit/7992218a9c22ea9469bd3386c7dc1d5efc6e51f9) | fix  | remove `declaration` and `sourceMap` from default tsconfig |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type     | Description                                    |
+| --------------------------------------------------------------------------------------------------- | -------- | ---------------------------------------------- |
+| [0b161bc76](https://github.com/angular/angular-cli/commit/0b161bc7616bef9a8f1f9113a50b07291635159d) | fix      | remove outdated browser-esbuild option warning |
+| [e40384e63](https://github.com/angular/angular-cli/commit/e40384e637bc6f92c28f4e572f986ca902938ba2) | refactor | remove deprecated `browserTarget`              |
+
+### @angular-devkit/core
+
+| Commit                                                                                              | Type     | Description                                                              |
+| --------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------ |
+| [0d8a1006d](https://github.com/angular/angular-cli/commit/0d8a1006d4629d8af1144065ea237ab30916e66e) | refactor | remove deprecated `fileBuffer` function in favor of `stringToFileBuffer` |
+
+### @angular/build
+
+| Commit                                                                                              | Type     | Description                                                                         |
+| --------------------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------- |
+| [71c06c69f](https://github.com/angular/angular-cli/commit/71c06c69f6f472e5ea86f2e5adbd5062a8cc5f2a) | fix      | improve error message when an unhandled exception occurs during prerendering        |
+| [6b544f70e](https://github.com/angular/angular-cli/commit/6b544f70e706b9e13564d4ddbb0f0cb352942b2c) | fix      | support reading on-disk files during i18n extraction                                |
+| [d6a34034d](https://github.com/angular/angular-cli/commit/d6a34034d7489c09753090642ade4c606cd98ece) | refactor | remove automatic addition of `@angular/localize/init` polyfill and related warnings |
+
+### @angular/ssr
+
+| Commit                                                                                              | Type | Description                                                |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------- |
+| [9692a9054](https://github.com/angular/angular-cli/commit/9692a9054c3cdbf151df01279c2d268332b1a032) | feat | improve handling of aborted requests in `AngularServerApp` |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="18.2.1"></a>
+
+# 18.2.1 (2024-08-21)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                                     |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------- |
+| [05a274a01](https://github.com/angular/angular-cli/commit/05a274a01365c21f69c0412f3455acd14cc6ddc5) | fix  | prevent bypassing select/checkbox prompts on validation failure |
+
+### @angular-devkit/schematics-cli
+
+| Commit                                                                                              | Type | Description                                                     |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------- |
+| [94e27c88b](https://github.com/angular/angular-cli/commit/94e27c88bb968589bc8b9b5d6536ce6c0ba0b24f) | fix  | prevent bypassing select/checkbox prompts on validation failure |
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                    |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------- |
+| [ddeb2b2b9](https://github.com/angular/angular-cli/commit/ddeb2b2b93eaa9d8b659d17357aa2b7a9dc509ce) | fix  | remove outdated browser-esbuild option warning |
+
+### @angular/build
+
+| Commit                                                                                              | Type | Description                                                                  |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------- |
+| [83b2699ab](https://github.com/angular/angular-cli/commit/83b2699abbf58a7c90d2339fa4a01d67aa2d2d33) | fix  | improve error message when an unhandled exception occurs during prerendering |
+| [0be4038a5](https://github.com/angular/angular-cli/commit/0be4038a503626e2e9f44d68fe5599cc6028dd8e) | fix  | support reading on-disk files during i18n extraction                         |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="19.0.0-next.0"></a>
 
 # 19.0.0-next.0 (2024-08-14)
