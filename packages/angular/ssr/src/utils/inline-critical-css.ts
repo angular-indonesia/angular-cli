@@ -6,8 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import Critters from 'critters';
-import { readFile } from 'node:fs/promises';
+import Critters from '../../third_party/critters';
 
 /**
  * Pattern used to extract the media query set by Critters in an `onload` handler.
@@ -61,16 +60,6 @@ const LINK_LOAD_SCRIPT_CONTENT = `
 })();
 `.trim();
 
-export interface InlineCriticalCssProcessOptions {
-  outputPath: string;
-}
-
-export interface InlineCriticalCssProcessorOptions {
-  minify?: boolean;
-  deployUrl?: string;
-  readAsset?: (path: string) => Promise<string>;
-}
-
 /** Partial representation of an `HTMLElement`. */
 interface PartialHTMLElement {
   getAttribute(name: string): string | null;
@@ -105,26 +94,26 @@ interface CrittersBase {
 class CrittersBase extends Critters {}
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
-class CrittersExtended extends CrittersBase {
-  readonly warnings: string[] = [];
-  readonly errors: string[] = [];
+export class InlineCriticalCssProcessor extends CrittersBase {
   private addedCspScriptsDocuments = new WeakSet<PartialDocument>();
   private documentNonces = new WeakMap<PartialDocument, string | null>();
 
   constructor(
-    private readonly optionsExtended: InlineCriticalCssProcessorOptions &
-      InlineCriticalCssProcessOptions,
+    public override readFile: (path: string) => Promise<string>,
+    readonly outputPath?: string,
   ) {
     super({
       logger: {
-        warn: (s: string) => this.warnings.push(s),
-        error: (s: string) => this.errors.push(s),
+        // eslint-disable-next-line no-console
+        warn: (s: string) => console.warn(s),
+        // eslint-disable-next-line no-console
+        error: (s: string) => console.error(s),
         info: () => {},
       },
       logLevel: 'warn',
-      path: optionsExtended.outputPath,
-      publicPath: optionsExtended.deployUrl,
-      compress: !!optionsExtended.minify,
+      path: outputPath,
+      publicPath: undefined,
+      compress: false,
       pruneSource: false,
       reduceInlineStyles: false,
       mergeStylesheets: false,
@@ -134,12 +123,6 @@ class CrittersExtended extends CrittersBase {
       noscriptFallback: true,
       inlineFonts: true,
     });
-  }
-
-  public override readFile(path: string): Promise<string> {
-    const readAsset = this.optionsExtended.readAsset;
-
-    return readAsset ? readAsset(path) : readFile(path, 'utf-8');
   }
 
   /**
@@ -223,6 +206,13 @@ class CrittersExtended extends CrittersBase {
       return;
     }
 
+    if (document.head.textContent.includes(LINK_LOAD_SCRIPT_CONTENT)) {
+      // Script was already added during the build.
+      this.addedCspScriptsDocuments.add(document);
+
+      return;
+    }
+
     const script = document.createElement('script');
     script.setAttribute('nonce', nonce);
     script.textContent = LINK_LOAD_SCRIPT_CONTENT;
@@ -230,26 +220,5 @@ class CrittersExtended extends CrittersBase {
     // run as early as possible, before the `link` tags.
     document.head.insertBefore(script, link);
     this.addedCspScriptsDocuments.add(document);
-  }
-}
-
-export class InlineCriticalCssProcessor {
-  constructor(protected readonly options: InlineCriticalCssProcessorOptions) {}
-
-  async process(
-    html: string,
-    options: InlineCriticalCssProcessOptions,
-  ): Promise<{ content: string; warnings: string[]; errors: string[] }> {
-    const critters = new CrittersExtended({ ...this.options, ...options });
-    const content = await critters.process(html);
-
-    return {
-      // Clean up value from value less attributes.
-      // This is caused because parse5 always requires attributes to have a string value.
-      // nomodule="" defer="" -> nomodule defer.
-      content: content.replace(/(\s(?:defer|nomodule))=""/g, '$1'),
-      errors: critters.errors,
-      warnings: critters.warnings,
-    };
   }
 }
