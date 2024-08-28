@@ -4,36 +4,16 @@
 
 ```ts
 
-import { ApplicationRef } from '@angular/core';
-import { StaticProvider } from '@angular/core';
-import { Type } from '@angular/core';
+// @public
+export interface AngularServerAppManager {
+    render(request: Request, requestContext?: unknown): Promise<Response | null>;
+}
 
 // @public
-export class CommonEngine {
-    constructor(options?: CommonEngineOptions | undefined);
-    render(opts: CommonEngineRenderOptions): Promise<string>;
-}
+export function destroyAngularAppEngine(): void;
 
-// @public (undocumented)
-export interface CommonEngineOptions {
-    bootstrap?: Type<{}> | (() => Promise<ApplicationRef>);
-    enablePerformanceProfiler?: boolean;
-    providers?: StaticProvider[];
-}
-
-// @public (undocumented)
-export interface CommonEngineRenderOptions {
-    bootstrap?: Type<{}> | (() => Promise<ApplicationRef>);
-    // (undocumented)
-    document?: string;
-    // (undocumented)
-    documentFilePath?: string;
-    inlineCriticalCss?: boolean;
-    providers?: StaticProvider[];
-    publicPath?: string;
-    // (undocumented)
-    url?: string;
-}
+// @public
+export function getOrCreateAngularAppEngine(): AngularServerAppManager;
 
 // (No @packageDocumentation comment for this package)
 
