@@ -1,3 +1,80 @@
+<a name="18.2.2"></a>
+
+# 18.2.2 (2024-08-29)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                 |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------- |
+| [504b00b93](https://github.com/angular/angular-cli/commit/504b00b93b80eec4185838b426c0f6acaa3a148e) | fix  | clear context in Karma by default for single run executions |
+| [82b76086e](https://github.com/angular/angular-cli/commit/82b76086eb519c224981038dfa55b2ec3cfec0b4) | fix  | update webpack to `5.94.0`                                  |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="19.0.0-next.2"></a>
+
+# 19.0.0-next.2 (2024-08-28)
+
+## Breaking Changes
+
+### @angular/ssr
+
+- The `CommonEngine` API now needs to be imported from `@angular/ssr/node`.
+
+  **Before**
+
+  ```ts
+  import { CommonEngine } from '@angular/ssr';
+  ```
+
+  **After**
+
+  ```ts
+  import { CommonEngine } from '@angular/ssr/node';
+  ```
+
+### @schematics/angular
+
+| Commit                                                                                              | Type | Description                               |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------- |
+| [a381a3db1](https://github.com/angular/angular-cli/commit/a381a3db187f7b20e5ec8d1e1a1f1bd860426fcd) | feat | add option to export component as default |
+
+### @angular/ssr
+
+| Commit                                                                                              | Type | Description                                               |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------- |
+| [30c25bf68](https://github.com/angular/angular-cli/commit/30c25bf6885fefea6094ec1815e066e4c6ada097) | feat | export `AngularAppEngine` as public API                   |
+| [4b09887a9](https://github.com/angular/angular-cli/commit/4b09887a9c82838ccb7a6c95d66225c7875e562b) | feat | move `CommonEngine` API to `/node` entry-point            |
+| [d43180af5](https://github.com/angular/angular-cli/commit/d43180af5f3e7b29387fd06625bd8e37f3ebad95) | fix  | add missing peer dependency on `@angular/platform-server` |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="17.3.9"></a>
+
+# 17.3.9 (2024-08-29)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                 |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------- |
+| [e2c5c034d](https://github.com/angular/angular-cli/commit/e2c5c034d96962fe6f358285e376630c71ac9673) | fix  | clear context in Karma by default for single run executions |
+| [88501f3d5](https://github.com/angular/angular-cli/commit/88501f3d5586f72ee0900b8d351af3d72bdc0dee) | fix  | upgrade webpack to `5.94.0`                                 |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="16.2.15"></a>
+
+# 16.2.15 (2024-08-29)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description                                                 |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------- |
+| [f596a3d5d](https://github.com/angular/angular-cli/commit/f596a3d5def009b5130440113e3c9b450eb98040) | fix  | clear context in Karma by default for single run executions |
+| [56fa051bd](https://github.com/angular/angular-cli/commit/56fa051bd92ad47ea089499a488f3566a93375e6) | fix  | upgrade webpack to `5.94.0`                                 |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="19.0.0-next.1"></a>
 
 # 19.0.0-next.1 (2024-08-22)

@@ -8,10 +8,10 @@
 /packages/angular_devkit/schematics_cli/blank/project-files/
 /packages/angular_devkit/schematics_cli/blank/schematic-files/
 /packages/angular_devkit/schematics_cli/schematic/files/
+/packages/schematics/angular/third_party/
 /README.md
 /CONTRIBUTING.md
 .yarn/
 dist/
-third_party/github.com/
 /tests/legacy-cli/e2e/assets/
 /tools/test/*.json
