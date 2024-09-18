@@ -9,7 +9,6 @@
 import type { ɵgetOrCreateAngularServerApp as getOrCreateAngularServerApp } from '@angular/ssr';
 import type { ServerResponse } from 'node:http';
 import type { Connect, ViteDevServer } from 'vite';
-import { appendServerConfiguredHeaders } from '../utils';
 
 export function createAngularSSRMiddleware(
   server: ViteDevServer,
@@ -17,7 +16,11 @@ export function createAngularSSRMiddleware(
 ): Connect.NextHandleFunction {
   let cachedAngularServerApp: ReturnType<typeof getOrCreateAngularServerApp> | undefined;
 
-  return function (req: Connect.IncomingMessage, res: ServerResponse, next: Connect.NextFunction) {
+  return function angularSSRMiddleware(
+    req: Connect.IncomingMessage,
+    res: ServerResponse,
+    next: Connect.NextFunction,
+  ) {
     if (req.url === undefined) {
       return next();
     }
@@ -55,7 +58,6 @@ export function createAngularSSRMiddleware(
           return next();
         }
 
-        appendServerConfiguredHeaders(server, res);
         res.end(content);
       })
       .catch((error) => next(error));

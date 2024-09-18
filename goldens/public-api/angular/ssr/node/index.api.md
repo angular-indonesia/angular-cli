@@ -11,6 +11,12 @@ import { StaticProvider } from '@angular/core';
 import { Type } from '@angular/core';
 
 // @public
+export class AngularNodeAppEngine {
+    getPrerenderHeaders(request: IncomingMessage): ReadonlyMap<string, string>;
+    render(request: IncomingMessage, requestContext?: unknown): Promise<Response | null>;
+}
+
+// @public
 export class CommonEngine {
     constructor(options?: CommonEngineOptions | undefined);
     render(opts: CommonEngineRenderOptions): Promise<string>;
@@ -39,6 +45,9 @@ export interface CommonEngineRenderOptions {
 
 // @public
 export function createWebRequestFromNodeRequest(nodeRequest: IncomingMessage): Request;
+
+// @public
+export function isMainModule(url: string): boolean;
 
 // @public
 export function writeResponseToNodeResponse(source: Response, destination: ServerResponse): Promise<void>;

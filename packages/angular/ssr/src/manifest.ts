@@ -36,13 +36,26 @@ export interface AngularAppEngineManifest {
    * - `key`: The base href for the entry point.
    * - `value`: A function that returns a promise resolving to an object of type `EntryPointExports`.
    */
-  readonly entryPoints: Readonly<Map<string, () => Promise<EntryPointExports>>>;
+  readonly entryPoints: ReadonlyMap<string, () => Promise<EntryPointExports>>;
 
   /**
    * The base path for the server application.
    * This is used to determine the root path of the application.
    */
   readonly basePath: string;
+
+  /**
+   * A map that associates static paths with their corresponding HTTP headers.
+   * Each entry in the map consists of:
+   * - `key`: The static path as a string.
+   * - `value`: An array of tuples, where each tuple contains:
+   *   - `headerName`: The name of the HTTP header.
+   *   - `headerValue`: The value of the HTTP header.
+   */
+  readonly staticPathsHeaders: ReadonlyMap<
+    string,
+    readonly [headerName: string, headerValue: string][]
+  >;
 }
 
 /**
@@ -55,13 +68,14 @@ export interface AngularAppManifest {
    * - `key`: The path of the asset.
    * - `value`: A function returning a promise that resolves to the file contents of the asset.
    */
-  readonly assets: Readonly<Map<string, () => Promise<string>>>;
+  readonly assets: ReadonlyMap<string, () => Promise<string>>;
 
   /**
    * The bootstrap mechanism for the server application.
-   * A function that returns a reference to an NgModule or a function returning a promise that resolves to an ApplicationRef.
+   * A function that returns a promise that resolves to an `NgModule` or a function
+   * returning a promise that resolves to an `ApplicationRef`.
    */
-  readonly bootstrap: () => AngularBootstrap;
+  readonly bootstrap: () => Promise<AngularBootstrap>;
 
   /**
    * Indicates whether critical CSS should be inlined into the HTML.

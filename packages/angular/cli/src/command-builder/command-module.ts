@@ -6,17 +6,14 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import { logging, schema, strings } from '@angular-devkit/core';
+import { logging, schema } from '@angular-devkit/core';
 import { readFileSync } from 'fs';
 import * as path from 'path';
 import yargs, {
-  Arguments,
   ArgumentsCamelCase,
   Argv,
   CamelCaseKey,
-  PositionalOptions,
   CommandModule as YargsCommandModule,
-  Options as YargsOptions,
 } from 'yargs';
 import { Parser as yargsParser } from 'yargs/helpers';
 import { getAnalyticsUserId } from '../analytics/analytics';
@@ -26,15 +23,17 @@ import { considerSettingUpAutocompletion } from '../utilities/completion';
 import { AngularWorkspace } from '../utilities/config';
 import { memoize } from '../utilities/memoize';
 import { PackageManagerUtils } from '../utilities/package-manager';
-import { Option } from './utilities/json-schema';
+import { Option, addSchemaOptionsToCommand } from './utilities/json-schema';
 
 export type Options<T> = { [key in keyof T as CamelCaseKey<key>]: T[key] };
 
 export enum CommandScope {
   /** Command can only run inside an Angular workspace. */
   In,
+
   /** Command can only run outside an Angular workspace. */
   Out,
+
   /** Command can run inside and outside an Angular workspace. */
   Both,
 }
@@ -46,6 +45,7 @@ export interface CommandContext {
   globalConfiguration: AngularWorkspace;
   logger: logging.Logger;
   packageManager: PackageManagerUtils;
+
   /** Arguments parsed in free-from without parser configuration. */
   args: {
     positional: string[];
@@ -63,10 +63,13 @@ export interface CommandModuleImplementation<T extends {} = {}>
   extends Omit<YargsCommandModule<{}, T>, 'builder' | 'handler'> {
   /** Scope in which the command can be executed in. */
   scope: CommandScope;
+
   /** Path used to load the long description for the command in JSON help text. */
   longDescriptionPath?: string;
+
   /** Object declaring the options the command accepts, or a function accepting and returning a yargs instance. */
   builder(argv: Argv): Promise<Argv<T>> | Argv<T>;
+
   /** A function which will be passed the parsed argv. */
   run(options: Options<T> & OtherOptions): Promise<number | void> | number | void;
 }
@@ -188,68 +191,16 @@ export abstract class CommandModule<T extends {} = {}> implements CommandModuleI
    * **Note:** This method should be called from the command bundler method.
    */
   protected addSchemaOptionsToCommand<T>(localYargs: Argv<T>, options: Option[]): Argv<T> {
-    const booleanOptionsWithNoPrefix = new Set<string>();
+    const optionsWithAnalytics = addSchemaOptionsToCommand(
+      localYargs,
+      options,
+      // This should only be done when `--help` is used otherwise default will override options set in angular.json.
+      /* includeDefaultValues= */ this.context.args.options.help,
+    );
 
-    for (const option of options) {
-      const {
-        default: defaultVal,
-        positional,
-        deprecated,
-        description,
-        alias,
-        userAnalytics,
-        type,
-        hidden,
-        name,
-        choices,
-      } = option;
-
-      const sharedOptions: YargsOptions & PositionalOptions = {
-        alias,
-        hidden,
-        description,
-        deprecated,
-        choices,
-        // This should only be done when `--help` is used otherwise default will override options set in angular.json.
-        ...(this.context.args.options.help ? { default: defaultVal } : {}),
-      };
-
-      let dashedName = strings.dasherize(name);
-
-      // Handle options which have been defined in the schema with `no` prefix.
-      if (type === 'boolean' && dashedName.startsWith('no-')) {
-        dashedName = dashedName.slice(3);
-        booleanOptionsWithNoPrefix.add(dashedName);
-      }
-
-      if (positional === undefined) {
-        localYargs = localYargs.option(dashedName, {
-          type,
-          ...sharedOptions,
-        });
-      } else {
-        localYargs = localYargs.positional(dashedName, {
-          type: type === 'array' || type === 'count' ? 'string' : type,
-          ...sharedOptions,
-        });
-      }
-
-      // Record option of analytics.
-      if (userAnalytics !== undefined) {
-        this.optionsWithAnalytics.set(name, userAnalytics);
-      }
-    }
-
-    // Handle options which have been defined in the schema with `no` prefix.
-    if (booleanOptionsWithNoPrefix.size) {
-      localYargs.middleware((options: Arguments) => {
-        for (const key of booleanOptionsWithNoPrefix) {
-          if (key in options) {
-            options[`no-${key}`] = !options[key];
-            delete options[key];
-          }
-        }
-      }, false);
+    // Record option of analytics.
+    for (const [name, userAnalytics] of optionsWithAnalytics) {
+      this.optionsWithAnalytics.set(name, userAnalytics);
     }
 
     return localYargs;

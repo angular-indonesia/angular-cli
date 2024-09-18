@@ -8,8 +8,11 @@
 
 export * from './private_export';
 
+export { AngularAppEngine } from './src/app-engine';
+
 export {
-  type AngularServerAppManager,
-  getOrCreateAngularAppEngine,
-  destroyAngularAppEngine,
-} from './src/app-engine';
+  type PrerenderFallback,
+  type RenderMode,
+  type ServerRoute,
+  provideServerRoutesConfig,
+} from './src/routes/route-config';

@@ -6,6 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
+// The compiler is needed as tests are in JIT.
 /* eslint-disable import/no-unassigned-import */
 import '@angular/compiler';
 /* eslint-enable import/no-unassigned-import */
@@ -14,6 +15,7 @@ import { Component } from '@angular/core';
 import { destroyAngularServerApp, getOrCreateAngularServerApp } from '../src/app';
 import { AngularAppEngine } from '../src/app-engine';
 import { setAngularAppEngineManifest } from '../src/manifest';
+import { RenderMode } from '../src/routes/route-config';
 import { setAngularAppTestingManifest } from './testing-utils';
 
 describe('AngularAppEngine', () => {
@@ -37,7 +39,11 @@ describe('AngularAppEngine', () => {
               })
               class HomeComponent {}
 
-              setAngularAppTestingManifest([{ path: 'home', component: HomeComponent }], locale);
+              setAngularAppTestingManifest(
+                [{ path: 'home', component: HomeComponent }],
+                [{ path: '**', renderMode: RenderMode.Server }],
+                locale,
+              );
 
               return {
                 ɵgetOrCreateAngularServerApp: getOrCreateAngularServerApp,
@@ -47,45 +53,82 @@ describe('AngularAppEngine', () => {
           ]),
         ),
         basePath: '',
+        staticPathsHeaders: new Map([
+          [
+            '/about',
+            [
+              ['Cache-Control', 'no-cache'],
+              ['X-Some-Header', 'value'],
+            ],
+          ],
+        ]),
       });
 
       appEngine = new AngularAppEngine();
     });
 
-    it('should return null for requests to unknown pages', async () => {
-      const request = new Request('https://example.com/unknown/page');
-      const response = await appEngine.render(request);
-      expect(response).toBeNull();
+    describe('render', () => {
+      it('should return null for requests to unknown pages', async () => {
+        const request = new Request('https://example.com/unknown/page');
+        const response = await appEngine.render(request);
+        expect(response).toBeNull();
+      });
+
+      it('should return null for requests with unknown locales', async () => {
+        const request = new Request('https://example.com/es/home');
+        const response = await appEngine.render(request);
+        expect(response).toBeNull();
+      });
+
+      it('should return a rendered page with correct locale', async () => {
+        const request = new Request('https://example.com/it/home');
+        const response = await appEngine.render(request);
+        expect(await response?.text()).toContain('Home works IT');
+      });
+
+      it('should correctly render the content when the URL ends with "index.html" with correct locale', async () => {
+        const request = new Request('https://example.com/it/home/index.html');
+        const response = await appEngine.render(request);
+        expect(await response?.text()).toContain('Home works IT');
+      });
+
+      it('should return null for requests to unknown pages in a locale', async () => {
+        const request = new Request('https://example.com/it/unknown/page');
+        const response = await appEngine.render(request);
+        expect(response).toBeNull();
+      });
+
+      it('should return null for requests to file-like resources in a locale', async () => {
+        const request = new Request('https://example.com/it/logo.png');
+        const response = await appEngine.render(request);
+        expect(response).toBeNull();
+      });
     });
 
-    it('should return null for requests with unknown locales', async () => {
-      const request = new Request('https://example.com/es/home');
-      const response = await appEngine.render(request);
-      expect(response).toBeNull();
-    });
+    describe('getPrerenderHeaders', () => {
+      it('should return headers for a known path without index.html', () => {
+        const request = new Request('https://example.com/about');
+        const headers = appEngine.getPrerenderHeaders(request);
+        expect(Object.fromEntries(headers.entries())).toEqual({
+          'Cache-Control': 'no-cache',
+          'X-Some-Header': 'value',
+        });
+      });
 
-    it('should return a rendered page with correct locale', async () => {
-      const request = new Request('https://example.com/it/home');
-      const response = await appEngine.render(request);
-      expect(await response?.text()).toContain('Home works IT');
-    });
+      it('should return headers for a known path with index.html', () => {
+        const request = new Request('https://example.com/about/index.html');
+        const headers = appEngine.getPrerenderHeaders(request);
+        expect(Object.fromEntries(headers.entries())).toEqual({
+          'Cache-Control': 'no-cache',
+          'X-Some-Header': 'value',
+        });
+      });
 
-    it('should correctly render the content when the URL ends with "index.html" with correct locale', async () => {
-      const request = new Request('https://example.com/it/home/index.html');
-      const response = await appEngine.render(request);
-      expect(await response?.text()).toContain('Home works IT');
-    });
-
-    it('should return null for requests to unknown pages in a locale', async () => {
-      const request = new Request('https://example.com/it/unknown/page');
-      const response = await appEngine.render(request);
-      expect(response).toBeNull();
-    });
-
-    it('should return null for requests to file-like resources in a locale', async () => {
-      const request = new Request('https://example.com/it/logo.png');
-      const response = await appEngine.render(request);
-      expect(response).toBeNull();
+      it('should return no headers for unknown paths', () => {
+        const request = new Request('https://example.com/unknown/path');
+        const headers = appEngine.getPrerenderHeaders(request);
+        expect(headers).toHaveSize(0);
+      });
     });
   });
 
@@ -105,7 +148,10 @@ describe('AngularAppEngine', () => {
               })
               class HomeComponent {}
 
-              setAngularAppTestingManifest([{ path: 'home', component: HomeComponent }]);
+              setAngularAppTestingManifest(
+                [{ path: 'home', component: HomeComponent }],
+                [{ path: '**', renderMode: RenderMode.Server }],
+              );
 
               return {
                 ɵgetOrCreateAngularServerApp: getOrCreateAngularServerApp,
@@ -115,6 +161,7 @@ describe('AngularAppEngine', () => {
           ],
         ]),
         basePath: '',
+        staticPathsHeaders: new Map(),
       });
 
       appEngine = new AngularAppEngine();

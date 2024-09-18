@@ -35,10 +35,12 @@ interface RenderRequestMessage {
    * The contents to compile.
    */
   source: string;
+
   /**
    * The Sass options to provide to the `dart-sass` compile function.
    */
   options: Omit<StringOptions<'sync'>, 'url'> & { url: string };
+
   /**
    * Indicates the request has a custom importer function on the main thread.
    */
@@ -46,17 +48,41 @@ interface RenderRequestMessage {
     port: MessagePort;
     signal: Int32Array;
   };
+
   /**
    * Indicates the request has a custom logger for warning messages.
    */
   hasLogger: boolean;
+
   /**
    * Indicates paths within url() CSS functions should be rebased.
    */
   rebase: boolean;
 }
 
-export default async function renderSassStylesheet(request: RenderRequestMessage) {
+interface RenderResult {
+  warnings: SerializableWarningMessage[] | undefined;
+  result: {
+    css: string;
+    loadedUrls: string[];
+    sourceMap?: RawSourceMap;
+  };
+}
+
+interface RenderError {
+  warnings: SerializableWarningMessage[] | undefined;
+  error: {
+    message: string;
+    stack?: string;
+    span?: Omit<SourceSpan, 'url'> & { url?: string };
+    sassMessage?: string;
+    sassStack?: string;
+  };
+}
+
+export default async function renderSassStylesheet(
+  request: RenderRequestMessage,
+): Promise<RenderResult | RenderError> {
   const { importerChannel, hasLogger, source, options, rebase } = request;
 
   const entryDirectory = dirname(options.url);
@@ -164,6 +190,7 @@ export default async function renderSassStylesheet(request: RenderRequestMessage
       warnings,
       result: {
         ...result,
+        sourceMap: result.sourceMap as unknown as RawSourceMap | undefined,
         // URL is not serializable so to convert to string here and back to URL in the parent.
         loadedUrls: result.loadedUrls.map((p) => fileURLToPath(p)),
       },

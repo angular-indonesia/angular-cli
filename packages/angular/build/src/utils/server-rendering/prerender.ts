@@ -9,14 +9,15 @@
 import { readFile } from 'node:fs/promises';
 import { extname, join, posix } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import Piscina from 'piscina';
 import { BuildOutputFile, BuildOutputFileType } from '../../tools/esbuild/bundler-context';
 import { BuildOutputAsset } from '../../tools/esbuild/bundler-execution-result';
 import { urlJoin } from '../url';
+import { WorkerPool } from '../worker-pool';
 import type { RenderWorkerData } from './render-worker';
 import type {
+  RoutersExtractorWorkerResult,
   RoutesExtractorWorkerData,
-  RoutersExtractorWorkerResult as SerializableRouteTreeNode,
+  SerializableRouteTreeNode,
 } from './routes-extractor-worker';
 
 interface PrerenderOptions {
@@ -187,7 +188,7 @@ async function renderPages(
     workerExecArgv.push('--enable-source-maps');
   }
 
-  const renderWorker = new Piscina({
+  const renderWorker = new WorkerPool({
     filename: require.resolve('./render-worker'),
     maxThreads: Math.min(allRoutes.size, maxThreads),
     workerData: {
@@ -196,7 +197,6 @@ async function renderPages(
       assetFiles: assetFilesForWorker,
     } as RenderWorkerData,
     execArgv: workerExecArgv,
-    recordTiming: false,
   });
 
   try {
@@ -210,12 +210,13 @@ async function renderPages(
         route.slice(baseHrefWithLeadingSlash.length - 1),
       );
 
-      const isAppShellRoute = appShellRoute === routeWithoutBaseHref;
-      const render: Promise<string | null> = renderWorker.run({ url: route, isAppShellRoute });
+      const render: Promise<string | null> = renderWorker.run({ url: route });
       const renderResult: Promise<void> = render
         .then((content) => {
           if (content !== null) {
             const outPath = posix.join(removeLeadingSlash(routeWithoutBaseHref), 'index.html');
+            const isAppShellRoute = appShellRoute === routeWithoutBaseHref;
+
             output[outPath] = { content, appShellRoute: isAppShellRoute };
           }
         })
@@ -284,7 +285,7 @@ async function getAllRoutes(
     workerExecArgv.push('--enable-source-maps');
   }
 
-  const renderWorker = new Piscina({
+  const renderWorker = new WorkerPool({
     filename: require.resolve('./routes-extractor-worker'),
     maxThreads: 1,
     workerData: {
@@ -293,18 +294,18 @@ async function getAllRoutes(
       assetFiles: assetFilesForWorker,
     } as RoutesExtractorWorkerData,
     execArgv: workerExecArgv,
-    recordTiming: false,
   });
 
   const errors: string[] = [];
-  const serializableRouteTreeNode: SerializableRouteTreeNode = await renderWorker
-    .run({})
-    .catch((err) => {
-      errors.push(`An error occurred while extracting routes.\n\n${err.stack}`);
-    })
-    .finally(() => {
-      void renderWorker.destroy();
-    });
+  const { serializedRouteTree: serializableRouteTreeNode }: RoutersExtractorWorkerResult =
+    await renderWorker
+      .run({})
+      .catch((err) => {
+        errors.push(`An error occurred while extracting routes.\n\n${err.stack}`);
+      })
+      .finally(() => {
+        void renderWorker.destroy();
+      });
 
   const skippedRedirects: string[] = [];
   const skippedOthers: string[] = [];

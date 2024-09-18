@@ -1,3 +1,103 @@
+<a name="18.2.5"></a>
+
+# 18.2.5 (2024-09-18)
+
+### @angular/build
+
+| Commit                                                                                              | Type | Description                                         |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------- |
+| [707431625](https://github.com/angular/angular-cli/commit/7074316257bd736e0d3393368fc93dec9604b49e) | fix  | support HTTP HEAD requests for virtual output files |
+| [1032b3da1](https://github.com/angular/angular-cli/commit/1032b3da1a0f3aaf63d2fd3cd8c6fd3b0d0b578c) | fix  | update vite to `5.4.6`                              |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="16.2.16"></a>
+
+# 16.2.16 (2024-09-18)
+
+### @angular-devkit/build-angular
+
+| Commit                                                                                              | Type | Description          |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------- |
+| [12aca0060](https://github.com/angular/angular-cli/commit/12aca0060492c73cec1bbc231119dde6a4b52607) | fix  | update vite to 4.5.5 |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="19.0.0-next.6"></a>
+
+# 19.0.0-next.6 (2024-09-13)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                                    |
+| --------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------- |
+| [de17cbcb8](https://github.com/angular/angular-cli/commit/de17cbcb88e1f057f93d366c3e2eac4315986e54) | fix  | Revert commit enable Node.js compile code cache when available |
+
+### @angular/ssr
+
+| Commit                                                                                              | Type | Description                          |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------ |
+| [d66aaa3ca](https://github.com/angular/angular-cli/commit/d66aaa3ca458e05b535bec7c1dcb98b0e9c5202e) | feat | add server routing configuration API |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="19.0.0-next.5"></a>
+
+# 19.0.0-next.5 (2024-09-12)
+
+### @angular-devkit/architect
+
+| Commit                                                                                              | Type | Description                   |
+| --------------------------------------------------------------------------------------------------- | ---- | ----------------------------- |
+| [78f76485f](https://github.com/angular/angular-cli/commit/78f76485fe315ffd0262c1a3732092731235828b) | feat | merge object options from CLI |
+
+### @angular/ssr
+
+| Commit                                                                                              | Type | Description                                 |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------- |
+| [85df4011b](https://github.com/angular/angular-cli/commit/85df4011ba27254ddb7f22dae550272c9c4406dd) | fix  | resolve `bootstrap is not a function` error |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="19.0.0-next.4"></a>
+
+# 19.0.0-next.4 (2024-09-11)
+
+### @angular/cli
+
+| Commit                                                                                              | Type | Description                                      |
+| --------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------ |
+| [201b60e1d](https://github.com/angular/angular-cli/commit/201b60e1dd25b4abb7670e21d103b67d4eda0e14) | feat | handle string key/value pairs, e.g. --define     |
+| [ecc107d83](https://github.com/angular/angular-cli/commit/ecc107d83bfdfd9d5dd1087e264892d60361625c) | perf | enable Node.js compile code cache when available |
+
+### @angular/build
+
+| Commit                                                                                              | Type | Description                                                     |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------- |
+| [4153a6ecf](https://github.com/angular/angular-cli/commit/4153a6ecf6707729a4f0c6a620eeb8d6916588df) | fix  | prevent transformation of Node.js internal dependencies by Vite |
+
+### @angular/ssr
+
+| Commit                                                                                              | Type | Description                                                                                                |
+| --------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------- |
+| [41fb2ed86](https://github.com/angular/angular-cli/commit/41fb2ed86056306406832317178ca5d94aa110e2) | feat | Add `getHeaders` Method to `AngularAppEngine` and `AngularNodeAppEngine` for handling pages static headers |
+| [576ff604c](https://github.com/angular/angular-cli/commit/576ff604cd739a9f41d588fa093ca2568e46826c) | feat | introduce `AngularNodeAppEngine` API for Node.js integration                                               |
+| [e9c9e4995](https://github.com/angular/angular-cli/commit/e9c9e4995e39d9d62d10fe0497e0b98127bc8afa) | fix  | resolve circular dependency issue from main.server.js reference in manifest                                |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
+<a name="18.2.4"></a>
+
+# 18.2.4 (2024-09-11)
+
+### @angular/build
+
+| Commit                                                                                              | Type | Description                                                     |
+| --------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------- |
+| [765309a2e](https://github.com/angular/angular-cli/commit/765309a2e1bcd3bb07ff87062fc2dc04e4bce16f) | fix  | prevent transformation of Node.js internal dependencies by Vite |
+
+<!-- CHANGELOG SPLIT MARKER -->
+
 <a name="19.0.0-next.3"></a>
 
 # 19.0.0-next.3 (2024-09-04)

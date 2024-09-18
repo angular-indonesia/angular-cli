@@ -4,16 +4,35 @@
 
 ```ts
 
+import { EnvironmentProviders } from '@angular/core';
+
 // @public
-export interface AngularServerAppManager {
+export class AngularAppEngine {
+    getPrerenderHeaders(request: Request): ReadonlyMap<string, string>;
     render(request: Request, requestContext?: unknown): Promise<Response | null>;
+    static ɵhooks: Hooks;
 }
 
 // @public
-export function destroyAngularAppEngine(): void;
+export enum PrerenderFallback {
+    Client = 1,
+    None = 2,
+    Server = 0
+}
 
 // @public
-export function getOrCreateAngularAppEngine(): AngularServerAppManager;
+export function provideServerRoutesConfig(routes: ServerRoute[]): EnvironmentProviders;
+
+// @public
+export enum RenderMode {
+    AppShell = 0,
+    Client = 2,
+    Prerender = 3,
+    Server = 1
+}
+
+// @public
+export type ServerRoute = ServerRouteAppShell | ServerRouteClient | ServerRoutePrerender | ServerRoutePrerenderWithParams | ServerRouteServer;
 
 // (No @packageDocumentation comment for this package)
 

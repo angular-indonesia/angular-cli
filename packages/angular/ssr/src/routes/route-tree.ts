@@ -7,6 +7,7 @@
  */
 
 import { stripTrailingSlash } from '../utils/url';
+import { RenderMode } from './route-config';
 
 /**
  * Represents the serialized format of a route tree as an array of node metadata objects.
@@ -49,13 +50,30 @@ export interface RouteTreeNodeMetadata {
    * structure and content of the application.
    */
   route: string;
+
+  /**
+   * Optional status code to return for this route.
+   */
+  status?: number;
+
+  /**
+   * Optional additional headers to include in the response for this route.
+   */
+  headers?: Record<string, string>;
+
+  /**
+   * Specifies the rendering mode used for this route.
+   * If not provided, the default rendering mode for the application will be used.
+   */
+  renderMode?: RenderMode;
 }
 
 /**
  * Represents a node within the route tree structure.
  * Each node corresponds to a route segment and may have associated metadata and child nodes.
+ * The `AdditionalMetadata` type parameter allows for extending the node metadata with custom data.
  */
-interface RouteTreeNode {
+interface RouteTreeNode<AdditionalMetadata extends Record<string, unknown>> {
   /**
    * The segment value associated with this node.
    * A segment is a single part of a route path, typically delimited by slashes (`/`).
@@ -74,20 +92,22 @@ interface RouteTreeNode {
   /**
    * A map of child nodes, keyed by their corresponding route segment or wildcard.
    */
-  children: Map<string, RouteTreeNode>;
+  children: Map<string, RouteTreeNode<AdditionalMetadata>>;
 
   /**
    * Optional metadata associated with this node, providing additional information such as redirects.
    */
-  metadata?: RouteTreeNodeMetadata;
+  metadata?: RouteTreeNodeMetadata & AdditionalMetadata;
 }
 
 /**
  * A route tree implementation that supports efficient route matching, including support for wildcard routes.
  * This structure is useful for organizing and retrieving routes in a hierarchical manner,
  * enabling complex routing scenarios with nested paths.
+ *
+ * @typeParam AdditionalMetadata - Type of additional metadata that can be associated with route nodes.
  */
-export class RouteTree {
+export class RouteTree<AdditionalMetadata extends Record<string, unknown> = {}> {
   /**
    * The root node of the route tree.
    * All routes are stored and accessed relative to this root node.
@@ -109,10 +129,9 @@ export class RouteTree {
    * @param route - The route path to insert into the tree.
    * @param metadata - Metadata associated with the route, excluding the route path itself.
    */
-  insert(route: string, metadata: RouteTreeNodeMetadataWithoutRoute): void {
+  insert(route: string, metadata: RouteTreeNodeMetadataWithoutRoute & AdditionalMetadata): void {
     let node = this.root;
-    const normalizedRoute = stripTrailingSlash(route);
-    const segments = normalizedRoute.split('/');
+    const segments = this.getPathSegments(route);
 
     for (const segment of segments) {
       // Replace parameterized segments (e.g., :id) with a wildcard (*) for matching
@@ -130,7 +149,7 @@ export class RouteTree {
     // At the leaf node, store the full route and its associated metadata
     node.metadata = {
       ...metadata,
-      route: normalizedRoute,
+      route: segments.join('/'),
     };
 
     node.insertionIndex = this.insertionIndexCounter++;
@@ -144,8 +163,8 @@ export class RouteTree {
    * @param route - The route path to match against the route tree.
    * @returns The metadata of the best matching route or `undefined` if no match is found.
    */
-  match(route: string): RouteTreeNodeMetadata | undefined {
-    const segments = stripTrailingSlash(route).split('/');
+  match(route: string): (RouteTreeNodeMetadata & AdditionalMetadata) | undefined {
+    const segments = this.getPathSegments(route);
 
     return this.traverseBySegments(segments)?.metadata;
   }
@@ -188,7 +207,7 @@ export class RouteTree {
    *
    * @param node - The current node to start the traversal from. Defaults to the root node of the tree.
    */
-  private *traverse(node = this.root): Generator<RouteTreeNodeMetadata> {
+  private *traverse(node = this.root): Generator<RouteTreeNodeMetadata & AdditionalMetadata> {
     if (node.metadata) {
       yield node.metadata;
     }
@@ -196,6 +215,16 @@ export class RouteTree {
     for (const childNode of node.children.values()) {
       yield* this.traverse(childNode);
     }
+  }
+
+  /**
+   * Extracts the path segments from a given route string.
+   *
+   * @param route - The route string from which to extract segments.
+   * @returns An array of path segments.
+   */
+  private getPathSegments(route: string): string[] {
+    return stripTrailingSlash(route).split('/');
   }
 
   /**
@@ -213,7 +242,7 @@ export class RouteTree {
   private traverseBySegments(
     remainingSegments: string[] | undefined,
     node = this.root,
-  ): RouteTreeNode | undefined {
+  ): RouteTreeNode<AdditionalMetadata> | undefined {
     const { metadata, children } = node;
 
     // If there are no remaining segments and the node has metadata, return this node
@@ -231,7 +260,7 @@ export class RouteTree {
     }
 
     const [segment, ...restSegments] = remainingSegments;
-    let currentBestMatchNode: RouteTreeNode | undefined;
+    let currentBestMatchNode: RouteTreeNode<AdditionalMetadata> | undefined;
 
     // 1. Exact segment match
     const exactMatchNode = node.children.get(segment);
@@ -263,9 +292,9 @@ export class RouteTree {
    * @returns The node with higher priority (i.e., lower insertion index). If one of the nodes is `undefined`, the other node is returned.
    */
   private getHigherPriorityNode(
-    currentBestMatchNode: RouteTreeNode | undefined,
-    candidateNode: RouteTreeNode | undefined,
-  ): RouteTreeNode | undefined {
+    currentBestMatchNode: RouteTreeNode<AdditionalMetadata> | undefined,
+    candidateNode: RouteTreeNode<AdditionalMetadata> | undefined,
+  ): RouteTreeNode<AdditionalMetadata> | undefined {
     if (!candidateNode) {
       return currentBestMatchNode;
     }
@@ -286,7 +315,7 @@ export class RouteTree {
    * @param segment - The route segment that this node represents.
    * @returns A new, empty route tree node.
    */
-  private createEmptyRouteTreeNode(segment: string): RouteTreeNode {
+  private createEmptyRouteTreeNode(segment: string): RouteTreeNode<AdditionalMetadata> {
     return {
       segment,
       insertionIndex: -1,
