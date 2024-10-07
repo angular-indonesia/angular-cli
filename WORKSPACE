@@ -114,7 +114,7 @@ yarn_install(
         "//:.yarn/patches/@angular-bazel-https-9848736cf4.patch",
         "//:.yarn/patches/@bazel-concatjs-npm-5.8.1-1bf81df846.patch",
         "//:.yarn/patches/@bazel-jasmine-npm-5.8.1-3370fee155.patch",
-        "//:.yarn/releases/yarn-4.4.0.cjs",
+        "//:.yarn/releases/yarn-4.5.0.cjs",
         "//:.yarnrc.yml",
     ],
     # Currently disabled due to:
@@ -125,15 +125,15 @@ yarn_install(
     # We prefer to symlink the `node_modules` to only maintain a single install.
     # See https://github.com/angular/dev-infra/pull/446#issuecomment-1059820287 for details.
     symlink_node_modules = True,
-    yarn = "//:.yarn/releases/yarn-4.4.0.cjs",
+    yarn = "//:.yarn/releases/yarn-4.5.0.cjs",
     yarn_lock = "//:yarn.lock",
 )
 
 http_archive(
     name = "aspect_bazel_lib",
-    sha256 = "688354ee6beeba7194243d73eb0992b9a12e8edeeeec5b6544f4b531a3112237",
-    strip_prefix = "bazel-lib-2.8.1",
-    url = "https://github.com/aspect-build/bazel-lib/releases/download/v2.8.1/bazel-lib-v2.8.1.tar.gz",
+    sha256 = "f93d386d8d0b0149031175e81df42a488be4267c3ca2249ba5321c23c60bc1f0",
+    strip_prefix = "bazel-lib-2.9.1",
+    url = "https://github.com/aspect-build/bazel-lib/releases/download/v2.9.1/bazel-lib-v2.9.1.tar.gz",
 )
 
 load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies", "aspect_bazel_lib_register_toolchains")

@@ -7,10 +7,14 @@
  */
 
 import { execute } from '../../index';
-import { BASE_OPTIONS, KARMA_BUILDER_INFO, describeBuilder } from '../setup';
+import { BASE_OPTIONS, KARMA_BUILDER_INFO, describeKarmaBuilder } from '../setup';
 
-describeBuilder(execute, KARMA_BUILDER_INFO, (harness) => {
+describeKarmaBuilder(execute, KARMA_BUILDER_INFO, (harness, setupTarget, isApplicationBuilder) => {
   describe('Option: "webWorkerTsConfig"', () => {
+    beforeEach(async () => {
+      await setupTarget(harness);
+    });
+
     beforeEach(async () => {
       await harness.writeFiles({
         'src/tsconfig.worker.json': `
@@ -65,15 +69,27 @@ describeBuilder(execute, KARMA_BUILDER_INFO, (harness) => {
       });
     });
 
-    it(`should not parse web workers when "webWorkerTsConfig" is not set or set to undefined.`, async () => {
-      harness.useTarget('test', {
-        ...BASE_OPTIONS,
-        webWorkerTsConfig: undefined,
-      });
+    // Web workers work with the application builder _without_ setting webWorkerTsConfig.
+    if (isApplicationBuilder) {
+      it(`should parse web workers when "webWorkerTsConfig" is not set or set to undefined.`, async () => {
+        harness.useTarget('test', {
+          ...BASE_OPTIONS,
+          webWorkerTsConfig: undefined,
+        });
 
-      await harness.writeFile(
-        './src/app/app.component.spec.ts',
-        `
+        const { result } = await harness.executeOnce();
+        expect(result?.success).toBeTrue();
+      });
+    } else {
+      it(`should not parse web workers when "webWorkerTsConfig" is not set or set to undefined.`, async () => {
+        harness.useTarget('test', {
+          ...BASE_OPTIONS,
+          webWorkerTsConfig: undefined,
+        });
+
+        await harness.writeFile(
+          './src/app/app.component.spec.ts',
+          `
         import { TestBed } from '@angular/core/testing';
         import { AppComponent } from './app.component';
 
@@ -87,11 +103,12 @@ describeBuilder(execute, KARMA_BUILDER_INFO, (harness) => {
               .toThrowError(/Failed to construct 'Worker'/);
           });
         });`,
-      );
+        );
 
-      const { result } = await harness.executeOnce();
-      expect(result?.success).toBeTrue();
-    });
+        const { result } = await harness.executeOnce();
+        expect(result?.success).toBeTrue();
+      });
+    }
 
     it(`should parse web workers when "webWorkerTsConfig" is set.`, async () => {
       harness.useTarget('test', {

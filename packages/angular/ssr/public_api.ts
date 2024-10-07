@@ -9,10 +9,13 @@
 export * from './private_export';
 
 export { AngularAppEngine } from './src/app-engine';
+export { createRequestHandler } from './src/handler';
 
 export {
   type PrerenderFallback,
-  type RenderMode,
   type ServerRoute,
   provideServerRoutesConfig,
+  RenderMode,
 } from './src/routes/route-config';
+
+export { REQUEST, RESPONSE_INIT, REQUEST_CONTEXT } from './src/tokens';

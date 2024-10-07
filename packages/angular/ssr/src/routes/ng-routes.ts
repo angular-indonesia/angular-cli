@@ -26,7 +26,7 @@ import { ServerAssets } from '../assets';
 import { Console } from '../console';
 import { AngularAppManifest, getAngularAppManifest } from '../manifest';
 import { AngularBootstrap, isNgModule } from '../utils/ng';
-import { joinUrlParts } from '../utils/url';
+import { joinUrlParts, stripLeadingSlash } from '../utils/url';
 import { PrerenderFallback, RenderMode, SERVER_ROUTES_CONFIG, ServerRoute } from './route-config';
 import { RouteTree, RouteTreeNodeMetadata } from './route-tree';
 
@@ -43,7 +43,10 @@ const VALID_REDIRECT_RESPONSE_CODES = new Set([301, 302, 303, 307, 308]);
 /**
  * Additional metadata for a server configuration route tree.
  */
-type ServerConfigRouteTreeAdditionalMetadata = Partial<ServerRoute>;
+type ServerConfigRouteTreeAdditionalMetadata = Partial<ServerRoute> & {
+  /** Indicates if the route has been matched with the Angular router routes. */
+  presentInClientRouter?: boolean;
+};
 
 /**
  * Metadata for a server configuration route tree node.
@@ -124,18 +127,22 @@ async function* traverseRoutesConfig(options: {
         if (!matchedMetaData) {
           yield {
             error:
-              `The '${currentRoutePath}' route does not match any route defined in the server routing configuration. ` +
+              `The '${stripLeadingSlash(currentRoutePath)}' route does not match any route defined in the server routing configuration. ` +
               'Please ensure this route is added to the server routing configuration.',
           };
 
           continue;
         }
+
+        matchedMetaData.presentInClientRouter = true;
       }
 
       const metadata: ServerConfigRouteTreeNodeMetadata = {
         ...matchedMetaData,
         route: currentRoutePath,
       };
+
+      delete metadata.presentInClientRouter;
 
       // Handle redirects
       if (typeof redirectTo === 'string') {
@@ -189,7 +196,9 @@ async function* traverseRoutesConfig(options: {
         }
       }
     } catch (error) {
-      yield { error: `Error processing route '${route.path}': ${(error as Error).message}` };
+      yield {
+        error: `Error processing route '${stripLeadingSlash(route.path ?? '')}': ${(error as Error).message}`,
+      };
     }
   }
 }
@@ -237,8 +246,8 @@ async function* handleSSGRoute(
     if (!getPrerenderParams) {
       yield {
         error:
-          `The '${currentRoutePath}' route uses prerendering and includes parameters, but 'getPrerenderParams' is missing. ` +
-          `Please define 'getPrerenderParams' function for this route in your server routing configuration ` +
+          `The '${stripLeadingSlash(currentRoutePath)}' route uses prerendering and includes parameters, but 'getPrerenderParams' ` +
+          `is missing. Please define 'getPrerenderParams' function for this route in your server routing configuration ` +
           `or specify a different 'renderMode'.`,
       };
 
@@ -253,7 +262,7 @@ async function* handleSSGRoute(
           const value = params[parameterName];
           if (typeof value !== 'string') {
             throw new Error(
-              `The 'getPrerenderParams' function defined for the '${currentRoutePath}' route ` +
+              `The 'getPrerenderParams' function defined for the '${stripLeadingSlash(currentRoutePath)}' route ` +
                 `returned a non-string value for parameter '${parameterName}'. ` +
                 `Please make sure the 'getPrerenderParams' function returns values for all parameters ` +
                 'specified in this route.',
@@ -433,11 +442,39 @@ export async function getRoutesFromAngularRouterConfig(
         includePrerenderFallbackRoutes,
       });
 
+      let seenAppShellRoute: string | undefined;
       for await (const result of traverseRoutes) {
         if ('error' in result) {
           errors.push(result.error);
         } else {
+          if (result.renderMode === RenderMode.AppShell) {
+            if (seenAppShellRoute !== undefined) {
+              errors.push(
+                `Error: Both '${seenAppShellRoute}' and '${stripLeadingSlash(result.route)}' routes have ` +
+                  `their 'renderMode' set to 'AppShell'. AppShell renderMode should only be assigned to one route. ` +
+                  `Please review your route configurations to ensure that only one route is set to 'RenderMode.AppShell'.`,
+              );
+            }
+
+            seenAppShellRoute = stripLeadingSlash(result.route);
+          }
+
           routesResults.push(result);
+        }
+      }
+
+      if (serverConfigRouteTree) {
+        for (const { route, presentInClientRouter } of serverConfigRouteTree.traverse()) {
+          if (presentInClientRouter || route === '**') {
+            // Skip if matched or it's the catch-all route.
+            continue;
+          }
+
+          errors.push(
+            `The '${route}' server route does not match any routes defined in the Angular ` +
+              `routing configuration (typically provided as a part of the 'provideRouter' call). ` +
+              'Please make sure that the mentioned server route is present in the Angular routing configuration.',
+          );
         }
       }
     } else {

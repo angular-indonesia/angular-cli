@@ -6,15 +6,23 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import { StaticProvider, ɵresetCompiledComponents } from '@angular/core';
+import { LOCALE_ID, StaticProvider, ɵresetCompiledComponents } from '@angular/core';
 import { ServerAssets } from './assets';
 import { Hooks } from './hooks';
 import { getAngularAppManifest } from './manifest';
 import { RenderMode } from './routes/route-config';
 import { ServerRouter } from './routes/router';
 import { REQUEST, REQUEST_CONTEXT, RESPONSE_INIT } from './tokens';
+import { sha256 } from './utils/crypto';
 import { InlineCriticalCssProcessor } from './utils/inline-critical-css';
+import { LRUCache } from './utils/lru-cache';
 import { AngularBootstrap, renderAngular } from './utils/ng';
+
+/**
+ * Maximum number of critical CSS entries the cache can store.
+ * This value determines the capacity of the LRU (Least Recently Used) cache, which stores critical CSS for pages.
+ */
+const MAX_INLINE_CSS_CACHE_ENTRIES = 50;
 
 /**
  * A mapping of `RenderMode` enum values to corresponding string representations.
@@ -71,6 +79,15 @@ export class AngularServerApp {
    * The bootstrap mechanism for the server application.
    */
   private boostrap: AngularBootstrap | undefined;
+
+  /**
+   * Cache for storing critical CSS for pages.
+   * Stores a maximum of MAX_INLINE_CSS_CACHE_ENTRIES entries.
+   *
+   * Uses an LRU (Least Recently Used) eviction policy, meaning that when the cache is full,
+   * the least recently accessed page's critical CSS will be removed to make space for new entries.
+   */
+  private readonly criticalCssLRUCache = new LRUCache<string, string>(MAX_INLINE_CSS_CACHE_ENTRIES);
 
   /**
    * Renders a response for the given HTTP request using the server application.
@@ -172,49 +189,64 @@ export class AngularServerApp {
       // Initialize the response with status and headers if available.
       responseInit = {
         status,
-        headers: headers ? new Headers(headers) : undefined,
+        headers: new Headers({
+          'Content-Type': 'text/html;charset=UTF-8',
+          ...headers,
+        }),
       };
 
-      if (renderMode === RenderMode.Client) {
+      if (renderMode === RenderMode.Server) {
+        // Configure platform providers for request and response only for SSR.
+        platformProviders.push(
+          {
+            provide: REQUEST,
+            useValue: request,
+          },
+          {
+            provide: REQUEST_CONTEXT,
+            useValue: requestContext,
+          },
+          {
+            provide: RESPONSE_INIT,
+            useValue: responseInit,
+          },
+        );
+      } else if (renderMode === RenderMode.Client) {
         // Serve the client-side rendered version if the route is configured for CSR.
         return new Response(await this.assets.getServerAsset('index.csr.html'), responseInit);
       }
-
-      platformProviders.push(
-        {
-          provide: REQUEST,
-          useValue: request,
-        },
-        {
-          provide: REQUEST_CONTEXT,
-          useValue: requestContext,
-        },
-        {
-          provide: RESPONSE_INIT,
-          useValue: responseInit,
-        },
-      );
     }
 
-    const { manifest, hooks, assets } = this;
+    const {
+      manifest: { bootstrap, inlineCriticalCss, locale },
+      hooks,
+      assets,
+    } = this;
+
+    if (locale !== undefined) {
+      platformProviders.push({
+        provide: LOCALE_ID,
+        useValue: locale,
+      });
+    }
 
     let html = await assets.getIndexServerHtml();
     // Skip extra microtask if there are no pre hooks.
     if (hooks.has('html:transform:pre')) {
-      html = await hooks.run('html:transform:pre', { html });
+      html = await hooks.run('html:transform:pre', { html, url });
     }
 
-    this.boostrap ??= await manifest.bootstrap();
+    this.boostrap ??= await bootstrap();
 
     html = await renderAngular(
       html,
       this.boostrap,
-      new URL(request.url),
+      url,
       platformProviders,
       SERVER_CONTEXT_VALUE[renderMode],
     );
 
-    if (manifest.inlineCriticalCss) {
+    if (inlineCriticalCss) {
       // Optionally inline critical CSS.
       this.inlineCriticalCssProcessor ??= new InlineCriticalCssProcessor((path: string) => {
         const fileName = path.split('/').pop() ?? path;
@@ -222,7 +254,29 @@ export class AngularServerApp {
         return this.assets.getServerAsset(fileName);
       });
 
-      html = await this.inlineCriticalCssProcessor.process(html);
+      // TODO(alanagius): remove once Node.js version 18 is no longer supported.
+      if (isSsrMode && typeof crypto === 'undefined') {
+        // eslint-disable-next-line no-console
+        console.error(
+          `The global 'crypto' module is unavailable. ` +
+            `If you are running on Node.js, please ensure you are using version 20 or later, ` +
+            `which includes built-in support for the Web Crypto module.`,
+        );
+      }
+
+      if (isSsrMode && typeof crypto !== 'undefined') {
+        // Only cache if we are running in SSR Mode.
+        const cacheKey = await sha256(html);
+        let htmlWithCriticalCss = this.criticalCssLRUCache.get(cacheKey);
+        if (htmlWithCriticalCss === undefined) {
+          htmlWithCriticalCss = await this.inlineCriticalCssProcessor.process(html);
+          this.criticalCssLRUCache.put(cacheKey, htmlWithCriticalCss);
+        }
+
+        html = htmlWithCriticalCss;
+      } else {
+        html = await this.inlineCriticalCssProcessor.process(html);
+      }
     }
 
     return new Response(html, responseInit);

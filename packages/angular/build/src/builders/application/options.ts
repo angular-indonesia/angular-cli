@@ -14,7 +14,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { normalizeAssetPatterns, normalizeOptimization, normalizeSourceMaps } from '../../utils';
 import { supportColor } from '../../utils/color';
-import { useJSONBuildLogs } from '../../utils/environment-options';
+import { useJSONBuildLogs, usePartialSsrBuild } from '../../utils/environment-options';
 import { I18nOptions, createI18nOptions } from '../../utils/i18n-options';
 import { IndexHtmlTransform } from '../../utils/index-file/index-html-generator';
 import { normalizeCacheOptions } from '../../utils/normalize-cache';
@@ -29,6 +29,7 @@ import {
   Schema as ApplicationBuilderOptions,
   I18NTranslation,
   OutputHashing,
+  OutputMode,
   OutputPathClass,
 } from './schema';
 
@@ -79,6 +80,29 @@ interface InternalOptions {
    * This is only used by the development server which currently only supports a single locale per build.
    */
   forceI18nFlatOutput?: boolean;
+
+  /**
+   * When set to `true`, enables fast SSR in development mode by disabling the full manifest generation and prerendering.
+   *
+   * This option is intended to optimize performance during development by skipping prerendering and route extraction when not required.
+   * @default false
+   */
+  partialSSRBuild?: boolean;
+
+  /**
+   * Enables the use of AOT compiler emitted external runtime styles.
+   * External runtime styles use `link` elements instead of embedded style content in the output JavaScript.
+   * This option is only intended to be used with a development server that can process and serve component
+   * styles.
+   */
+  externalRuntimeStyles?: boolean;
+
+  /**
+   * Enables instrumentation to collect code coverage data for specific files.
+   *
+   * Used exclusively for tests and shouldn't be used for other kinds of builds.
+   */
+  instrumentForCoverage?: (filename: string) => boolean;
 }
 
 /** Full set of options for `application` builder. */
@@ -179,6 +203,37 @@ export async function normalizeOptions(
     }
   }
 
+  // Validate prerender and ssr options when using the outputMode
+  if (options.outputMode === OutputMode.Server) {
+    if (!options.server) {
+      throw new Error('The "server" option is required when "outputMode" is set to "server".');
+    }
+
+    if (typeof options.ssr === 'boolean' || !options.ssr?.entry) {
+      throw new Error('The "ssr.entry" option is required when "outputMode" is set to "server".');
+    }
+  }
+
+  if (options.outputMode) {
+    if (!options.server) {
+      options.ssr = false;
+    }
+
+    if (options.prerender) {
+      context.logger.warn(
+        'The "prerender" option is no longer needed when "outputMode" is specified.',
+      );
+    } else {
+      options.prerender = !!options.server;
+    }
+
+    if (options.appShell) {
+      context.logger.warn(
+        'The "appShell" option is no longer needed when "outputMode" is specified.',
+      );
+    }
+  }
+
   // A configuration file can exist in the project or workspace root
   const searchDirectories = await generateSearchDirectories([projectRoot, workspaceRoot]);
   const postcssConfiguration = await loadPostcssConfiguration(searchDirectories);
@@ -235,7 +290,10 @@ export async function normalizeOptions(
     clean: options.deleteOutputPath ?? true,
     // For app-shell and SSG server files are not required by users.
     // Omit these when SSR is not enabled.
-    ignoreServer: ssrOptions === undefined || serverEntryPoint === undefined,
+    ignoreServer:
+      ((ssrOptions === undefined || serverEntryPoint === undefined) &&
+        options.outputMode === undefined) ||
+      options.outputMode === OutputMode.Static,
   };
 
   const outputNames = {
@@ -317,6 +375,7 @@ export async function normalizeOptions(
     poll,
     polyfills,
     statsJson,
+    outputMode,
     stylePreprocessorOptions,
     subresourceIntegrity,
     verbose,
@@ -328,6 +387,9 @@ export async function normalizeOptions(
     deployUrl,
     clearScreen,
     define,
+    partialSSRBuild = false,
+    externalRuntimeStyles,
+    instrumentForCoverage,
   } = options;
 
   // Return all the normalized options
@@ -352,6 +414,7 @@ export async function normalizeOptions(
     serverEntryPoint,
     prerenderOptions,
     appShellOptions,
+    outputMode,
     ssrOptions,
     verbose,
     watch,
@@ -387,6 +450,9 @@ export async function normalizeOptions(
     colors: supportColor(),
     clearScreen,
     define,
+    partialSSRBuild: usePartialSsrBuild || partialSSRBuild,
+    externalRuntimeStyles,
+    instrumentForCoverage,
   };
 }
 

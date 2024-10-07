@@ -7,6 +7,7 @@
  */
 
 import { OutputFile } from 'esbuild';
+import assert from 'node:assert';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { BuildOutputFileType, BundleContextResult, BundlerContext } from '../bundler-context';
@@ -35,24 +36,41 @@ export class ComponentStylesheetBundler {
     private readonly incremental: boolean,
   ) {}
 
-  async bundleFile(entry: string) {
+  async bundleFile(entry: string, externalId?: string | boolean) {
     const bundlerContext = await this.#fileContexts.getOrCreate(entry, () => {
       return new BundlerContext(this.options.workspaceRoot, this.incremental, (loadCache) => {
         const buildOptions = createStylesheetBundleOptions(this.options, loadCache);
-        buildOptions.entryPoints = [entry];
+        if (externalId) {
+          assert(
+            typeof externalId === 'string',
+            'Initial external component stylesheets must have a string identifier',
+          );
+
+          buildOptions.entryPoints = { [externalId]: entry };
+          delete buildOptions.publicPath;
+        } else {
+          buildOptions.entryPoints = [entry];
+        }
 
         return buildOptions;
       });
     });
 
-    return this.extractResult(await bundlerContext.bundle(), bundlerContext.watchFiles);
+    return this.extractResult(
+      await bundlerContext.bundle(),
+      bundlerContext.watchFiles,
+      !!externalId,
+    );
   }
 
-  async bundleInline(data: string, filename: string, language: string) {
+  async bundleInline(data: string, filename: string, language: string, externalId?: string) {
     // Use a hash of the inline stylesheet content to ensure a consistent identifier. External stylesheets will resolve
     // to the actual stylesheet file path.
     // TODO: Consider xxhash instead for hashing
-    const id = createHash('sha256').update(data).digest('hex');
+    const id = createHash('sha256')
+      .update(data)
+      .update(externalId ?? '')
+      .digest('hex');
     const entry = [language, id, filename].join(';');
 
     const bundlerContext = await this.#inlineContexts.getOrCreate(entry, () => {
@@ -62,7 +80,13 @@ export class ComponentStylesheetBundler {
         const buildOptions = createStylesheetBundleOptions(this.options, loadCache, {
           [entry]: data,
         });
-        buildOptions.entryPoints = [`${namespace};${entry}`];
+        if (externalId) {
+          buildOptions.entryPoints = { [externalId]: `${namespace};${entry}` };
+          delete buildOptions.publicPath;
+        } else {
+          buildOptions.entryPoints = [`${namespace};${entry}`];
+        }
+
         buildOptions.plugins.push({
           name: 'angular-component-styles',
           setup(build) {
@@ -91,22 +115,37 @@ export class ComponentStylesheetBundler {
     });
 
     // Extract the result of the bundling from the output files
-    return this.extractResult(await bundlerContext.bundle(), bundlerContext.watchFiles);
+    return this.extractResult(
+      await bundlerContext.bundle(),
+      bundlerContext.watchFiles,
+      !!externalId,
+    );
   }
 
-  invalidate(files: Iterable<string>) {
+  /**
+   * Invalidates both file and inline based component style bundling state for a set of modified files.
+   * @param files The group of files that have been modified
+   * @returns An array of file based stylesheet entries if any were invalidated; otherwise, undefined.
+   */
+  invalidate(files: Iterable<string>): string[] | undefined {
     if (!this.incremental) {
       return;
     }
 
     const normalizedFiles = [...files].map(path.normalize);
+    let entries: string[] | undefined;
 
-    for (const bundler of this.#fileContexts.values()) {
-      bundler.invalidate(normalizedFiles);
+    for (const [entry, bundler] of this.#fileContexts.entries()) {
+      if (bundler.invalidate(normalizedFiles)) {
+        entries ??= [];
+        entries.push(entry);
+      }
     }
     for (const bundler of this.#inlineContexts.values()) {
       bundler.invalidate(normalizedFiles);
     }
+
+    return entries;
   }
 
   async dispose(): Promise<void> {
@@ -117,7 +156,11 @@ export class ComponentStylesheetBundler {
     await Promise.allSettled(contexts.map((context) => context.dispose()));
   }
 
-  private extractResult(result: BundleContextResult, referencedFiles?: Set<string>) {
+  private extractResult(
+    result: BundleContextResult,
+    referencedFiles: Set<string> | undefined,
+    external: boolean,
+  ) {
     let contents = '';
     let metafile;
     const outputFiles: OutputFile[] = [];
@@ -140,7 +183,14 @@ export class ComponentStylesheetBundler {
 
           outputFiles.push(clonedOutputFile);
         } else if (filename.endsWith('.css')) {
-          contents = outputFile.text;
+          if (external) {
+            const clonedOutputFile = outputFile.clone();
+            clonedOutputFile.path = path.join(this.options.workspaceRoot, outputFile.path);
+            outputFiles.push(clonedOutputFile);
+            contents = path.posix.join(this.options.publicPath ?? '', filename);
+          } else {
+            contents = outputFile.text;
+          }
         } else {
           throw new Error(
             `Unexpected non CSS/Media file "${filename}" outputted during component stylesheet processing.`,

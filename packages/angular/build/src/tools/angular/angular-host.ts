@@ -7,6 +7,7 @@
  */
 
 import type ng from '@angular/compiler-cli';
+import assert from 'node:assert';
 import { createHash } from 'node:crypto';
 import nodePath from 'node:path';
 import type ts from 'typescript';
@@ -18,10 +19,12 @@ export interface AngularHostOptions {
   fileReplacements?: Record<string, string>;
   sourceFileCache?: Map<string, ts.SourceFile>;
   modifiedFiles?: Set<string>;
+  externalStylesheets?: Map<string, string>;
   transformStylesheet(
     data: string,
     containingFile: string,
     stylesheetFile?: string,
+    order?: number,
   ): Promise<string | null>;
   processWebWorker(workerFile: string, containingFile: string): string;
 }
@@ -180,6 +183,11 @@ export function createAngularCompilerHost(
       return null;
     }
 
+    assert(
+      !context.resourceFile || !hostOptions.externalStylesheets?.has(context.resourceFile),
+      'External runtime stylesheets should not be transformed: ' + context.resourceFile,
+    );
+
     // No transformation required if the resource is empty
     if (data.trim().length === 0) {
       return { content: '' };
@@ -189,9 +197,30 @@ export function createAngularCompilerHost(
       data,
       context.containingFile,
       context.resourceFile ?? undefined,
+      // TODO: Remove once available in compiler-cli types
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (context as any).order,
     );
 
     return typeof result === 'string' ? { content: result } : null;
+  };
+
+  host.resourceNameToFileName = function (resourceName, containingFile) {
+    const resolvedPath = nodePath.join(nodePath.dirname(containingFile), resourceName);
+
+    // All resource names that have HTML file extensions are assumed to be templates
+    if (resourceName.endsWith('.html') || !hostOptions.externalStylesheets) {
+      return resolvedPath;
+    }
+
+    // For external stylesheets, create a unique identifier and store the mapping
+    let externalId = hostOptions.externalStylesheets.get(resolvedPath);
+    if (externalId === undefined) {
+      externalId = createHash('sha256').update(resolvedPath).digest('hex');
+      hostOptions.externalStylesheets.set(resolvedPath, externalId);
+    }
+
+    return externalId + '.css';
   };
 
   // Allow the AOT compiler to request the set of changed templates and styles

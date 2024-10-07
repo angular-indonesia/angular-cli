@@ -13,10 +13,32 @@ import {
   getLocaleBaseHref,
 } from '../../builders/application/options';
 import type { BuildOutputFile } from '../../tools/esbuild/bundler-context';
+import { PrerenderedRoutesRecord } from '../../tools/esbuild/bundler-execution-result';
 
 export const SERVER_APP_MANIFEST_FILENAME = 'angular-app-manifest.mjs';
+export const SERVER_APP_ENGINE_MANIFEST_FILENAME = 'angular-app-engine-manifest.mjs';
 
 const MAIN_SERVER_OUTPUT_FILENAME = 'main.server.mjs';
+
+/**
+ * A mapping of unsafe characters to their escaped Unicode equivalents.
+ */
+const UNSAFE_CHAR_MAP: Record<string, string> = {
+  '`': '\\`',
+  '$': '\\$',
+  '\\': '\\\\',
+};
+
+/**
+ * Escapes unsafe characters in a given string by replacing them with
+ * their Unicode escape sequences.
+ *
+ * @param str - The string to be escaped.
+ * @returns The escaped string where unsafe characters are replaced.
+ */
+function escapeUnsafeChars(str: string): string {
+  return str.replace(/[$`\\]/g, (c) => UNSAFE_CHAR_MAP[c]);
+}
 
 /**
  * Generates the server manifest for the App Engine environment.
@@ -29,11 +51,13 @@ const MAIN_SERVER_OUTPUT_FILENAME = 'main.server.mjs';
  * includes settings for inlining locales and determining the output structure.
  * @param baseHref - The base HREF for the application. This is used to set the base URL
  * for all relative URLs in the application.
+ * @param perenderedRoutes - A record mapping static paths to their associated data.
  * @returns A string representing the content of the SSR server manifest for App Engine.
  */
 export function generateAngularServerAppEngineManifest(
   i18nOptions: NormalizedApplicationBuildOptions['i18nOptions'],
   baseHref: string | undefined,
+  perenderedRoutes: PrerenderedRoutesRecord | undefined = {},
 ): string {
   const entryPointsContent: string[] = [];
 
@@ -42,19 +66,40 @@ export function generateAngularServerAppEngineManifest(
       const importPath =
         './' + (i18nOptions.flatOutput ? '' : locale + '/') + MAIN_SERVER_OUTPUT_FILENAME;
 
-      const localWithBaseHref = getLocaleBaseHref('', i18nOptions, locale) || '/';
-      entryPointsContent.push(`['${localWithBaseHref}', () => import('${importPath}')]`);
+      let localeWithBaseHref = getLocaleBaseHref('', i18nOptions, locale) || '/';
+
+      // Remove leading and trailing slashes.
+      const start = localeWithBaseHref[0] === '/' ? 1 : 0;
+      const end = localeWithBaseHref[localeWithBaseHref.length - 1] === '/' ? -1 : undefined;
+      localeWithBaseHref = localeWithBaseHref.slice(start, end);
+
+      entryPointsContent.push(`['${localeWithBaseHref}', () => import('${importPath}')]`);
     }
   } else {
-    entryPointsContent.push(`['/', () => import('./${MAIN_SERVER_OUTPUT_FILENAME}')]`);
+    entryPointsContent.push(`['', () => import('./${MAIN_SERVER_OUTPUT_FILENAME}')]`);
+  }
+
+  const staticHeaders: string[] = [];
+  for (const [path, { headers }] of Object.entries(perenderedRoutes)) {
+    if (!headers) {
+      continue;
+    }
+
+    const headersValues: string[] = [];
+    for (const [name, value] of Object.entries(headers)) {
+      headersValues.push(`['${name}', '${encodeURIComponent(value)}']`);
+    }
+
+    staticHeaders.push(`['${path}', [${headersValues.join(', ')}]]`);
   }
 
   const manifestContent = `
-  {
-    basePath: '${baseHref ?? '/'}',
-    entryPoints: new Map([${entryPointsContent.join(', \n')}]),
-  }
-`;
+export default {
+  basePath: '${baseHref ?? '/'}',
+  entryPoints: new Map([${entryPointsContent.join(', \n')}]),
+  staticPathsHeaders: new Map([${staticHeaders.join(', \n')}]),
+};
+  `;
 
   return manifestContent;
 }
@@ -75,6 +120,9 @@ export function generateAngularServerAppEngineManifest(
  * in the server-side rendered pages.
  * @param routes - An optional array of route definitions for the application, used for
  * server-side rendering and routing.
+ * @param locale - An optional string representing the locale or language code to be used for
+ * the application, helping with localization and rendering content specific to the locale.
+ *
  * @returns A string representing the content of the SSR server manifest for the Node.js
  * environment.
  */
@@ -83,6 +131,7 @@ export function generateAngularServerAppManifest(
   outputFiles: BuildOutputFile[],
   inlineCriticalCss: boolean,
   routes: readonly unknown[] | undefined,
+  locale: string | undefined,
 ): string {
   const serverAssetsContent: string[] = [];
   for (const file of [...additionalHtmlOutputFiles.values(), ...outputFiles]) {
@@ -91,7 +140,7 @@ export function generateAngularServerAppManifest(
       file.path === INDEX_HTML_CSR ||
       (inlineCriticalCss && file.path.endsWith('.css'))
     ) {
-      serverAssetsContent.push(`['${file.path}', async () => ${JSON.stringify(file.text)}]`);
+      serverAssetsContent.push(`['${file.path}', async () => \`${escapeUnsafeChars(file.text)}\`]`);
     }
   }
 
@@ -101,6 +150,7 @@ export default {
   inlineCriticalCss: ${inlineCriticalCss},
   routes: ${JSON.stringify(routes, undefined, 2)},
   assets: new Map([${serverAssetsContent.join(', \n')}]),
+  locale: ${locale !== undefined ? `'${locale}'` : undefined},
 };
 `;
 
