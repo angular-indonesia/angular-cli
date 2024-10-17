@@ -8,6 +8,7 @@
 
 import type {
   BuildFailure,
+  Loader,
   Metafile,
   OnStartResult,
   OutputFile,
@@ -181,7 +182,7 @@ export function createCompilerPlugin(
           fileReplacements: pluginOptions.fileReplacements,
           modifiedFiles,
           sourceFileCache: pluginOptions.sourceFileCache,
-          async transformStylesheet(data, containingFile, stylesheetFile, order) {
+          async transformStylesheet(data, containingFile, stylesheetFile, order, className) {
             let stylesheetResult;
 
             // Stylesheet file only exists for external stylesheets
@@ -201,6 +202,7 @@ export function createCompilerPlugin(
                   ? createHash('sha-256')
                       .update(containingFile)
                       .update((order ?? 0).toString())
+                      .update(className ?? '')
                       .digest('hex')
                   : undefined,
               );
@@ -286,7 +288,12 @@ export function createCompilerPlugin(
           const initializationResult = await compilation.initialize(
             pluginOptions.tsconfig,
             hostOptions,
-            createCompilerOptionsTransformer(setupWarnings, pluginOptions, preserveSymlinks),
+            createCompilerOptionsTransformer(
+              setupWarnings,
+              pluginOptions,
+              preserveSymlinks,
+              build.initialOptions.conditions,
+            ),
           );
           shouldTsIgnoreJs = !initializationResult.compilerOptions.allowJs;
           // Isolated modules option ensures safe non-TypeScript transpilation.
@@ -456,9 +463,21 @@ export function createCompilerPlugin(
           typeScriptFileCache.set(request, contents);
         }
 
+        let loader: Loader;
+        if (useTypeScriptTranspilation || isJS) {
+          // TypeScript has transpiled to JS or is already JS
+          loader = 'js';
+        } else if (request.at(-1) === 'x') {
+          // TSX and TS have different syntax rules. Only set if input is a TSX file.
+          loader = 'tsx';
+        } else {
+          // Otherwise, directly bundle TS
+          loader = 'ts';
+        }
+
         return {
           contents,
-          loader: useTypeScriptTranspilation || isJS ? 'js' : 'ts',
+          loader,
         };
       });
 
@@ -572,6 +591,7 @@ function createCompilerOptionsTransformer(
   setupWarnings: PartialMessage[] | undefined,
   pluginOptions: CompilerPluginOptions,
   preserveSymlinks: boolean | undefined,
+  customConditions: string[] | undefined,
 ): Parameters<AngularCompilation['initialize']>[2] {
   return (compilerOptions) => {
     // target of 9 is ES2022 (using the number avoids an expensive import of typescript just for an enum)
@@ -629,6 +649,12 @@ function createCompilerOptionsTransformer(
         location: null,
         notes: [{ text: `The 'module' option will be set to 'ES2022' instead.` }],
       });
+    }
+
+    // Synchronize custom resolve conditions.
+    // Set if using the supported bundler resolution mode (bundler is the default in new projects)
+    if (compilerOptions.moduleResolution === 100 /* ModuleResolutionKind.Bundler */) {
+      compilerOptions.customConditions = customConditions;
     }
 
     return {

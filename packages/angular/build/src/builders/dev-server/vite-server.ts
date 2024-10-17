@@ -137,8 +137,13 @@ export async function* serveWithVite(
     process.setSourceMapsEnabled(true);
   }
 
-  // TODO: Enable by default once full support across CLI and FW is integrated
-  browserOptions.externalRuntimeStyles = useComponentStyleHmr;
+  // Enable to support component style hot reloading (`NG_HMR_CSTYLES=0` can be used to disable)
+  browserOptions.externalRuntimeStyles = !!serverOptions.liveReload && useComponentStyleHmr;
+  if (browserOptions.externalRuntimeStyles) {
+    // Preload the @angular/compiler package to avoid first stylesheet request delays.
+    // Once @angular/build is native ESM, this should be re-evaluated.
+    void loadEsmModule('@angular/compiler');
+  }
 
   // Setup the prebundling transformer that will be shared across Vite prebundling requests
   const prebundleTransformer = new JavaScriptTransformer(
@@ -166,7 +171,8 @@ export async function* serveWithVite(
     explicitBrowser: [],
     explicitServer: [],
   };
-  const usedComponentStyles = new Map<string, string[]>();
+  const usedComponentStyles = new Map<string, Set<string>>();
+  const templateUpdates = new Map<string, string>();
 
   // Add cleanup logic via a builder teardown.
   let deferred: () => void;
@@ -211,6 +217,9 @@ export async function* serveWithVite(
             assetFiles.set('/' + normalizePath(outputPath), normalizePath(file.inputPath));
           }
         }
+        // Clear stale template updates on a code rebuilds
+        templateUpdates.clear();
+
         // Analyze result files for changes
         analyzeResultFiles(normalizePath, htmlIndexPath, result.files, generatedFiles);
         break;
@@ -220,8 +229,22 @@ export async function* serveWithVite(
         break;
       case ResultKind.ComponentUpdate:
         assert(serverOptions.hmr, 'Component updates are only supported with HMR enabled.');
-        // TODO: Implement support -- application builder currently does not use
-        break;
+        assert(
+          server,
+          'Builder must provide an initial full build before component update results.',
+        );
+
+        for (const componentUpdate of result.updates) {
+          if (componentUpdate.type === 'template') {
+            templateUpdates.set(componentUpdate.id, componentUpdate.content);
+            server.ws.send('angular:component-update', {
+              id: componentUpdate.id,
+              timestamp: Date.now(),
+            });
+          }
+        }
+        context.logger.info('Component update sent to client(s).');
+        continue;
       default:
         context.logger.warn(`Unknown result kind [${(result as Result).kind}] provided by build.`);
         continue;
@@ -353,6 +376,7 @@ export async function* serveWithVite(
         target,
         isZonelessApp(polyfills),
         usedComponentStyles,
+        templateUpdates,
         browserOptions.loader as EsbuildLoaderOption | undefined,
         extensions?.middleware,
         transformers?.indexHtml,
@@ -404,7 +428,7 @@ async function handleUpdate(
   server: ViteDevServer,
   serverOptions: NormalizedDevServerOptions,
   logger: BuilderContext['logger'],
-  usedComponentStyles: Map<string, string[]>,
+  usedComponentStyles: Map<string, Set<string>>,
 ): Promise<void> {
   const updatedFiles: string[] = [];
   let destroyAngularServerAppCalled = false;
@@ -451,7 +475,7 @@ async function handleUpdate(
           // are not typically reused across components.
           const componentIds = usedComponentStyles.get(filePath);
           if (componentIds) {
-            return componentIds.map((id) => ({
+            return Array.from(componentIds).map((id) => ({
               type: 'css-update',
               timestamp,
               path: `${filePath}?ngcomp` + (id ? `=${id}` : ''),
@@ -460,7 +484,7 @@ async function handleUpdate(
           }
 
           return {
-            type: 'css-update',
+            type: 'css-update' as const,
             timestamp,
             path: filePath,
             acceptedPath: filePath,
@@ -563,7 +587,8 @@ export async function setupServer(
   prebundleTransformer: JavaScriptTransformer,
   target: string[],
   zoneless: boolean,
-  usedComponentStyles: Map<string, string[]>,
+  usedComponentStyles: Map<string, Set<string>>,
+  templateUpdates: Map<string, string>,
   prebundleLoaderExtensions: EsbuildLoaderOption | undefined,
   extensionMiddleware?: Connect.NextHandleFunction[],
   indexHtmlTransformer?: (content: string) => Promise<string>,
@@ -671,6 +696,7 @@ export async function setupServer(
         indexHtmlTransformer,
         extensionMiddleware,
         usedComponentStyles,
+        templateUpdates,
         ssrMode,
       }),
       createRemoveIdPrefixPlugin(externalMetadata.explicitBrowser),
