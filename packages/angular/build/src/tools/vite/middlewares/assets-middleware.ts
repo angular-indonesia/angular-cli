@@ -85,6 +85,16 @@ export function createAngularAssetsMiddleware(
             } else {
               usedIds.add(componentId);
             }
+
+            // Report if there are no changes to avoid reprocessing
+            const etag = `W/"${outputFile.contents.byteLength}-${outputFile.hash}-${componentId}"`;
+            if (req.headers['if-none-match'] === etag) {
+              res.statusCode = 304;
+              res.end();
+
+              return;
+            }
+
             // Shim the stylesheet if a component ID is provided
             if (componentId.length > 0) {
               // Validate component ID
@@ -98,6 +108,7 @@ export function createAngularAssetsMiddleware(
 
                     res.setHeader('Content-Type', 'text/css');
                     res.setHeader('Cache-Control', 'no-cache');
+                    res.setHeader('ETag', etag);
                     res.end(encapsulatedData);
                   })
                   .catch((e) => next(e));
@@ -111,11 +122,21 @@ export function createAngularAssetsMiddleware(
           }
         }
 
+        // Avoid resending the content if it has not changed since last request
+        const etag = `W/"${outputFile.contents.byteLength}-${outputFile.hash}"`;
+        if (req.headers['if-none-match'] === etag) {
+          res.statusCode = 304;
+          res.end();
+
+          return;
+        }
+
         const mimeType = lookupMimeType(extension);
         if (mimeType) {
           res.setHeader('Content-Type', mimeType);
         }
         res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('ETag', etag);
         res.end(data);
 
         return;

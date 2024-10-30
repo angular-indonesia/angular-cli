@@ -42,7 +42,7 @@ import type { DevServerBuilderOutput } from './output';
 interface OutputFileRecord {
   contents: Uint8Array;
   size: number;
-  hash?: string;
+  hash: string;
   updated: boolean;
   servable: boolean;
   type: BuildOutputFileType;
@@ -102,7 +102,7 @@ export async function* serveWithVite(
   if (browserOptions.prerender || (browserOptions.outputMode && browserOptions.server)) {
     // Disable prerendering if enabled and force SSR.
     // This is so instead of prerendering all the routes for every change, the page is "prerendered" when it is requested.
-    browserOptions.prerender = false;
+    browserOptions.prerender = undefined;
     browserOptions.ssr ||= true;
   }
 
@@ -540,6 +540,7 @@ function analyzeResultFiles(
         contents: file.contents,
         servable,
         size: file.contents.byteLength,
+        hash: file.hash,
         type: file.type,
         updated: false,
       });

@@ -11,16 +11,11 @@ import {
   ApplicationRef,
   Compiler,
   Injector,
-  createPlatformFactory,
-  platformCore,
   runInInjectionContext,
   ɵwhenStable as whenStable,
   ɵConsole,
 } from '@angular/core';
-import {
-  INITIAL_CONFIG,
-  ɵINTERNAL_SERVER_PLATFORM_PROVIDERS as INTERNAL_SERVER_PLATFORM_PROVIDERS,
-} from '@angular/platform-server';
+import { INITIAL_CONFIG, platformServer } from '@angular/platform-server';
 import { Route, Router, ɵloadChildren as loadChildrenHelper } from '@angular/router';
 import { ServerAssets } from '../assets';
 import { Console } from '../console';
@@ -377,7 +372,7 @@ export async function getRoutesFromAngularRouterConfig(
   const { protocol, host } = url;
 
   // Create and initialize the Angular platform for server-side rendering.
-  const platformRef = createPlatformFactory(platformCore, 'server', [
+  const platformRef = platformServer([
     {
       provide: INITIAL_CONFIG,
       useValue: { document, url: `${protocol}//${host}/` },
@@ -386,8 +381,7 @@ export async function getRoutesFromAngularRouterConfig(
       provide: ɵConsole,
       useFactory: () => new Console(),
     },
-    ...INTERNAL_SERVER_PLATFORM_PROVIDERS,
-  ])();
+  ]);
 
   try {
     let applicationRef: ApplicationRef;
@@ -411,26 +405,26 @@ export async function getRoutesFromAngularRouterConfig(
       injector.get(APP_BASE_HREF, null, { optional: true }) ??
       injector.get(PlatformLocation).getBaseHrefFromDOM();
 
+    const compiler = injector.get(Compiler);
+
+    const serverRoutesConfig = injector.get(SERVER_ROUTES_CONFIG, null, { optional: true });
+    let serverConfigRouteTree: RouteTree<ServerConfigRouteTreeAdditionalMetadata> | undefined;
+
+    if (serverRoutesConfig) {
+      const result = buildServerConfigRouteTree(serverRoutesConfig);
+      serverConfigRouteTree = result.serverConfigRouteTree;
+      errors.push(...result.errors);
+    }
+
+    if (errors.length) {
+      return {
+        baseHref,
+        routes: routesResults,
+        errors,
+      };
+    }
+
     if (router.config.length) {
-      const compiler = injector.get(Compiler);
-
-      const serverRoutesConfig = injector.get(SERVER_ROUTES_CONFIG, null, { optional: true });
-      let serverConfigRouteTree: RouteTree<ServerConfigRouteTreeAdditionalMetadata> | undefined;
-
-      if (serverRoutesConfig) {
-        const result = buildServerConfigRouteTree(serverRoutesConfig);
-        serverConfigRouteTree = result.serverConfigRouteTree;
-        errors.push(...result.errors);
-      }
-
-      if (errors.length) {
-        return {
-          baseHref,
-          routes: routesResults,
-          errors,
-        };
-      }
-
       // Retrieve all routes from the Angular router configuration.
       const traverseRoutes = traverseRoutesConfig({
         routes: router.config,
@@ -478,7 +472,12 @@ export async function getRoutesFromAngularRouterConfig(
         }
       }
     } else {
-      routesResults.push({ route: '', renderMode: RenderMode.Prerender });
+      const renderMode = serverConfigRouteTree?.match('')?.renderMode ?? RenderMode.Prerender;
+
+      routesResults.push({
+        route: '',
+        renderMode,
+      });
     }
 
     return {

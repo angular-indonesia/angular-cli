@@ -18,7 +18,18 @@
     },
     "server": {
       "type": "string",
-      "description": "The full path for the server entry point to the application, relative to the current workspace."
+      "description": "The full path for the server entry point to the application, relative to the current workspace.",
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "The full path for the server entry point to the application, relative to the current workspace."
+        },
+        {
+          "const": false,
+          "type": "boolean",
+          "description": "Indicates that a server entry point is not provided."
+        }
+      ]
     },
     "polyfills": {
       "description": "A list of polyfills to include in the build. Can be a full path for a file, relative to the current workspace or module specifier. Example: 'zone.js'.",
@@ -36,6 +47,33 @@
     "deployUrl": {
       "type": "string",
       "description": "Customize the base path for the URLs of resources in 'index.html' and component stylesheets. This option is only necessary for specific deployment scenarios, such as with Angular Elements or when utilizing different CDN locations."
+    },
+    "security": {
+      "description": "Security features to protect against XSS and other common attacks",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "autoCsp": {
+          "description": "Enables automatic generation of a hash-based Strict Content Security Policy (https://web.dev/articles/strict-csp#choose-hash) based on scripts in index.html. Will default to true once we are out of experimental/preview phases.",
+          "default": false,
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "unsafeEval": {
+                  "type": "boolean",
+                  "description": "Include the `unsafe-eval` directive (https://web.dev/articles/strict-csp#remove-eval) in the auto-CSP. Please only enable this if you are absolutely sure that you need to, as allowing calls to eval will weaken the XSS defenses provided by the auto-CSP.",
+                  "default": false
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        }
+      }
     },
     "scripts": {
       "description": "Global scripts to be included in the build.",
@@ -509,7 +547,6 @@
     },
     "prerender": {
       "description": "Prerender (SSG) pages of your application during build time.",
-      "default": false,
       "oneOf": [
         {
           "type": "boolean",
@@ -559,8 +596,7 @@
     },
     "appShell": {
       "type": "boolean",
-      "description": "Generates an application shell during build time.",
-      "default": false
+      "description": "Generates an application shell during build time."
     },
     "outputMode": {
       "type": "string",

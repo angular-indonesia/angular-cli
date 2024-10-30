@@ -1,0 +1,58 @@
+load("@npm//@bazel/rollup:index.bzl", "rollup_bundle")
+load("//tools:defaults.bzl", "js_library")
+
+package(default_visibility = ["//visibility:public"])
+
+js_library(
+    name = "bundled_beasties_lib",
+    srcs = [
+        "index.d.ts",
+        ":bundled_beasties_files",
+    ],
+    deps = [
+        "@npm//beasties",
+    ],
+)
+
+# Filter out esbuild metadata files and only copy the necessary files
+genrule(
+    name = "bundled_beasties_files",
+    srcs = [
+        ":bundled_beasties",
+    ],
+    outs = [
+        "index.js",
+        "index.js.map",
+        "THIRD_PARTY_LICENSES.txt",
+    ],
+    cmd = """
+        for f in $(locations :bundled_beasties); do
+            # Only process files inside the bundled_beasties directory
+            if [[ "$${f}" == *bundled_beasties ]]; then
+                cp "$${f}/index.js" $(location :index.js)
+                cp "$${f}/index.js.map" $(location :index.js.map)
+                cp "$${f}/THIRD_PARTY_LICENSES.txt" $(location :THIRD_PARTY_LICENSES.txt)
+            fi
+        done
+    """,
+)
+
+rollup_bundle(
+    name = "bundled_beasties",
+    config_file = ":rollup.config.mjs",
+    entry_points = {
+        "@npm//:node_modules/beasties/dist/index.mjs": "index",
+    },
+    format = "esm",
+    link_workspace_root = True,
+    output_dir = True,
+    sourcemap = "true",
+    deps = [
+        "@npm//@rollup/plugin-alias",
+        "@npm//@rollup/plugin-commonjs",
+        "@npm//@rollup/plugin-node-resolve",
+        "@npm//beasties",
+        "@npm//rollup-license-plugin",
+        "@npm//unenv",
+    ],
+)

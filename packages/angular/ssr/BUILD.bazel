@@ -19,7 +19,8 @@ ts_library(
     module_name = "@angular/ssr",
     tsconfig = "//:tsconfig-build-ng",
     deps = [
-        "//packages/angular/ssr/third_party/critters:bundled_critters_lib",
+        "//packages/angular/ssr/third_party/beasties:bundled_beasties_lib",
+        "//packages/angular/ssr/tokens",
         "@npm//@angular/common",
         "@npm//@angular/core",
         "@npm//@angular/platform-server",
@@ -33,12 +34,13 @@ ng_package(
     package_name = "@angular/ssr",
     srcs = [
         ":package.json",
-        "//packages/angular/ssr/third_party/critters:bundled_critters_lib",
+        "//packages/angular/ssr/third_party/beasties:bundled_beasties_lib",
     ],
     externals = [
         "@angular/ssr",
         "@angular/ssr/node",
-        "../../third_party/critters",
+        "@angular/ssr/tokens",
+        "../../third_party/beasties",
     ],
     nested_packages = [
         "//packages/angular/ssr/schematics:npm_package",
@@ -47,6 +49,7 @@ ng_package(
     deps = [
         ":ssr",
         "//packages/angular/ssr/node",
+        "//packages/angular/ssr/tokens",
     ],
 )
 
