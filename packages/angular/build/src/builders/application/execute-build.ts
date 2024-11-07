@@ -7,10 +7,13 @@
  */
 
 import { BuilderContext } from '@angular-devkit/architect';
-import assert from 'node:assert';
 import { SourceFileCache } from '../../tools/esbuild/angular/source-file-cache';
 import { generateBudgetStats } from '../../tools/esbuild/budget-stats';
-import { BuildOutputFileType, BundlerContext } from '../../tools/esbuild/bundler-context';
+import {
+  BuildOutputFileType,
+  BundleContextResult,
+  BundlerContext,
+} from '../../tools/esbuild/bundler-context';
 import { ExecutionResult, RebuildState } from '../../tools/esbuild/bundler-execution-result';
 import { checkCommonJSModules } from '../../tools/esbuild/commonjs-checker';
 import { extractLicenses } from '../../tools/esbuild/license-extractor';
@@ -32,7 +35,6 @@ import { optimizeChunks } from './chunk-optimizer';
 import { executePostBundleSteps } from './execute-post-bundle';
 import { inlineI18n, loadActiveTranslations } from './i18n';
 import { NormalizedApplicationBuildOptions } from './options';
-import { OutputMode } from './schema';
 import { createComponentStyleBundler, setupBundlerContexts } from './setup-bundling';
 
 // eslint-disable-next-line max-lines-per-function
@@ -47,7 +49,6 @@ export async function executeBuild(
     i18nOptions,
     optimizationOptions,
     assets,
-    outputMode,
     cacheOptions,
     serverEntryPoint,
     baseHref,
@@ -70,21 +71,62 @@ export async function executeBuild(
   let bundlerContexts;
   let componentStyleBundler;
   let codeBundleCache;
+  let bundlingResult: BundleContextResult;
+  let templateUpdates: Map<string, string> | undefined;
   if (rebuildState) {
     bundlerContexts = rebuildState.rebuildContexts;
     componentStyleBundler = rebuildState.componentStyleBundler;
     codeBundleCache = rebuildState.codeBundleCache;
+    templateUpdates = rebuildState.templateUpdates;
+    // Reset template updates for new rebuild
+    templateUpdates?.clear();
+
+    const allFileChanges = rebuildState.fileChanges.all;
+
+    // Bundle all contexts that do not require TypeScript changed file checks.
+    // These will automatically use cached results based on the changed files.
+    bundlingResult = await BundlerContext.bundleAll(bundlerContexts.otherContexts, allFileChanges);
+
+    // Check the TypeScript code bundling cache for changes. If invalid, force a rebundle of
+    // all TypeScript related contexts.
+    const forceTypeScriptRebuild = codeBundleCache?.invalidate(allFileChanges);
+    const typescriptResults: BundleContextResult[] = [];
+    for (const typescriptContext of bundlerContexts.typescriptContexts) {
+      typescriptContext.invalidate(allFileChanges);
+      const result = await typescriptContext.bundle(forceTypeScriptRebuild);
+      typescriptResults.push(result);
+    }
+    bundlingResult = BundlerContext.mergeResults([bundlingResult, ...typescriptResults]);
   } else {
     const target = transformSupportedBrowsersToTargets(browsers);
     codeBundleCache = new SourceFileCache(cacheOptions.enabled ? cacheOptions.path : undefined);
     componentStyleBundler = createComponentStyleBundler(options, target);
-    bundlerContexts = setupBundlerContexts(options, target, codeBundleCache, componentStyleBundler);
+    if (options.templateUpdates) {
+      templateUpdates = new Map<string, string>();
+    }
+    bundlerContexts = setupBundlerContexts(
+      options,
+      target,
+      codeBundleCache,
+      componentStyleBundler,
+      templateUpdates,
+    );
+
+    // Bundle everything on initial build
+    bundlingResult = await BundlerContext.bundleAll([
+      ...bundlerContexts.typescriptContexts,
+      ...bundlerContexts.otherContexts,
+    ]);
   }
 
-  let bundlingResult = await BundlerContext.bundleAll(
-    bundlerContexts,
-    rebuildState?.fileChanges.all,
-  );
+  // Update any external component styles if enabled and rebuilding.
+  // TODO: Only attempt rebundling of invalidated styles once incremental build results are supported.
+  if (rebuildState && options.externalRuntimeStyles) {
+    componentStyleBundler.invalidate(rebuildState.fileChanges.all);
+
+    const componentResults = await componentStyleBundler.bundleAllFiles(true, true);
+    bundlingResult = BundlerContext.mergeResults([bundlingResult, ...componentResults]);
+  }
 
   if (options.optimizationOptions.scripts && shouldOptimizeChunks) {
     bundlingResult = await profileAsync('OPTIMIZE_CHUNKS', () =>
@@ -99,8 +141,14 @@ export async function executeBuild(
     bundlerContexts,
     componentStyleBundler,
     codeBundleCache,
+    templateUpdates,
   );
   executionResult.addWarnings(bundlingResult.warnings);
+
+  // Add used external component style referenced files to be watched
+  if (options.externalRuntimeStyles) {
+    executionResult.extraWatchFiles.push(...componentStyleBundler.collectReferencedFiles());
+  }
 
   // Return if the bundling has errors
   if (bundlingResult.errors) {
@@ -187,7 +235,7 @@ export async function executeBuild(
   if (serverEntryPoint) {
     executionResult.addOutputFile(
       SERVER_APP_ENGINE_MANIFEST_FILENAME,
-      generateAngularServerAppEngineManifest(i18nOptions, baseHref, undefined),
+      generateAngularServerAppEngineManifest(i18nOptions, baseHref),
       BuildOutputFileType.ServerRoot,
     );
   }
@@ -220,26 +268,11 @@ export async function executeBuild(
     executionResult.assetFiles.push(...result.additionalAssets);
   }
 
-  if (serverEntryPoint) {
-    const prerenderedRoutes = executionResult.prerenderedRoutes;
-
-    // Regenerate the manifest to append prerendered routes data. This is only needed if SSR is enabled.
-    if (outputMode === OutputMode.Server && Object.keys(prerenderedRoutes).length) {
-      const manifest = executionResult.outputFiles.find(
-        (f) => f.path === SERVER_APP_ENGINE_MANIFEST_FILENAME,
-      );
-      assert(manifest, `${SERVER_APP_ENGINE_MANIFEST_FILENAME} was not found in output files.`);
-      manifest.contents = new TextEncoder().encode(
-        generateAngularServerAppEngineManifest(i18nOptions, baseHref, prerenderedRoutes),
-      );
-    }
-
-    executionResult.addOutputFile(
-      'prerendered-routes.json',
-      JSON.stringify({ routes: prerenderedRoutes }, null, 2),
-      BuildOutputFileType.Root,
-    );
-  }
+  executionResult.addOutputFile(
+    'prerendered-routes.json',
+    JSON.stringify({ routes: executionResult.prerenderedRoutes }, null, 2),
+    BuildOutputFileType.Root,
+  );
 
   // Write metafile if stats option is enabled
   if (options.stats) {

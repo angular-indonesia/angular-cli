@@ -6,23 +6,32 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import type { AngularServerApp } from './app';
+import type { AngularServerApp, getOrCreateAngularServerApp } from './app';
 import { Hooks } from './hooks';
 import { getPotentialLocaleIdFromUrl } from './i18n';
 import { EntryPointExports, getAngularAppEngineManifest } from './manifest';
-import { stripIndexHtmlFromURL, stripTrailingSlash } from './utils/url';
 
 /**
  * Angular server application engine.
  * Manages Angular server applications (including localized ones), handles rendering requests,
  * and optionally transforms index HTML before rendering.
  *
- * @note This class should be instantiated once and used as a singleton across the server-side
+ * @remarks This class should be instantiated once and used as a singleton across the server-side
  * application to ensure consistent handling of rendering requests and resource management.
  *
  * @developerPreview
  */
 export class AngularAppEngine {
+  /**
+   * A flag to enable or disable the rendering of prerendered routes.
+   *
+   * Typically used during development to avoid prerendering all routes ahead of time,
+   * allowing them to be rendered on the fly as requested.
+   *
+   * @private
+   */
+  static ɵallowStaticRouteRender = false;
+
   /**
    * Hooks for extending or modifying the behavior of the server application.
    * These hooks are used by the Angular CLI when running the development server and
@@ -31,16 +40,6 @@ export class AngularAppEngine {
    * @private
    */
   static ɵhooks = /* #__PURE__*/ new Hooks();
-
-  /**
-   * Provides access to the hooks for extending or modifying the server application's behavior.
-   * This allows attaching custom functionality to various server application lifecycle events.
-   *
-   * @internal
-   */
-  get hooks(): Hooks {
-    return AngularAppEngine.ɵhooks;
-  }
 
   /**
    * The manifest for the server application.
@@ -53,21 +52,34 @@ export class AngularAppEngine {
   private readonly entryPointsCache = new Map<string, Promise<EntryPointExports>>();
 
   /**
-   * Renders a response for the given HTTP request using the server application.
+   * Handles an incoming HTTP request by serving prerendered content, performing server-side rendering,
+   * or delivering a static file for client-side rendered routes based on the `RenderMode` setting.
    *
-   * This method processes the request, determines the appropriate route and rendering context,
-   * and returns an HTTP response.
+   * @param request - The HTTP request to handle.
+   * @param requestContext - Optional context for rendering, such as metadata associated with the request.
+   * @returns A promise that resolves to the resulting HTTP response object, or `null` if no matching Angular route is found.
    *
-   * If the request URL appears to be for a file (excluding `/index.html`), the method returns `null`.
-   * A request to `https://www.example.com/page/index.html` will render the Angular route
+   * @remarks A request to `https://www.example.com/page/index.html` will serve or render the Angular route
    * corresponding to `https://www.example.com/page`.
-   *
-   * @param request - The incoming HTTP request object to be rendered.
-   * @param requestContext - Optional additional context for the request, such as metadata.
-   * @returns A promise that resolves to a Response object, or `null` if the request URL represents a file (e.g., `./logo.png`)
-   * rather than an application route.
    */
-  async render(request: Request, requestContext?: unknown): Promise<Response | null> {
+  async handle(request: Request, requestContext?: unknown): Promise<Response | null> {
+    const serverApp = await this.getAngularServerAppForRequest(request);
+
+    return serverApp ? serverApp.handle(request, requestContext) : null;
+  }
+
+  /**
+   * Retrieves the Angular server application instance for a given request.
+   *
+   * This method checks if the request URL corresponds to an Angular application entry point.
+   * If so, it initializes or retrieves an instance of the Angular server application for that entry point.
+   * Requests that resemble file requests (except for `/index.html`) are skipped.
+   *
+   * @param request - The incoming HTTP request object.
+   * @returns A promise that resolves to an `AngularServerApp` instance if a valid entry point is found,
+   * or `null` if no entry point matches the request URL.
+   */
+  private async getAngularServerAppForRequest(request: Request): Promise<AngularServerApp | null> {
     // Skip if the request looks like a file but not `/index.html`.
     const url = new URL(request.url);
     const entryPoint = await this.getEntryPointExportsForUrl(url);
@@ -75,33 +87,17 @@ export class AngularAppEngine {
       return null;
     }
 
-    const { ɵgetOrCreateAngularServerApp: getOrCreateAngularServerApp } = entryPoint;
     // Note: Using `instanceof` is not feasible here because `AngularServerApp` will
     // be located in separate bundles, making `instanceof` checks unreliable.
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-    const serverApp = getOrCreateAngularServerApp() as AngularServerApp;
-    serverApp.hooks = this.hooks;
+    const ɵgetOrCreateAngularServerApp =
+      entryPoint.ɵgetOrCreateAngularServerApp as typeof getOrCreateAngularServerApp;
 
-    return serverApp.render(request, requestContext);
-  }
+    const serverApp = ɵgetOrCreateAngularServerApp({
+      allowStaticRouteRender: AngularAppEngine.ɵallowStaticRouteRender,
+      hooks: AngularAppEngine.ɵhooks,
+    });
 
-  /**
-   * Retrieves HTTP headers for a request associated with statically generated (SSG) pages,
-   * based on the URL pathname.
-   *
-   * @param request - The incoming request object.
-   * @returns A `Map` containing the HTTP headers as key-value pairs.
-   * @note This function should be used exclusively for retrieving headers of SSG pages.
-   */
-  getPrerenderHeaders(request: Request): ReadonlyMap<string, string> {
-    if (this.manifest.staticPathsHeaders.size === 0) {
-      return new Map();
-    }
-
-    const { pathname } = stripIndexHtmlFromURL(new URL(request.url));
-    const headers = this.manifest.staticPathsHeaders.get(stripTrailingSlash(pathname));
-
-    return new Map(headers);
+    return serverApp;
   }
 
   /**

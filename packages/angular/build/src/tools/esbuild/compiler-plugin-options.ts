@@ -8,14 +8,16 @@
 
 import { NormalizedApplicationBuildOptions } from '../../builders/application/options';
 import type { createCompilerPlugin } from './angular/compiler-plugin';
-import { ComponentStylesheetBundler } from './angular/component-stylesheets';
 import type { SourceFileCache } from './angular/source-file-cache';
+import type { LoadResultCache } from './load-result-cache';
 
 type CreateCompilerPluginParameters = Parameters<typeof createCompilerPlugin>;
 
 export function createCompilerPluginOptions(
   options: NormalizedApplicationBuildOptions,
-  sourceFileCache?: SourceFileCache,
+  sourceFileCache: SourceFileCache,
+  loadResultCache?: LoadResultCache,
+  templateUpdates?: Map<string, string>,
 ): CreateCompilerPluginParameters[0] {
   const {
     sourcemapOptions,
@@ -36,9 +38,10 @@ export function createCompilerPluginOptions(
     advancedOptimizations,
     fileReplacements,
     sourceFileCache,
-    loadResultCache: sourceFileCache?.loadResultCache,
+    loadResultCache,
     incremental,
     externalRuntimeStyles,
     instrumentForCoverage,
+    templateUpdates,
   };
 }

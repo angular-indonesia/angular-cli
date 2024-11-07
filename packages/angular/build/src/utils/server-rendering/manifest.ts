@@ -6,14 +6,13 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
+import { extname } from 'node:path';
 import {
-  INDEX_HTML_CSR,
-  INDEX_HTML_SERVER,
   NormalizedApplicationBuildOptions,
   getLocaleBaseHref,
 } from '../../builders/application/options';
-import type { BuildOutputFile } from '../../tools/esbuild/bundler-context';
-import type { PrerenderedRoutesRecord } from '../../tools/esbuild/bundler-execution-result';
+import { type BuildOutputFile, BuildOutputFileType } from '../../tools/esbuild/bundler-context';
+import { createOutputFile } from '../../tools/esbuild/utils';
 
 export const SERVER_APP_MANIFEST_FILENAME = 'angular-app-manifest.mjs';
 export const SERVER_APP_ENGINE_MANIFEST_FILENAME = 'angular-app-engine-manifest.mjs';
@@ -51,13 +50,10 @@ function escapeUnsafeChars(str: string): string {
  * includes settings for inlining locales and determining the output structure.
  * @param baseHref - The base HREF for the application. This is used to set the base URL
  * for all relative URLs in the application.
- * @param perenderedRoutes - A record mapping static paths to their associated data.
- * @returns A string representing the content of the SSR server manifest for App Engine.
  */
 export function generateAngularServerAppEngineManifest(
   i18nOptions: NormalizedApplicationBuildOptions['i18nOptions'],
   baseHref: string | undefined,
-  perenderedRoutes: PrerenderedRoutesRecord | undefined = {},
 ): string {
   const entryPointsContent: string[] = [];
 
@@ -79,25 +75,10 @@ export function generateAngularServerAppEngineManifest(
     entryPointsContent.push(`['', () => import('./${MAIN_SERVER_OUTPUT_FILENAME}')]`);
   }
 
-  const staticHeaders: string[] = [];
-  for (const [path, { headers }] of Object.entries(perenderedRoutes)) {
-    if (!headers) {
-      continue;
-    }
-
-    const headersValues: string[] = [];
-    for (const [name, value] of Object.entries(headers)) {
-      headersValues.push(`['${name}', '${encodeURIComponent(value)}']`);
-    }
-
-    staticHeaders.push(`['${path}', [${headersValues.join(', ')}]]`);
-  }
-
   const manifestContent = `
 export default {
   basePath: '${baseHref ?? '/'}',
   entryPoints: new Map([${entryPointsContent.join(', \n')}]),
-  staticPathsHeaders: new Map([${staticHeaders.join(', \n')}]),
 };
   `;
 
@@ -123,8 +104,9 @@ export default {
  * @param locale - An optional string representing the locale or language code to be used for
  * the application, helping with localization and rendering content specific to the locale.
  *
- * @returns A string representing the content of the SSR server manifest for the Node.js
- * environment.
+ * @returns An object containing:
+ * - `manifestContent`: A string of the SSR manifest content.
+ * - `serverAssetsChunks`: An array of build output files containing the generated assets for the server.
  */
 export function generateAngularServerAppManifest(
   additionalHtmlOutputFiles: Map<string, BuildOutputFile>,
@@ -132,15 +114,30 @@ export function generateAngularServerAppManifest(
   inlineCriticalCss: boolean,
   routes: readonly unknown[] | undefined,
   locale: string | undefined,
-): string {
+): {
+  manifestContent: string;
+  serverAssetsChunks: BuildOutputFile[];
+} {
+  const serverAssetsChunks: BuildOutputFile[] = [];
   const serverAssetsContent: string[] = [];
   for (const file of [...additionalHtmlOutputFiles.values(), ...outputFiles]) {
-    if (
-      file.path === INDEX_HTML_SERVER ||
-      file.path === INDEX_HTML_CSR ||
-      (inlineCriticalCss && file.path.endsWith('.css'))
-    ) {
-      serverAssetsContent.push(`['${file.path}', async () => \`${escapeUnsafeChars(file.text)}\`]`);
+    const extension = extname(file.path);
+    if (extension === '.html' || (inlineCriticalCss && extension === '.css')) {
+      const jsChunkFilePath = `assets-chunks/${file.path.replace(/[./]/g, '_')}.mjs`;
+      const escapedContent = escapeUnsafeChars(file.text);
+
+      serverAssetsChunks.push(
+        createOutputFile(
+          jsChunkFilePath,
+          `export default \`${escapedContent}\`;`,
+          BuildOutputFileType.ServerApplication,
+        ),
+      );
+
+      const contentLength = Buffer.byteLength(escapedContent);
+      serverAssetsContent.push(
+        `['${file.path}', {size: ${contentLength}, hash: '${file.hash}', text: () => import('./${jsChunkFilePath}').then(m => m.default)}]`,
+      );
     }
   }
 
@@ -149,10 +146,10 @@ export default {
   bootstrap: () => import('./main.server.mjs').then(m => m.default),
   inlineCriticalCss: ${inlineCriticalCss},
   routes: ${JSON.stringify(routes, undefined, 2)},
-  assets: new Map([${serverAssetsContent.join(', \n')}]),
+  assets: new Map([\n${serverAssetsContent.join(', \n')}\n]),
   locale: ${locale !== undefined ? `'${locale}'` : undefined},
 };
 `;
 
-  return manifestContent;
+  return { manifestContent, serverAssetsChunks };
 }

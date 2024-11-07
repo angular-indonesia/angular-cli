@@ -9,11 +9,17 @@
 export * from './private_export';
 
 export { AngularAppEngine } from './src/app-engine';
-export { createRequestHandler } from './src/handler';
+export { createRequestHandler, type RequestHandlerFunction } from './src/handler';
 
 export {
   type PrerenderFallback,
   type ServerRoute,
   provideServerRoutesConfig,
   RenderMode,
+  type ServerRouteAppShell,
+  type ServerRouteClient,
+  type ServerRoutePrerender,
+  type ServerRoutePrerenderWithParams,
+  type ServerRouteServer,
+  type ServerRouteCommon,
 } from './src/routes/route-config';

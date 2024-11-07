@@ -14,6 +14,7 @@ import { readFile } from 'node:fs/promises';
 import { builtinModules, isBuiltin } from 'node:module';
 import { join } from 'node:path';
 import type { Connect, DepOptimizationConfig, InlineConfig, ViteDevServer } from 'vite';
+import type { ComponentStyleRecord } from '../../tools/vite/middlewares';
 import {
   ServerSsrMode,
   createAngularLocaleDataPlugin,
@@ -23,7 +24,7 @@ import {
   createRemoveIdPrefixPlugin,
 } from '../../tools/vite/plugins';
 import { loadProxyConfiguration, normalizeSourceMaps } from '../../utils';
-import { useComponentStyleHmr } from '../../utils/environment-options';
+import { useComponentStyleHmr, useComponentTemplateHmr } from '../../utils/environment-options';
 import { loadEsmModule } from '../../utils/load-esm';
 import { Result, ResultFile, ResultKind } from '../application/results';
 import {
@@ -137,12 +138,16 @@ export async function* serveWithVite(
     process.setSourceMapsEnabled(true);
   }
 
-  // Enable to support component style hot reloading (`NG_HMR_CSTYLES=0` can be used to disable)
-  browserOptions.externalRuntimeStyles = !!serverOptions.liveReload && useComponentStyleHmr;
-  if (browserOptions.externalRuntimeStyles) {
-    // Preload the @angular/compiler package to avoid first stylesheet request delays.
-    // Once @angular/build is native ESM, this should be re-evaluated.
-    void loadEsmModule('@angular/compiler');
+  // Enable to support component style hot reloading (`NG_HMR_CSTYLES=0` can be used to disable selectively)
+  browserOptions.externalRuntimeStyles =
+    serverOptions.liveReload && serverOptions.hmr && useComponentStyleHmr;
+
+  // Enable to support component template hot replacement (`NG_HMR_TEMPLATE=1` can be used to enable)
+  browserOptions.templateUpdates = !!serverOptions.liveReload && useComponentTemplateHmr;
+  if (browserOptions.templateUpdates) {
+    context.logger.warn(
+      'Experimental support for component template hot replacement has been enabled via the "NG_HMR_TEMPLATE" environment variable.',
+    );
   }
 
   // Setup the prebundling transformer that will be shared across Vite prebundling requests
@@ -171,7 +176,7 @@ export async function* serveWithVite(
     explicitBrowser: [],
     explicitServer: [],
   };
-  const usedComponentStyles = new Map<string, Set<string>>();
+  const componentStyles = new Map<string, ComponentStyleRecord>();
   const templateUpdates = new Map<string, string>();
 
   // Add cleanup logic via a builder teardown.
@@ -184,20 +189,31 @@ export async function* serveWithVite(
 
   // TODO: Switch this to an architect schedule call when infrastructure settings are supported
   for await (const result of builderAction(browserOptions, context, extensions?.buildPlugins)) {
+    if (result.kind === ResultKind.Failure) {
+      if (result.errors.length && server) {
+        hadError = true;
+        server.ws.send({
+          type: 'error',
+          err: {
+            message: result.errors[0].text,
+            stack: '',
+            loc: result.errors[0].location ?? undefined,
+          },
+        });
+      }
+      continue;
+    }
+    // Clear existing error overlay on successful result
+    if (hadError && server) {
+      hadError = false;
+      // Send an empty update to clear the error overlay
+      server.ws.send({
+        'type': 'update',
+        updates: [],
+      });
+    }
+
     switch (result.kind) {
-      case ResultKind.Failure:
-        if (result.errors.length && server) {
-          hadError = true;
-          server.ws.send({
-            type: 'error',
-            err: {
-              message: result.errors[0].text,
-              stack: '',
-              loc: result.errors[0].location ?? undefined,
-            },
-          });
-        }
-        continue;
       case ResultKind.Full:
         if (result.detail?.['htmlIndexPath']) {
           htmlIndexPath = result.detail['htmlIndexPath'] as string;
@@ -217,11 +233,17 @@ export async function* serveWithVite(
             assetFiles.set('/' + normalizePath(outputPath), normalizePath(file.inputPath));
           }
         }
-        // Clear stale template updates on a code rebuilds
+        // Clear stale template updates on code rebuilds
         templateUpdates.clear();
 
         // Analyze result files for changes
-        analyzeResultFiles(normalizePath, htmlIndexPath, result.files, generatedFiles);
+        analyzeResultFiles(
+          normalizePath,
+          htmlIndexPath,
+          result.files,
+          generatedFiles,
+          componentStyles,
+        );
         break;
       case ResultKind.Incremental:
         assert(server, 'Builder must provide an initial full build before incremental results.');
@@ -248,16 +270,6 @@ export async function* serveWithVite(
       default:
         context.logger.warn(`Unknown result kind [${(result as Result).kind}] provided by build.`);
         continue;
-    }
-
-    // Clear existing error overlay on successful result
-    if (hadError && server) {
-      hadError = false;
-      // Send an empty update to clear the error overlay
-      server.ws.send({
-        'type': 'update',
-        updates: [],
-      });
     }
 
     // To avoid disconnecting the array objects from the option, these arrays need to be mutated instead of replaced.
@@ -316,7 +328,7 @@ export async function* serveWithVite(
           server,
           serverOptions,
           context.logger,
-          usedComponentStyles,
+          componentStyles,
         );
       }
     } else {
@@ -375,7 +387,7 @@ export async function* serveWithVite(
         prebundleTransformer,
         target,
         isZonelessApp(polyfills),
-        usedComponentStyles,
+        componentStyles,
         templateUpdates,
         browserOptions.loader as EsbuildLoaderOption | undefined,
         extensions?.middleware,
@@ -401,6 +413,7 @@ export async function* serveWithVite(
             key: 'r',
             description: 'force reload browser',
             action(server) {
+              componentStyles.forEach((record) => record.used?.clear());
               server.ws.send({
                 type: 'full-reload',
                 path: '*',
@@ -428,7 +441,7 @@ async function handleUpdate(
   server: ViteDevServer,
   serverOptions: NormalizedDevServerOptions,
   logger: BuilderContext['logger'],
-  usedComponentStyles: Map<string, Set<string>>,
+  componentStyles: Map<string, ComponentStyleRecord>,
 ): Promise<void> {
   const updatedFiles: string[] = [];
   let destroyAngularServerAppCalled = false;
@@ -462,44 +475,61 @@ async function handleUpdate(
     return;
   }
 
-  if (serverOptions.liveReload || serverOptions.hmr) {
+  if (serverOptions.hmr) {
     if (updatedFiles.every((f) => f.endsWith('.css'))) {
+      let requiresReload = false;
       const timestamp = Date.now();
-      server.ws.send({
-        type: 'update',
-        updates: updatedFiles.flatMap((filePath) => {
-          // For component styles, an HMR update must be sent for each one with the corresponding
-          // component identifier search parameter (`ngcomp`). The Vite client code will not keep
-          // the existing search parameters when it performs an update and each one must be
-          // specified explicitly. Typically, there is only one each though as specific style files
-          // are not typically reused across components.
-          const componentIds = usedComponentStyles.get(filePath);
-          if (componentIds) {
-            return Array.from(componentIds).map((id) => ({
-              type: 'css-update',
-              timestamp,
-              path: `${filePath}?ngcomp` + (id ? `=${id}` : ''),
-              acceptedPath: filePath,
-            }));
+      const updates = updatedFiles.flatMap((filePath) => {
+        // For component styles, an HMR update must be sent for each one with the corresponding
+        // component identifier search parameter (`ngcomp`). The Vite client code will not keep
+        // the existing search parameters when it performs an update and each one must be
+        // specified explicitly. Typically, there is only one each though as specific style files
+        // are not typically reused across components.
+        const record = componentStyles.get(filePath);
+        if (record) {
+          if (record.reload) {
+            // Shadow DOM components currently require a full reload.
+            // Vite's CSS hot replacement does not support shadow root searching.
+            requiresReload = true;
+
+            return [];
           }
 
-          return {
-            type: 'css-update' as const,
-            timestamp,
-            path: filePath,
-            acceptedPath: filePath,
-          };
-        }),
+          return Array.from(record.used ?? []).map((id) => {
+            return {
+              type: 'css-update' as const,
+              timestamp,
+              path: `${filePath}?ngcomp` + (typeof id === 'string' ? `=${id}` : ''),
+              acceptedPath: filePath,
+            };
+          });
+        }
+
+        return {
+          type: 'css-update' as const,
+          timestamp,
+          path: filePath,
+          acceptedPath: filePath,
+        };
       });
 
-      logger.info('HMR update sent to client(s).');
+      if (!requiresReload) {
+        server.ws.send({
+          type: 'update',
+          updates,
+        });
+        logger.info('HMR update sent to client(s).');
 
-      return;
+        return;
+      }
     }
   }
 
   // Send reload command to clients
   if (serverOptions.liveReload) {
+    // Clear used component tracking on full reload
+    componentStyles.forEach((record) => record.used?.clear());
+
     server.ws.send({
       type: 'full-reload',
       path: '*',
@@ -514,6 +544,7 @@ function analyzeResultFiles(
   htmlIndexPath: string,
   resultFiles: Record<string, ResultFile>,
   generatedFiles: Map<string, OutputFileRecord>,
+  componentStyles: Map<string, ComponentStyleRecord>,
 ) {
   const seen = new Set<string>(['/index.html']);
   for (const [outputPath, file] of Object.entries(resultFiles)) {
@@ -568,12 +599,25 @@ function analyzeResultFiles(
       type: file.type,
       servable,
     });
+
+    // Record any external component styles
+    if (filePath.endsWith('.css') && /^\/[a-f0-9]{64}\.css$/.test(filePath)) {
+      const componentStyle = componentStyles.get(filePath);
+      if (componentStyle) {
+        componentStyle.rawContent = file.contents;
+      } else {
+        componentStyles.set(filePath, {
+          rawContent: file.contents,
+        });
+      }
+    }
   }
 
   // Clear stale output files
   for (const file of generatedFiles.keys()) {
     if (!seen.has(file)) {
       generatedFiles.delete(file);
+      componentStyles.delete(file);
     }
   }
 }
@@ -588,7 +632,7 @@ export async function setupServer(
   prebundleTransformer: JavaScriptTransformer,
   target: string[],
   zoneless: boolean,
-  usedComponentStyles: Map<string, Set<string>>,
+  componentStyles: Map<string, ComponentStyleRecord>,
   templateUpdates: Map<string, string>,
   prebundleLoaderExtensions: EsbuildLoaderOption | undefined,
   extensionMiddleware?: Connect.NextHandleFunction[],
@@ -646,6 +690,8 @@ export async function setupServer(
       host: serverOptions.host,
       open: serverOptions.open,
       headers: serverOptions.headers,
+      // Disable the websocket if live reload is disabled (false/undefined are the only valid values)
+      ws: serverOptions.liveReload === false && serverOptions.hmr === false ? false : undefined,
       proxy,
       cors: {
         // Allow preflight requests to be proxied.
@@ -696,7 +742,7 @@ export async function setupServer(
         assets,
         indexHtmlTransformer,
         extensionMiddleware,
-        usedComponentStyles,
+        componentStyles,
         templateUpdates,
         ssrMode,
       }),
@@ -706,6 +752,7 @@ export async function setupServer(
         virtualProjectRoot,
         outputFiles,
         external: externalMetadata.explicitBrowser,
+        skipViteClient: serverOptions.liveReload === false && serverOptions.hmr === false,
       }),
     ],
     // Browser only optimizeDeps. (This does not run for SSR dependencies).
@@ -801,6 +848,9 @@ function getDepOptimizationConfig({
       supported: getFeatureSupport(target, zoneless),
       plugins,
       loader,
+      define: {
+        'ngServerMode': `${ssr}`,
+      },
       resolveExtensions: ['.mjs', '.js', '.cjs'],
     },
   };

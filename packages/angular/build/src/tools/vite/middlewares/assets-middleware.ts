@@ -9,14 +9,20 @@
 import { lookup as lookupMimeType } from 'mrmime';
 import { extname } from 'node:path';
 import type { Connect, ViteDevServer } from 'vite';
-import { loadEsmModule } from '../../../utils/load-esm';
 import { AngularMemoryOutputFiles, pathnameWithoutBasePath } from '../utils';
+
+export interface ComponentStyleRecord {
+  rawContent: Uint8Array;
+  used?: Set<string>;
+  reload?: boolean;
+}
 
 export function createAngularAssetsMiddleware(
   server: ViteDevServer,
   assets: Map<string, string>,
   outputFiles: AngularMemoryOutputFiles,
-  usedComponentStyles: Map<string, Set<string>>,
+  componentStyles: Map<string, ComponentStyleRecord>,
+  encapsulateStyle: (style: Uint8Array, componentId: string) => string,
 ): Connect.NextHandleFunction {
   return function angularAssetsMiddleware(req, res, next) {
     if (req.url === undefined || res.writableEnded) {
@@ -73,17 +79,25 @@ export function createAngularAssetsMiddleware(
     if (extension !== '.js' && extension !== '.html') {
       const outputFile = outputFiles.get(pathname);
       if (outputFile?.servable) {
-        const data = outputFile.contents;
-        if (extension === '.css') {
+        let data: Uint8Array | string = outputFile.contents;
+        const componentStyle = componentStyles.get(pathname);
+        if (componentStyle) {
           // Inject component ID for view encapsulation if requested
-          const componentId = new URL(req.url, 'http://localhost').searchParams.get('ngcomp');
+          const searchParams = new URL(req.url, 'http://localhost').searchParams;
+          const componentId = searchParams.get('ngcomp');
           if (componentId !== null) {
+            // Track if the component uses ShadowDOM encapsulation (3 = ViewEncapsulation.ShadowDom)
+            // Shadow DOM components currently require a full reload.
+            // Vite's CSS hot replacement does not support shadow root searching.
+            if (searchParams.get('e') === '3') {
+              componentStyle.reload = true;
+            }
+
             // Record the component style usage for HMR updates
-            const usedIds = usedComponentStyles.get(pathname);
-            if (usedIds === undefined) {
-              usedComponentStyles.set(pathname, new Set([componentId]));
+            if (componentStyle.used === undefined) {
+              componentStyle.used = new Set([componentId]);
             } else {
-              usedIds.add(componentId);
+              componentStyle.used.add(componentId);
             }
 
             // Report if there are no changes to avoid reprocessing
@@ -98,27 +112,25 @@ export function createAngularAssetsMiddleware(
             // Shim the stylesheet if a component ID is provided
             if (componentId.length > 0) {
               // Validate component ID
-              if (/^[_.\-\p{Letter}\d]+-c\d+$/u.test(componentId)) {
-                loadEsmModule<typeof import('@angular/compiler')>('@angular/compiler')
-                  .then((compilerModule) => {
-                    const encapsulatedData = compilerModule.encapsulateStyle(
-                      new TextDecoder().decode(data),
-                      componentId,
-                    );
-
-                    res.setHeader('Content-Type', 'text/css');
-                    res.setHeader('Cache-Control', 'no-cache');
-                    res.setHeader('ETag', etag);
-                    res.end(encapsulatedData);
-                  })
-                  .catch((e) => next(e));
+              if (!/^[_.\-\p{Letter}\d]+-c\d+$/u.test(componentId)) {
+                const message = 'Invalid component stylesheet ID request: ' + componentId;
+                // eslint-disable-next-line no-console
+                console.error(message);
+                res.statusCode = 400;
+                res.end(message);
 
                 return;
-              } else {
-                // eslint-disable-next-line no-console
-                console.error('Invalid component stylesheet ID request: ' + componentId);
               }
+
+              data = encapsulateStyle(data, componentId);
             }
+
+            res.setHeader('Content-Type', 'text/css');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('ETag', etag);
+            res.end(data);
+
+            return;
           }
         }
 

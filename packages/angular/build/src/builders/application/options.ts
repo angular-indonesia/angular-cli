@@ -64,8 +64,10 @@ interface InternalOptions {
    * If given a relative path, it is resolved relative to the current workspace and will generate an output at the same relative location
    * in the output directory. If given an absolute path, the output will be generated in the root of the output directory with the same base
    * name.
+   *
+   * If provided a Map, the key is the name of the output bundle and the value is the entry point file.
    */
-  entryPoints?: Set<string>;
+  entryPoints?: Set<string> | Map<string, string>;
 
   /** File extension to use for the generated output files. */
   outExtension?: 'js' | 'mjs';
@@ -97,6 +99,13 @@ interface InternalOptions {
    * styles.
    */
   externalRuntimeStyles?: boolean;
+
+  /**
+   * Enables the AOT compiler to generate template component update functions.
+   * This option is only intended to be used with a development server that can process and serve component
+   * template updates.
+   */
+  templateUpdates?: boolean;
 
   /**
    * Enables instrumentation to collect code coverage data for specific files.
@@ -463,6 +472,7 @@ export async function normalizeOptions(
     externalRuntimeStyles,
     instrumentForCoverage,
     security,
+    templateUpdates: !!options.templateUpdates,
   };
 }
 
@@ -511,7 +521,7 @@ async function getTailwindConfig(
 function normalizeEntryPoints(
   workspaceRoot: string,
   browser: string | undefined,
-  entryPoints: Set<string> = new Set(),
+  entryPoints: Set<string> | Map<string, string> = new Set(),
 ): Record<string, string> {
   if (browser === '') {
     throw new Error('`browser` option cannot be an empty string.');
@@ -530,6 +540,16 @@ function normalizeEntryPoints(
   if (browser) {
     // Use `browser` alone.
     return { 'main': path.join(workspaceRoot, browser) };
+  } else if (entryPoints instanceof Map) {
+    return Object.fromEntries(
+      Array.from(entryPoints.entries(), ([name, entryPoint]) => {
+        // Get the full file path to a relative entry point input. Leave bare specifiers alone so they are resolved as modules.
+        const isRelativePath = entryPoint.startsWith('.');
+        const entryPointPath = isRelativePath ? path.join(workspaceRoot, entryPoint) : entryPoint;
+
+        return [name, entryPointPath];
+      }),
+    );
   } else {
     // Use `entryPoints` alone.
     const entryPointPaths: Record<string, string> = {};

@@ -34,7 +34,11 @@ export function setupBundlerContexts(
   target: string[],
   codeBundleCache: SourceFileCache,
   stylesheetBundler: ComponentStylesheetBundler,
-): BundlerContext[] {
+  templateUpdates: Map<string, string> | undefined,
+): {
+  typescriptContexts: BundlerContext[];
+  otherContexts: BundlerContext[];
+} {
   const {
     outputMode,
     serverEntryPoint,
@@ -44,14 +48,21 @@ export function setupBundlerContexts(
     workspaceRoot,
     watch = false,
   } = options;
-  const bundlerContexts = [];
+  const typescriptContexts = [];
+  const otherContexts = [];
 
   // Browser application code
-  bundlerContexts.push(
+  typescriptContexts.push(
     new BundlerContext(
       workspaceRoot,
       watch,
-      createBrowserCodeBundleOptions(options, target, codeBundleCache, stylesheetBundler),
+      createBrowserCodeBundleOptions(
+        options,
+        target,
+        codeBundleCache,
+        stylesheetBundler,
+        templateUpdates,
+      ),
     ),
   );
 
@@ -63,7 +74,16 @@ export function setupBundlerContexts(
     stylesheetBundler,
   );
   if (browserPolyfillBundleOptions) {
-    bundlerContexts.push(new BundlerContext(workspaceRoot, watch, browserPolyfillBundleOptions));
+    const browserPolyfillContext = new BundlerContext(
+      workspaceRoot,
+      watch,
+      browserPolyfillBundleOptions,
+    );
+    if (typeof browserPolyfillBundleOptions === 'function') {
+      otherContexts.push(browserPolyfillContext);
+    } else {
+      typescriptContexts.push(browserPolyfillContext);
+    }
   }
 
   // Global Stylesheets
@@ -71,9 +91,7 @@ export function setupBundlerContexts(
     for (const initial of [true, false]) {
       const bundleOptions = createGlobalStylesBundleOptions(options, target, initial);
       if (bundleOptions) {
-        bundlerContexts.push(
-          new BundlerContext(workspaceRoot, watch, bundleOptions, () => initial),
-        );
+        otherContexts.push(new BundlerContext(workspaceRoot, watch, bundleOptions, () => initial));
       }
     }
   }
@@ -83,9 +101,7 @@ export function setupBundlerContexts(
     for (const initial of [true, false]) {
       const bundleOptions = createGlobalScriptsBundleOptions(options, target, initial);
       if (bundleOptions) {
-        bundlerContexts.push(
-          new BundlerContext(workspaceRoot, watch, bundleOptions, () => initial),
-        );
+        otherContexts.push(new BundlerContext(workspaceRoot, watch, bundleOptions, () => initial));
       }
     }
   }
@@ -94,7 +110,7 @@ export function setupBundlerContexts(
   if (serverEntryPoint && (outputMode || prerenderOptions || appShellOptions || ssrOptions)) {
     const nodeTargets = [...target, ...getSupportedNodeTargets()];
 
-    bundlerContexts.push(
+    typescriptContexts.push(
       new BundlerContext(
         workspaceRoot,
         watch,
@@ -104,7 +120,7 @@ export function setupBundlerContexts(
 
     if (outputMode && ssrOptions?.entry) {
       // New behavior introduced: 'server.ts' is now bundled separately from 'main.server.ts'.
-      bundlerContexts.push(
+      typescriptContexts.push(
         new BundlerContext(
           workspaceRoot,
           watch,
@@ -117,15 +133,15 @@ export function setupBundlerContexts(
     const serverPolyfillBundleOptions = createServerPolyfillBundleOptions(
       options,
       nodeTargets,
-      codeBundleCache,
+      codeBundleCache.loadResultCache,
     );
 
     if (serverPolyfillBundleOptions) {
-      bundlerContexts.push(new BundlerContext(workspaceRoot, watch, serverPolyfillBundleOptions));
+      otherContexts.push(new BundlerContext(workspaceRoot, watch, serverPolyfillBundleOptions));
     }
   }
 
-  return bundlerContexts;
+  return { typescriptContexts, otherContexts };
 }
 
 export function createComponentStyleBundler(

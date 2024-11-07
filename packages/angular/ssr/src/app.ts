@@ -12,11 +12,13 @@ import { ServerAssets } from './assets';
 import { Hooks } from './hooks';
 import { getAngularAppManifest } from './manifest';
 import { RenderMode } from './routes/route-config';
+import { RouteTreeNodeMetadata } from './routes/route-tree';
 import { ServerRouter } from './routes/router';
 import { sha256 } from './utils/crypto';
 import { InlineCriticalCssProcessor } from './utils/inline-critical-css';
 import { LRUCache } from './utils/lru-cache';
 import { AngularBootstrap, renderAngular } from './utils/ng';
+import { joinUrlParts, stripIndexHtmlFromURL, stripLeadingSlash } from './utils/url';
 
 /**
  * Maximum number of critical CSS entries the cache can store.
@@ -44,16 +46,58 @@ const SERVER_CONTEXT_VALUE: Record<RenderMode, string> = {
 };
 
 /**
+ * Options for configuring an `AngularServerApp`.
+ */
+interface AngularServerAppOptions {
+  /**
+   * Whether to allow rendering of prerendered routes.
+   *
+   * When enabled, prerendered routes will be served directly. When disabled, they will be
+   * rendered on demand.
+   *
+   * Defaults to `false`.
+   */
+  allowStaticRouteRender?: boolean;
+
+  /**
+   *  Hooks for extending or modifying server behavior.
+   *
+   * This allows customization of the server's rendering process and other lifecycle events.
+   *
+   * If not provided, a new `Hooks` instance is created.
+   */
+  hooks?: Hooks;
+}
+
+/**
  * Represents a locale-specific Angular server application managed by the server application engine.
  *
  * The `AngularServerApp` class handles server-side rendering and asset management for a specific locale.
  */
 export class AngularServerApp {
   /**
-   * Hooks for extending or modifying the behavior of the server application.
-   * This instance can be used to attach custom functionality to various events in the server application lifecycle.
+   * Whether prerendered routes should be rendered on demand or served directly.
+   *
+   * @see {@link AngularServerAppOptions.allowStaticRouteRender} for more details.
    */
-  hooks = new Hooks();
+  private readonly allowStaticRouteRender: boolean;
+
+  /**
+   * Hooks for extending or modifying server behavior.
+   *
+   * @see {@link AngularServerAppOptions.hooks} for more details.
+   */
+  readonly hooks: Hooks;
+
+  /**
+   * Constructs an instance of `AngularServerApp`.
+   *
+   * @param options Optional configuration options for the server application.
+   */
+  constructor(private readonly options: Readonly<AngularServerAppOptions> = {}) {
+    this.allowStaticRouteRender = this.options.allowStaticRouteRender ?? false;
+    this.hooks = options.hooks ?? new Hooks();
+  }
 
   /**
    * The manifest associated with this server application.
@@ -90,60 +134,82 @@ export class AngularServerApp {
   private readonly criticalCssLRUCache = new LRUCache<string, string>(MAX_INLINE_CSS_CACHE_ENTRIES);
 
   /**
-   * Renders a response for the given HTTP request using the server application.
+   * Handles an incoming HTTP request by serving prerendered content, performing server-side rendering,
+   * or delivering a static file for client-side rendered routes based on the `RenderMode` setting.
    *
-   * This method processes the request and returns a response based on the specified rendering context.
+   * @param request - The HTTP request to handle.
+   * @param requestContext - Optional context for rendering, such as metadata associated with the request.
+   * @returns A promise that resolves to the resulting HTTP response object, or `null` if no matching Angular route is found.
    *
-   * @param request - The incoming HTTP request to be rendered.
-   * @param requestContext - Optional additional context for rendering, such as request metadata.
-   *
-   * @returns A promise that resolves to the HTTP response object resulting from the rendering, or null if no match is found.
+   * @remarks A request to `https://www.example.com/page/index.html` will serve or render the Angular route
+   * corresponding to `https://www.example.com/page`.
    */
-  render(request: Request, requestContext?: unknown): Promise<Response | null> {
+  async handle(request: Request, requestContext?: unknown): Promise<Response | null> {
+    const url = new URL(request.url);
+    this.router ??= await ServerRouter.from(this.manifest, url);
+    const matchedRoute = this.router.match(url);
+
+    if (!matchedRoute) {
+      // Not a known Angular route.
+      return null;
+    }
+
+    if (matchedRoute.renderMode === RenderMode.Prerender) {
+      const response = await this.handleServe(request, matchedRoute);
+      if (response) {
+        return response;
+      }
+    }
+
     return Promise.race([
-      this.createAbortPromise(request),
-      this.handleRendering(request, /** isSsrMode */ true, requestContext),
+      this.waitForRequestAbort(request),
+      this.handleRendering(request, matchedRoute, requestContext),
     ]);
   }
 
   /**
-   * Renders a page based on the provided URL via server-side rendering and returns the corresponding HTTP response.
-   * The rendering process can be interrupted by an abort signal, where the first resolved promise (either from the abort
-   * or the render process) will dictate the outcome.
+   * Handles serving a prerendered static asset if available for the matched route.
    *
-   * @param url - The full URL to be processed and rendered by the server.
-   * @param signal - (Optional) An `AbortSignal` object that allows for the cancellation of the rendering process.
-   * @returns A promise that resolves to the generated HTTP response object, or `null` if no matching route is found.
-   */
-  renderStatic(url: URL, signal?: AbortSignal): Promise<Response | null> {
-    const request = new Request(url, { signal });
-
-    return Promise.race([
-      this.createAbortPromise(request),
-      this.handleRendering(request, /** isSsrMode */ false),
-    ]);
-  }
-
-  /**
-   * Creates a promise that rejects when the request is aborted.
+   * This method only supports `GET` and `HEAD` requests.
    *
-   * @param request - The HTTP request to monitor for abortion.
-   * @returns A promise that never resolves but rejects with an `AbortError` if the request is aborted.
+   * @param request - The incoming HTTP request for serving a static page.
+   * @param matchedRoute - The metadata of the matched route for rendering.
+   * If not provided, the method attempts to find a matching route based on the request URL.
+   * @returns A promise that resolves to a `Response` object if the prerendered page is found, or `null`.
    */
-  private createAbortPromise(request: Request): Promise<never> {
-    return new Promise<never>((_, reject) => {
-      request.signal.addEventListener(
-        'abort',
-        () => {
-          const abortError = new Error(
-            `Request for: ${request.url} was aborted.\n${request.signal.reason}`,
-          );
-          abortError.name = 'AbortError';
-          reject(abortError);
-        },
-        { once: true },
-      );
-    });
+  private async handleServe(
+    request: Request,
+    matchedRoute: RouteTreeNodeMetadata,
+  ): Promise<Response | null> {
+    const { headers, renderMode } = matchedRoute;
+    if (renderMode !== RenderMode.Prerender) {
+      return null;
+    }
+
+    const { url, method } = request;
+    if (method !== 'GET' && method !== 'HEAD') {
+      return null;
+    }
+
+    const { pathname } = stripIndexHtmlFromURL(new URL(request.url));
+    const assetPath = stripLeadingSlash(joinUrlParts(pathname, 'index.html'));
+    if (!this.assets.hasServerAsset(assetPath)) {
+      return null;
+    }
+
+    const { text, hash, size } = this.assets.getServerAsset(assetPath);
+    const etag = `"${hash}"`;
+
+    return request.headers.get('if-none-match') === etag
+      ? new Response(undefined, { status: 304, statusText: 'Not Modified' })
+      : new Response(await text(), {
+          headers: {
+            'Content-Length': size.toString(),
+            'ETag': etag,
+            'Content-Type': 'text/html;charset=UTF-8',
+            ...headers,
+          },
+        });
   }
 
   /**
@@ -151,26 +217,20 @@ export class AngularServerApp {
    * This method matches the request URL to a route and performs rendering if a matching route is found.
    *
    * @param request - The incoming HTTP request to be processed.
-   * @param isSsrMode - A boolean indicating whether the rendering is performed in server-side rendering (SSR) mode.
+   * @param matchedRoute - The metadata of the matched route for rendering.
+   * If not provided, the method attempts to find a matching route based on the request URL.
    * @param requestContext - Optional additional context for rendering, such as request metadata.
    *
    * @returns A promise that resolves to the rendered response, or null if no matching route is found.
    */
   private async handleRendering(
     request: Request,
-    isSsrMode: boolean,
+    matchedRoute: RouteTreeNodeMetadata,
     requestContext?: unknown,
   ): Promise<Response | null> {
-    const url = new URL(request.url);
-    this.router ??= await ServerRouter.from(this.manifest, url);
-
-    const matchedRoute = this.router.match(url);
-    if (!matchedRoute) {
-      // Not a known Angular route.
-      return null;
-    }
-
     const { redirectTo, status } = matchedRoute;
+    const url = new URL(request.url);
+
     if (redirectTo !== undefined) {
       // Note: The status code is validated during route extraction.
       // 302 Found is used by default for redirections
@@ -179,42 +239,44 @@ export class AngularServerApp {
       return Response.redirect(new URL(redirectTo, url), (status as any) ?? 302);
     }
 
-    const { renderMode = isSsrMode ? RenderMode.Server : RenderMode.Prerender, headers } =
-      matchedRoute;
+    const { renderMode, headers } = matchedRoute;
+    if (
+      !this.allowStaticRouteRender &&
+      (renderMode === RenderMode.Prerender || renderMode === RenderMode.AppShell)
+    ) {
+      return null;
+    }
 
     const platformProviders: StaticProvider[] = [];
-    let responseInit: ResponseInit | undefined;
 
-    if (isSsrMode) {
-      // Initialize the response with status and headers if available.
-      responseInit = {
-        status,
-        headers: new Headers({
-          'Content-Type': 'text/html;charset=UTF-8',
-          ...headers,
-        }),
-      };
+    // Initialize the response with status and headers if available.
+    const responseInit = {
+      status,
+      headers: new Headers({
+        'Content-Type': 'text/html;charset=UTF-8',
+        ...headers,
+      }),
+    };
 
-      if (renderMode === RenderMode.Server) {
-        // Configure platform providers for request and response only for SSR.
-        platformProviders.push(
-          {
-            provide: REQUEST,
-            useValue: request,
-          },
-          {
-            provide: REQUEST_CONTEXT,
-            useValue: requestContext,
-          },
-          {
-            provide: RESPONSE_INIT,
-            useValue: responseInit,
-          },
-        );
-      } else if (renderMode === RenderMode.Client) {
-        // Serve the client-side rendered version if the route is configured for CSR.
-        return new Response(await this.assets.getServerAsset('index.csr.html'), responseInit);
-      }
+    if (renderMode === RenderMode.Server) {
+      // Configure platform providers for request and response only for SSR.
+      platformProviders.push(
+        {
+          provide: REQUEST,
+          useValue: request,
+        },
+        {
+          provide: REQUEST_CONTEXT,
+          useValue: requestContext,
+        },
+        {
+          provide: RESPONSE_INIT,
+          useValue: responseInit,
+        },
+      );
+    } else if (renderMode === RenderMode.Client) {
+      // Serve the client-side rendered version if the route is configured for CSR.
+      return new Response(await this.assets.getServerAsset('index.csr.html').text(), responseInit);
     }
 
     const {
@@ -230,7 +292,7 @@ export class AngularServerApp {
       });
     }
 
-    let html = await assets.getIndexServerHtml();
+    let html = await assets.getIndexServerHtml().text();
     // Skip extra microtask if there are no pre hooks.
     if (hooks.has('html:transform:pre')) {
       html = await hooks.run('html:transform:pre', { html, url });
@@ -251,11 +313,11 @@ export class AngularServerApp {
       this.inlineCriticalCssProcessor ??= new InlineCriticalCssProcessor((path: string) => {
         const fileName = path.split('/').pop() ?? path;
 
-        return this.assets.getServerAsset(fileName);
+        return this.assets.getServerAsset(fileName).text();
       });
 
       // TODO(alanagius): remove once Node.js version 18 is no longer supported.
-      if (isSsrMode && typeof crypto === 'undefined') {
+      if (renderMode === RenderMode.Server && typeof crypto === 'undefined') {
         // eslint-disable-next-line no-console
         console.error(
           `The global 'crypto' module is unavailable. ` +
@@ -264,7 +326,7 @@ export class AngularServerApp {
         );
       }
 
-      if (isSsrMode && typeof crypto !== 'undefined') {
+      if (renderMode === RenderMode.Server && typeof crypto !== 'undefined') {
         // Only cache if we are running in SSR Mode.
         const cacheKey = await sha256(html);
         let htmlWithCriticalCss = this.criticalCssLRUCache.get(cacheKey);
@@ -281,6 +343,29 @@ export class AngularServerApp {
 
     return new Response(html, responseInit);
   }
+
+  /**
+   * Returns a promise that rejects if the request is aborted.
+   *
+   * @param request - The HTTP request object being monitored for abortion.
+   * @returns A promise that never resolves and rejects with an `AbortError`
+   * if the request is aborted.
+   */
+  private waitForRequestAbort(request: Request): Promise<never> {
+    return new Promise<never>((_, reject) => {
+      request.signal.addEventListener(
+        'abort',
+        () => {
+          const abortError = new Error(
+            `Request for: ${request.url} was aborted.\n${request.signal.reason}`,
+          );
+          abortError.name = 'AbortError';
+          reject(abortError);
+        },
+        { once: true },
+      );
+    });
+  }
 }
 
 let angularServerApp: AngularServerApp | undefined;
@@ -289,10 +374,15 @@ let angularServerApp: AngularServerApp | undefined;
  * Retrieves or creates an instance of `AngularServerApp`.
  * - If an instance of `AngularServerApp` already exists, it will return the existing one.
  * - If no instance exists, it will create a new one with the provided options.
+ *
+ * @param options Optional configuration options for the server application.
+ *
  * @returns The existing or newly created instance of `AngularServerApp`.
  */
-export function getOrCreateAngularServerApp(): AngularServerApp {
-  return (angularServerApp ??= new AngularServerApp());
+export function getOrCreateAngularServerApp(
+  options?: Readonly<AngularServerAppOptions>,
+): AngularServerApp {
+  return (angularServerApp ??= new AngularServerApp(options));
 }
 
 /**

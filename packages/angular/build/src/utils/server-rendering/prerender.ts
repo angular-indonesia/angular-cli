@@ -7,8 +7,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import { extname, join, posix } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { extname, posix } from 'node:path';
 import { NormalizedApplicationBuildOptions } from '../../builders/application/options';
 import { OutputMode } from '../../builders/application/schema';
 import { BuildOutputFile, BuildOutputFileType } from '../../tools/esbuild/bundler-context';
@@ -16,6 +15,7 @@ import { BuildOutputAsset } from '../../tools/esbuild/bundler-execution-result';
 import { assertIsError } from '../error';
 import { urlJoin } from '../url';
 import { WorkerPool } from '../worker-pool';
+import { IMPORT_EXEC_ARGV } from './esm-in-memory-loader/utils';
 import {
   RouteRenderMode,
   RoutersExtractorWorkerResult,
@@ -194,12 +194,7 @@ async function renderPages(
 }> {
   const output: PrerenderOutput = {};
   const errors: string[] = [];
-
-  const workerExecArgv = [
-    '--import',
-    // Loader cannot be an absolute path on Windows.
-    pathToFileURL(join(__dirname, 'esm-in-memory-loader/register-hooks.js')).href,
-  ];
+  const workerExecArgv = [IMPORT_EXEC_ARGV];
 
   if (sourcemap) {
     workerExecArgv.push('--enable-source-maps');
@@ -224,10 +219,11 @@ async function renderPages(
     const baseHrefWithLeadingSlash = addLeadingSlash(baseHref);
 
     for (const { route, redirectTo, renderMode } of serializableRouteTreeNode) {
-      // Remove base href from file output path.
-      const routeWithoutBaseHref = addLeadingSlash(
-        route.slice(baseHrefWithLeadingSlash.length - 1),
-      );
+      // Remove the base href from the file output path.
+      const routeWithoutBaseHref = addTrailingSlash(route).startsWith(baseHrefWithLeadingSlash)
+        ? addLeadingSlash(route.slice(baseHrefWithLeadingSlash.length - 1))
+        : route;
+
       const outPath = posix.join(removeLeadingSlash(routeWithoutBaseHref), 'index.html');
 
       if (typeof redirectTo === 'string') {
@@ -284,6 +280,7 @@ async function getAllRoutes(
 
   if (appShellOptions) {
     routes.push({
+      renderMode: RouteRenderMode.AppShell,
       route: urlJoin(baseHref, appShellOptions.route),
     });
   }
@@ -292,6 +289,7 @@ async function getAllRoutes(
     const routesFromFile = (await readFile(routesFile, 'utf8')).split(/\r?\n/);
     for (const route of routesFromFile) {
       routes.push({
+        renderMode: RouteRenderMode.Prerender,
         route: urlJoin(baseHref, route.trim()),
       });
     }
@@ -301,11 +299,7 @@ async function getAllRoutes(
     return { errors: [], serializedRouteTree: routes };
   }
 
-  const workerExecArgv = [
-    '--import',
-    // Loader cannot be an absolute path on Windows.
-    pathToFileURL(join(__dirname, 'esm-in-memory-loader/register-hooks.js')).href,
-  ];
+  const workerExecArgv = [IMPORT_EXEC_ARGV];
 
   if (sourcemap) {
     workerExecArgv.push('--enable-source-maps');
@@ -329,7 +323,19 @@ async function getAllRoutes(
       {},
     );
 
-    return { errors, serializedRouteTree: [...routes, ...serializedRouteTree] };
+    if (!routes.length) {
+      return { errors, serializedRouteTree };
+    }
+
+    // Merge the routing trees
+    const uniqueRoutes = new Map();
+    for (const item of [...routes, ...serializedRouteTree]) {
+      if (!uniqueRoutes.has(item.route)) {
+        uniqueRoutes.set(item.route, item);
+      }
+    }
+
+    return { errors, serializedRouteTree: Array.from(uniqueRoutes.values()) };
   } catch (err) {
     assertIsError(err);
 
@@ -345,11 +351,15 @@ async function getAllRoutes(
 }
 
 function addLeadingSlash(value: string): string {
-  return value.charAt(0) === '/' ? value : '/' + value;
+  return value[0] === '/' ? value : '/' + value;
+}
+
+function addTrailingSlash(url: string): string {
+  return url[url.length - 1] === '/' ? url : `${url}/`;
 }
 
 function removeLeadingSlash(value: string): string {
-  return value.charAt(0) === '/' ? value.slice(1) : value;
+  return value[0] === '/' ? value.slice(1) : value;
 }
 
 /**

@@ -10,13 +10,35 @@ import type { SerializableRouteTreeNode } from './routes/route-tree';
 import { AngularBootstrap } from './utils/ng';
 
 /**
+ * Represents of a server asset stored in the manifest.
+ */
+export interface ServerAsset {
+  /**
+   * Retrieves the text content of the asset.
+   *
+   * @returns A promise that resolves to the asset's content as a string.
+   */
+  text: () => Promise<string>;
+
+  /**
+   * A hash string representing the asset's content.
+   */
+  hash: string;
+
+  /**
+   * The size of the asset's content in bytes.
+   */
+  size: number;
+}
+
+/**
  * Represents the exports of an Angular server application entry point.
  */
 export interface EntryPointExports {
   /**
    * A reference to the function that creates an Angular server application instance.
    *
-   * @note The return type is `unknown` to prevent circular dependency issues.
+   * @remarks The return type is `unknown` to prevent circular dependency issues.
    */
   ɵgetOrCreateAngularServerApp: () => unknown;
 
@@ -43,19 +65,6 @@ export interface AngularAppEngineManifest {
    * This is used to determine the root path of the application.
    */
   readonly basePath: string;
-
-  /**
-   * A map that associates static paths with their corresponding HTTP headers.
-   * Each entry in the map consists of:
-   * - `key`: The static path as a string.
-   * - `value`: An array of tuples, where each tuple contains:
-   *   - `headerName`: The name of the HTTP header.
-   *   - `headerValue`: The value of the HTTP header.
-   */
-  readonly staticPathsHeaders: ReadonlyMap<
-    string,
-    readonly [headerName: string, headerValue: string][]
-  >;
 }
 
 /**
@@ -68,7 +77,7 @@ export interface AngularAppManifest {
    * - `key`: The path of the asset.
    * - `value`: A function returning a promise that resolves to the file contents of the asset.
    */
-  readonly assets: ReadonlyMap<string, () => Promise<string>>;
+  readonly assets: ReadonlyMap<string, ServerAsset>;
 
   /**
    * The bootstrap mechanism for the server application.
