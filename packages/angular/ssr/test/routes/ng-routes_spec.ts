@@ -41,13 +41,13 @@ describe('extractRoutesAndCreateRouteTree', () => {
       ],
     );
 
-    const { routeTree, errors } = await extractRoutesAndCreateRouteTree(url);
+    const { routeTree, errors } = await extractRoutesAndCreateRouteTree({ url });
     expect(errors).toHaveSize(0);
     expect(routeTree.toObject()).toEqual([
       { route: '/', renderMode: RenderMode.Server },
       { route: '/home', renderMode: RenderMode.Client },
       { route: '/redirect', renderMode: RenderMode.Server, status: 301, redirectTo: '/home' },
-      { route: '/user/:id', renderMode: RenderMode.Server },
+      { route: '/user/*', renderMode: RenderMode.Server },
     ]);
   });
 
@@ -60,7 +60,7 @@ describe('extractRoutesAndCreateRouteTree', () => {
       ],
     );
 
-    const { errors } = await extractRoutesAndCreateRouteTree(url);
+    const { errors } = await extractRoutesAndCreateRouteTree({ url });
     expect(errors[0]).toContain(
       `Invalid '/invalid' route configuration: the path cannot start with a slash.`,
     );
@@ -85,7 +85,10 @@ describe('extractRoutesAndCreateRouteTree', () => {
         ],
       );
 
-      const { routeTree, errors } = await extractRoutesAndCreateRouteTree(url, undefined, true);
+      const { routeTree, errors } = await extractRoutesAndCreateRouteTree({
+        url,
+        invokeGetPrerenderParams: true,
+      });
       expect(errors).toHaveSize(0);
       expect(routeTree.toObject()).toEqual([
         { route: '/user/joe/role/admin', renderMode: RenderMode.Prerender },
@@ -93,7 +96,7 @@ describe('extractRoutesAndCreateRouteTree', () => {
           route: '/user/jane/role/writer',
           renderMode: RenderMode.Prerender,
         },
-        { route: '/user/:id/role/:role', renderMode: RenderMode.Server },
+        { route: '/user/*/role/*', renderMode: RenderMode.Server },
       ]);
     });
 
@@ -119,7 +122,10 @@ describe('extractRoutesAndCreateRouteTree', () => {
         ],
       );
 
-      const { routeTree, errors } = await extractRoutesAndCreateRouteTree(url, undefined, true);
+      const { routeTree, errors } = await extractRoutesAndCreateRouteTree({
+        url,
+        invokeGetPrerenderParams: true,
+      });
       expect(errors).toHaveSize(0);
       expect(routeTree.toObject()).toEqual([
         { route: '/home', renderMode: RenderMode.Server },
@@ -128,7 +134,7 @@ describe('extractRoutesAndCreateRouteTree', () => {
           route: '/user/jane/role/writer',
           renderMode: RenderMode.Prerender,
         },
-        { route: '/user/:id/role/:role', renderMode: RenderMode.Client },
+        { route: '/user/*/role/*', renderMode: RenderMode.Client },
       ]);
     });
 
@@ -154,7 +160,10 @@ describe('extractRoutesAndCreateRouteTree', () => {
         ],
       );
 
-      const { routeTree, errors } = await extractRoutesAndCreateRouteTree(url, undefined, true);
+      const { routeTree, errors } = await extractRoutesAndCreateRouteTree({
+        url,
+        invokeGetPrerenderParams: true,
+      });
       expect(errors).toHaveSize(0);
       expect(routeTree.toObject()).toEqual([
         { route: '/home', renderMode: RenderMode.Server },
@@ -165,6 +174,91 @@ describe('extractRoutesAndCreateRouteTree', () => {
         },
       ]);
     });
+
+    it('should extract nested redirects that are not explicitly defined.', async () => {
+      setAngularAppTestingManifest(
+        [
+          {
+            path: '',
+            pathMatch: 'full',
+            redirectTo: 'some',
+          },
+          {
+            path: ':param',
+            children: [
+              {
+                path: '',
+                pathMatch: 'full',
+                redirectTo: 'thing',
+              },
+              {
+                path: 'thing',
+                component: DummyComponent,
+              },
+            ],
+          },
+        ],
+        [
+          {
+            path: ':param',
+            renderMode: RenderMode.Prerender,
+            async getPrerenderParams() {
+              return [{ param: 'some' }];
+            },
+          },
+          { path: '**', renderMode: RenderMode.Prerender },
+        ],
+      );
+
+      const { routeTree, errors } = await extractRoutesAndCreateRouteTree({
+        url,
+        invokeGetPrerenderParams: true,
+        includePrerenderFallbackRoutes: true,
+      });
+      expect(errors).toHaveSize(0);
+      expect(routeTree.toObject()).toEqual([
+        { route: '/', renderMode: RenderMode.Prerender, redirectTo: '/some' },
+        { route: '/some', renderMode: RenderMode.Prerender, redirectTo: '/some/thing' },
+        { route: '/some/thing', renderMode: RenderMode.Prerender },
+        { redirectTo: '/*/thing', route: '/*', renderMode: RenderMode.Server },
+        { route: '/*/thing', renderMode: RenderMode.Server },
+      ]);
+    });
+  });
+
+  it('should extract nested redirects that are not explicitly defined.', async () => {
+    setAngularAppTestingManifest(
+      [
+        {
+          path: '',
+          pathMatch: 'full',
+          redirectTo: 'some',
+        },
+        {
+          path: ':param',
+          children: [
+            {
+              path: '',
+              pathMatch: 'full',
+              redirectTo: 'thing',
+            },
+            {
+              path: 'thing',
+              component: DummyComponent,
+            },
+          ],
+        },
+      ],
+      [{ path: '**', renderMode: RenderMode.Server }],
+    );
+
+    const { routeTree, errors } = await extractRoutesAndCreateRouteTree({ url });
+    expect(errors).toHaveSize(0);
+    expect(routeTree.toObject()).toEqual([
+      { route: '/', renderMode: RenderMode.Server, redirectTo: '/some' },
+      { route: '/*', renderMode: RenderMode.Server, redirectTo: '/*/thing' },
+      { route: '/*/thing', renderMode: RenderMode.Server },
+    ]);
   });
 
   it('should not resolve parameterized routes for SSG when `invokeGetPrerenderParams` is false', async () => {
@@ -188,11 +282,14 @@ describe('extractRoutesAndCreateRouteTree', () => {
       ],
     );
 
-    const { routeTree, errors } = await extractRoutesAndCreateRouteTree(url, undefined, false);
+    const { routeTree, errors } = await extractRoutesAndCreateRouteTree({
+      url,
+      invokeGetPrerenderParams: false,
+    });
     expect(errors).toHaveSize(0);
     expect(routeTree.toObject()).toEqual([
       { route: '/home', renderMode: RenderMode.Server },
-      { route: '/user/:id/role/:role', renderMode: RenderMode.Server },
+      { route: '/user/*/role/*', renderMode: RenderMode.Server },
     ]);
   });
 
@@ -218,12 +315,12 @@ describe('extractRoutesAndCreateRouteTree', () => {
       ],
     );
 
-    const { routeTree, errors } = await extractRoutesAndCreateRouteTree(
+    const { routeTree, errors } = await extractRoutesAndCreateRouteTree({
       url,
-      /** manifest */ undefined,
-      /** invokeGetPrerenderParams */ true,
-      /** includePrerenderFallbackRoutes */ false,
-    );
+
+      invokeGetPrerenderParams: true,
+      includePrerenderFallbackRoutes: false,
+    });
 
     expect(errors).toHaveSize(0);
     expect(routeTree.toObject()).toEqual([
@@ -258,12 +355,11 @@ describe('extractRoutesAndCreateRouteTree', () => {
       ],
     );
 
-    const { routeTree, errors } = await extractRoutesAndCreateRouteTree(
+    const { routeTree, errors } = await extractRoutesAndCreateRouteTree({
       url,
-      /** manifest */ undefined,
-      /** invokeGetPrerenderParams */ true,
-      /** includePrerenderFallbackRoutes */ true,
-    );
+      invokeGetPrerenderParams: true,
+      includePrerenderFallbackRoutes: true,
+    });
 
     expect(errors).toHaveSize(0);
     expect(routeTree.toObject()).toEqual([
@@ -273,7 +369,7 @@ describe('extractRoutesAndCreateRouteTree', () => {
         route: '/user/jane/role/writer',
         renderMode: RenderMode.Prerender,
       },
-      { route: '/user/:id/role/:role', renderMode: RenderMode.Client },
+      { route: '/user/*/role/*', renderMode: RenderMode.Client },
     ]);
   });
 
@@ -286,12 +382,11 @@ describe('extractRoutesAndCreateRouteTree', () => {
       ],
     );
 
-    const { errors } = await extractRoutesAndCreateRouteTree(
+    const { errors } = await extractRoutesAndCreateRouteTree({
       url,
-      /** manifest */ undefined,
-      /** invokeGetPrerenderParams */ false,
-      /** includePrerenderFallbackRoutes */ false,
-    );
+      invokeGetPrerenderParams: false,
+      includePrerenderFallbackRoutes: false,
+    });
 
     expect(errors).toHaveSize(0);
   });
@@ -305,12 +400,11 @@ describe('extractRoutesAndCreateRouteTree', () => {
       ],
     );
 
-    const { errors } = await extractRoutesAndCreateRouteTree(
+    const { errors } = await extractRoutesAndCreateRouteTree({
       url,
-      /** manifest */ undefined,
-      /** invokeGetPrerenderParams */ false,
-      /** includePrerenderFallbackRoutes */ false,
-    );
+      invokeGetPrerenderParams: false,
+      includePrerenderFallbackRoutes: false,
+    });
 
     expect(errors).toHaveSize(1);
     expect(errors[0]).toContain(
@@ -327,12 +421,11 @@ describe('extractRoutesAndCreateRouteTree', () => {
       [{ path: 'home', renderMode: RenderMode.Server }],
     );
 
-    const { errors } = await extractRoutesAndCreateRouteTree(
+    const { errors } = await extractRoutesAndCreateRouteTree({
       url,
-      /** manifest */ undefined,
-      /** invokeGetPrerenderParams */ false,
-      /** includePrerenderFallbackRoutes */ false,
-    );
+      invokeGetPrerenderParams: false,
+      includePrerenderFallbackRoutes: false,
+    });
 
     expect(errors).toHaveSize(1);
     expect(errors[0]).toContain(
@@ -340,17 +433,66 @@ describe('extractRoutesAndCreateRouteTree', () => {
     );
   });
 
-  it('should apply RenderMode matching the wildcard when no Angular routes are defined', async () => {
-    setAngularAppTestingManifest([], [{ path: '**', renderMode: RenderMode.Server }]);
+  it('should use wildcard configuration when no Angular routes are defined', async () => {
+    setAngularAppTestingManifest([], [{ path: '**', renderMode: RenderMode.Server, status: 201 }]);
 
-    const { errors, routeTree } = await extractRoutesAndCreateRouteTree(
+    const { errors, routeTree } = await extractRoutesAndCreateRouteTree({
       url,
-      /** manifest */ undefined,
-      /** invokeGetPrerenderParams */ false,
-      /** includePrerenderFallbackRoutes */ false,
-    );
+      invokeGetPrerenderParams: false,
+      includePrerenderFallbackRoutes: false,
+    });
 
     expect(errors).toHaveSize(0);
-    expect(routeTree.toObject()).toEqual([{ route: '/', renderMode: RenderMode.Server }]);
+    expect(routeTree.toObject()).toEqual([
+      { route: '/', renderMode: RenderMode.Server, status: 201 },
+    ]);
+  });
+
+  it(`handles a baseHref starting with a "./" path`, async () => {
+    setAngularAppTestingManifest(
+      [{ path: 'home', component: DummyComponent }],
+      [{ path: '**', renderMode: RenderMode.Server }],
+      /** baseHref*/ './example',
+    );
+
+    const { routeTree, errors } = await extractRoutesAndCreateRouteTree({
+      url,
+      invokeGetPrerenderParams: true,
+      includePrerenderFallbackRoutes: true,
+    });
+
+    expect(errors).toHaveSize(0);
+    expect(routeTree.toObject()).toEqual([
+      { route: '/example/home', renderMode: RenderMode.Server },
+    ]);
+  });
+
+  it('should not bootstrap the root component', async () => {
+    @Component({
+      standalone: true,
+      selector: 'app-root',
+      template: '',
+    })
+    class RootComponent {
+      constructor() {
+        throw new Error('RootComponent should not be bootstrapped.');
+      }
+    }
+
+    setAngularAppTestingManifest(
+      [
+        { path: '', component: DummyComponent },
+        { path: 'home', component: DummyComponent },
+      ],
+      [{ path: '**', renderMode: RenderMode.Server }],
+      undefined,
+      undefined,
+      undefined,
+      RootComponent,
+    );
+
+    const { routeTree, errors } = await extractRoutesAndCreateRouteTree({ url });
+    expect(errors).toHaveSize(0);
+    expect(routeTree.toObject()).toHaveSize(2);
   });
 });

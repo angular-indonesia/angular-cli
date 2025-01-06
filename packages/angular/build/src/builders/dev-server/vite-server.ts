@@ -13,7 +13,7 @@ import assert from 'node:assert';
 import { readFile } from 'node:fs/promises';
 import { builtinModules, isBuiltin } from 'node:module';
 import { join } from 'node:path';
-import type { Connect, DepOptimizationConfig, InlineConfig, ViteDevServer } from 'vite';
+import type { Connect, InlineConfig, ViteDevServer } from 'vite';
 import type { ComponentStyleRecord } from '../../tools/vite/middlewares';
 import {
   ServerSsrMode,
@@ -23,6 +23,7 @@ import {
   createAngularSsrTransformPlugin,
   createRemoveIdPrefixPlugin,
 } from '../../tools/vite/plugins';
+import { EsbuildLoaderOption, getDepOptimizationConfig } from '../../tools/vite/utils';
 import { loadProxyConfiguration, normalizeSourceMaps } from '../../utils';
 import { useComponentStyleHmr, useComponentTemplateHmr } from '../../utils/environment-options';
 import { loadEsmModule } from '../../utils/load-esm';
@@ -32,7 +33,6 @@ import {
   BuildOutputFileType,
   type ExternalResultMetadata,
   JavaScriptTransformer,
-  getFeatureSupport,
   getSupportedBrowsers,
   isZonelessApp,
   transformSupportedBrowsersToTargets,
@@ -138,17 +138,14 @@ export async function* serveWithVite(
     process.setSourceMapsEnabled(true);
   }
 
-  // Enable to support component style hot reloading (`NG_HMR_CSTYLES=0` can be used to disable selectively)
+  // Enable to support link-based component style hot reloading (`NG_HMR_CSTYLES=0` can be used to disable selectively)
   browserOptions.externalRuntimeStyles =
     serverOptions.liveReload && serverOptions.hmr && useComponentStyleHmr;
 
-  // Enable to support component template hot replacement (`NG_HMR_TEMPLATE=1` can be used to enable)
-  browserOptions.templateUpdates = !!serverOptions.liveReload && useComponentTemplateHmr;
-  if (browserOptions.templateUpdates) {
-    context.logger.warn(
-      'Experimental support for component template hot replacement has been enabled via the "NG_HMR_TEMPLATE" environment variable.',
-    );
-  }
+  // Enable to support component template hot replacement (`NG_HMR_TEMPLATE=0` can be used to disable selectively)
+  // This will also replace file-based/inline styles as code if external runtime styles are not enabled.
+  browserOptions.templateUpdates =
+    serverOptions.liveReload && serverOptions.hmr && useComponentTemplateHmr;
 
   // Setup the prebundling transformer that will be shared across Vite prebundling requests
   const prebundleTransformer = new JavaScriptTransformer(
@@ -233,6 +230,12 @@ export async function* serveWithVite(
             assetFiles.set('/' + normalizePath(outputPath), normalizePath(file.inputPath));
           }
         }
+
+        // Invalidate SSR module graph to ensure that only new rebuild is used and not stale component updates
+        if (server && browserOptions.ssr && templateUpdates.size > 0) {
+          server.moduleGraph.invalidateAll();
+        }
+
         // Clear stale template updates on code rebuilds
         templateUpdates.clear();
 
@@ -256,6 +259,16 @@ export async function* serveWithVite(
           'Builder must provide an initial full build before component update results.',
         );
 
+        // Invalidate SSR module graph to ensure that new component updates are used
+        // TODO: Use fine-grained invalidation of only the component update modules
+        if (browserOptions.ssr) {
+          server.moduleGraph.invalidateAll();
+          const { ɵresetCompiledComponents } = (await server.ssrLoadModule('/main.server.mjs')) as {
+            ɵresetCompiledComponents: () => void;
+          };
+          ɵresetCompiledComponents();
+        }
+
         for (const componentUpdate of result.updates) {
           if (componentUpdate.type === 'template') {
             templateUpdates.set(componentUpdate.id, componentUpdate.content);
@@ -273,7 +286,6 @@ export async function* serveWithVite(
     }
 
     // To avoid disconnecting the array objects from the option, these arrays need to be mutated instead of replaced.
-    let requiresServerRestart = false;
     if (result.detail?.['externalMetadata']) {
       const { implicitBrowser, implicitServer, explicit } = result.detail[
         'externalMetadata'
@@ -282,15 +294,6 @@ export async function* serveWithVite(
         (m) => !isBuiltin(m) && !isAbsoluteUrl(m),
       );
       const implicitBrowserFiltered = implicitBrowser.filter((m) => !isAbsoluteUrl(m));
-
-      if (browserOptions.ssr && serverOptions.prebundle !== false) {
-        const previousImplicitServer = new Set(externalMetadata.implicitServer);
-        // Restart the server to force SSR dep re-optimization when a dependency has been added.
-        // This is a workaround for: https://github.com/vitejs/vite/issues/14896
-        requiresServerRestart = implicitServerFiltered.some(
-          (dep) => !previousImplicitServer.has(dep),
-        );
-      }
 
       // Empty Arrays to avoid growing unlimited with every re-build.
       externalMetadata.explicitBrowser.length = 0;
@@ -317,20 +320,14 @@ export async function* serveWithVite(
         ...new Set([...server.config.server.fs.allow, ...assetFiles.values()]),
       ];
 
-      if (requiresServerRestart) {
-        // Restart the server to force SSR dep re-optimization when a dependency has been added.
-        // This is a workaround for: https://github.com/vitejs/vite/issues/14896
-        await server.restart();
-      } else {
-        await handleUpdate(
-          normalizePath,
-          generatedFiles,
-          server,
-          serverOptions,
-          context.logger,
-          componentStyles,
-        );
-      }
+      await handleUpdate(
+        normalizePath,
+        generatedFiles,
+        server,
+        serverOptions,
+        context.logger,
+        componentStyles,
+      );
     } else {
       const projectName = context.target?.project;
       if (!projectName) {
@@ -473,6 +470,11 @@ async function handleUpdate(
 
   if (!updatedFiles.length) {
     return;
+  }
+
+  if (destroyAngularServerAppCalled) {
+    // Trigger module evaluation before reload to initiate dependency optimization.
+    await server.ssrLoadModule('/main.server.mjs');
   }
 
   if (serverOptions.hmr) {
@@ -692,7 +694,15 @@ export async function setupServer(
       headers: serverOptions.headers,
       // Disable the websocket if live reload is disabled (false/undefined are the only valid values)
       ws: serverOptions.liveReload === false && serverOptions.hmr === false ? false : undefined,
-      proxy,
+      // When server-side rendering (SSR) is enabled togather with SSL and Express is being used,
+      // we must configure Vite to use HTTP/1.1.
+      // This is necessary because Express does not support HTTP/2.
+      // We achieve this by defining an empty proxy.
+      // See: https://github.com/vitejs/vite/blob/c4b532cc900bf988073583511f57bd581755d5e3/packages/vite/src/node/http.ts#L106
+      proxy:
+        serverOptions.ssl && ssrMode === ServerSsrMode.ExternalSsrMiddleware
+          ? (proxy ?? {})
+          : proxy,
       cors: {
         // Allow preflight requests to be proxied.
         preflightContinue: true,
@@ -705,11 +715,6 @@ export async function setupServer(
         // the Vite client-side code for browser reloading. These would be available by default but when
         // the `allow` option is explicitly configured, they must be included manually.
         allow: [cacheDir, join(serverOptions.workspaceRoot, 'node_modules'), ...assets.values()],
-
-        // Temporary disable cached FS checks.
-        // This is because we configure `config.base` to a virtual directory which causes `getRealPath` to fail.
-        // See: https://github.com/vitejs/vite/blob/b2873ac3936de25ca8784327cb9ef16bd4881805/packages/vite/src/node/fsUtils.ts#L45-L67
-        cachedChecks: false,
       },
       // This is needed when `externalDependencies` is used to prevent Vite load errors.
       // NOTE: If Vite adds direct support for externals, this can be removed.
@@ -751,6 +756,7 @@ export async function setupServer(
       await createAngularMemoryPlugin({
         virtualProjectRoot,
         outputFiles,
+        templateUpdates,
         external: externalMetadata.explicitBrowser,
         skipViteClient: serverOptions.liveReload === false && serverOptions.hmr === false,
       }),
@@ -789,71 +795,6 @@ export async function setupServer(
   }
 
   return configuration;
-}
-
-type ViteEsBuildPlugin = NonNullable<
-  NonNullable<DepOptimizationConfig['esbuildOptions']>['plugins']
->[0];
-
-type EsbuildLoaderOption = Exclude<DepOptimizationConfig['esbuildOptions'], undefined>['loader'];
-
-function getDepOptimizationConfig({
-  disabled,
-  exclude,
-  include,
-  target,
-  zoneless,
-  prebundleTransformer,
-  ssr,
-  loader,
-  thirdPartySourcemaps,
-}: {
-  disabled: boolean;
-  exclude: string[];
-  include: string[];
-  target: string[];
-  prebundleTransformer: JavaScriptTransformer;
-  ssr: boolean;
-  zoneless: boolean;
-  loader?: EsbuildLoaderOption;
-  thirdPartySourcemaps: boolean;
-}): DepOptimizationConfig {
-  const plugins: ViteEsBuildPlugin[] = [
-    {
-      name: `angular-vite-optimize-deps${ssr ? '-ssr' : ''}${
-        thirdPartySourcemaps ? '-vendor-sourcemap' : ''
-      }`,
-      setup(build) {
-        build.onLoad({ filter: /\.[cm]?js$/ }, async (args) => {
-          return {
-            contents: await prebundleTransformer.transformFile(args.path),
-            loader: 'js',
-          };
-        });
-      },
-    },
-  ];
-
-  return {
-    // Exclude any explicitly defined dependencies (currently build defined externals)
-    exclude,
-    // NB: to disable the deps optimizer, set optimizeDeps.noDiscovery to true and optimizeDeps.include as undefined.
-    // Include all implict dependencies from the external packages internal option
-    include: disabled ? undefined : include,
-    noDiscovery: disabled,
-    // Add an esbuild plugin to run the Angular linker on dependencies
-    esbuildOptions: {
-      // Set esbuild supported targets.
-      target,
-      supported: getFeatureSupport(target, zoneless),
-      plugins,
-      loader,
-      define: {
-        'ngServerMode': `${ssr}`,
-      },
-      resolveExtensions: ['.mjs', '.js', '.cjs'],
-    },
-  };
 }
 
 /**

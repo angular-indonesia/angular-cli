@@ -193,17 +193,25 @@ export class WorkspaceNodeModulesArchitectHost implements ArchitectHost<NodeModu
     }
 
     // Determine builder option schema path (relative within package only)
-    const schemaPath = builder.schema && path.normalize(builder.schema);
+    let schemaPath = builder.schema;
     if (!schemaPath) {
       throw new Error('Could not find the schema for builder ' + builderStr);
     }
-    if (path.isAbsolute(schemaPath) || schemaPath.startsWith('..')) {
+    if (path.isAbsolute(schemaPath) || path.normalize(schemaPath).startsWith('..')) {
       throw new Error(
-        `Package "${packageName}" has an invalid builder implementation path: "${builderName}" --> "${builder.schema}"`,
+        `Package "${packageName}" has an invalid builder schema path: "${builderName}" --> "${builder.schema}"`,
       );
     }
 
-    const schemaText = readFileSync(path.join(buildersManifestDirectory, schemaPath), 'utf-8');
+    // The file could be either a package reference or in the local manifest directory.
+    if (schemaPath.startsWith('.')) {
+      schemaPath = path.join(buildersManifestDirectory, schemaPath);
+    } else {
+      const manifestRequire = createRequire(buildersManifestDirectory + '/');
+      schemaPath = manifestRequire.resolve(schemaPath);
+    }
+
+    const schemaText = readFileSync(schemaPath, 'utf-8');
 
     return Promise.resolve({
       name: builderStr,

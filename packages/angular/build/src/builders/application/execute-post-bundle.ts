@@ -6,6 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
+import type { Metafile } from 'esbuild';
 import assert from 'node:assert';
 import {
   BuildOutputFile,
@@ -34,6 +35,7 @@ import { OutputMode } from './schema';
 
 /**
  * Run additional builds steps including SSG, AppShell, Index HTML file and Service worker generation.
+ * @param metafile An esbuild metafile object.
  * @param options The normalized application builder options used to create the build.
  * @param outputFiles The output files of an executed build.
  * @param assetFiles The assets of an executed build.
@@ -42,6 +44,7 @@ import { OutputMode } from './schema';
  */
 // eslint-disable-next-line max-lines-per-function
 export async function executePostBundleSteps(
+  metafile: Metafile,
   options: NormalizedApplicationBuildOptions,
   outputFiles: BuildOutputFile[],
   assetFiles: BuildOutputAsset[],
@@ -63,6 +66,7 @@ export async function executePostBundleSteps(
   const {
     baseHref = '/',
     serviceWorker,
+    i18nOptions,
     indexHtmlOptions,
     optimizationOptions,
     sourcemapOptions,
@@ -70,6 +74,7 @@ export async function executePostBundleSteps(
     serverEntryPoint,
     prerenderOptions,
     appShellOptions,
+    publicPath,
     workspaceRoot,
     partialSSRBuild,
   } = options;
@@ -107,6 +112,7 @@ export async function executePostBundleSteps(
   }
 
   // Create server manifest
+  const initialFilesPaths = new Set(initialFiles.keys());
   if (serverEntryPoint) {
     const { manifestContent, serverAssetsChunks } = generateAngularServerAppManifest(
       additionalHtmlOutputFiles,
@@ -114,6 +120,10 @@ export async function executePostBundleSteps(
       optimizationOptions.styles.inlineCritical ?? false,
       undefined,
       locale,
+      baseHref,
+      initialFilesPaths,
+      metafile,
+      publicPath,
     );
 
     additionalOutputFiles.push(
@@ -194,6 +204,10 @@ export async function executePostBundleSteps(
         optimizationOptions.styles.inlineCritical ?? false,
         serializableRouteTreeNodeForManifest,
         locale,
+        baseHref,
+        initialFilesPaths,
+        metafile,
+        publicPath,
       );
 
       for (const chunk of serverAssetsChunks) {

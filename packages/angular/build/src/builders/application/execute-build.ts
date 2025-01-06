@@ -31,7 +31,6 @@ import {
   generateAngularServerAppEngineManifest,
 } from '../../utils/server-rendering/manifest';
 import { getSupportedBrowsers } from '../../utils/supported-browsers';
-import { optimizeChunks } from './chunk-optimizer';
 import { executePostBundleSteps } from './execute-post-bundle';
 import { inlineI18n, loadActiveTranslations } from './i18n';
 import { NormalizedApplicationBuildOptions } from './options';
@@ -129,6 +128,7 @@ export async function executeBuild(
   }
 
   if (options.optimizationOptions.scripts && shouldOptimizeChunks) {
+    const { optimizeChunks } = await import('./chunk-optimizer');
     bundlingResult = await profileAsync('OPTIMIZE_CHUNKS', () =>
       optimizeChunks(
         bundlingResult,
@@ -247,12 +247,13 @@ export async function executeBuild(
 
   // Perform i18n translation inlining if enabled
   if (i18nOptions.shouldInline) {
-    const result = await inlineI18n(options, executionResult, initialFiles);
+    const result = await inlineI18n(metafile, options, executionResult, initialFiles);
     executionResult.addErrors(result.errors);
     executionResult.addWarnings(result.warnings);
     executionResult.addPrerenderedRoutes(result.prerenderedRoutes);
   } else {
     const result = await executePostBundleSteps(
+      metafile,
       options,
       executionResult.outputFiles,
       executionResult.assetFiles,

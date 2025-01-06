@@ -1,9 +1,14 @@
-workspace(
-    name = "angular_cli",
-    managed_directories = {"@npm": ["node_modules"]},
+workspace(name = "angular_cli")
+
+DEFAULT_NODE_VERSION = "18.19.1"
+
+# Workaround for: https://github.com/bazel-contrib/bazel-lib/issues/968.
+# Override toolchain for tar on windows.
+register_toolchains(
+    "//tools:windows_tar_system_toolchain",
 )
 
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 
 http_archive(
     name = "bazel_skylib",
@@ -29,6 +34,17 @@ http_archive(
 load("@build_bazel_rules_nodejs//:repositories.bzl", "build_bazel_rules_nodejs_dependencies")
 
 build_bazel_rules_nodejs_dependencies()
+
+http_archive(
+    name = "aspect_rules_js",
+    sha256 = "fbc34d815a0cc52183a1a26732fc0329e26774a51abbe0f26fc9fd2dab6133b4",
+    strip_prefix = "rules_js-2.1.2",
+    url = "https://github.com/aspect-build/rules_js/releases/download/v2.1.2/rules_js-v2.1.2.tar.gz",
+)
+
+load("@aspect_rules_js//js:repositories.bzl", "rules_js_dependencies")
+
+rules_js_dependencies()
 
 http_archive(
     name = "rules_pkg",
@@ -73,7 +89,7 @@ nodejs_register_toolchains(
     name = "nodejs",
     # The below can be removed once @rules_nodejs/nodejs is updated to latest which contains https://github.com/bazelbuild/rules_nodejs/pull/3701
     node_repositories = NODE_18_REPO,
-    node_version = "18.19.1",
+    node_version = DEFAULT_NODE_VERSION,
 )
 
 nodejs_register_toolchains(
@@ -106,34 +122,38 @@ nodejs_register_toolchains(
     node_version = "22.0.0",
 )
 
+load("@aspect_rules_js//js:toolchains.bzl", "rules_js_register_toolchains")
+
+rules_js_register_toolchains(
+    node_repositories = NODE_18_REPO,
+    node_version = DEFAULT_NODE_VERSION,
+)
+
 load("@build_bazel_rules_nodejs//:index.bzl", "yarn_install")
 
 yarn_install(
     name = "npm",
     data = [
-        "//:.yarn/patches/@angular-bazel-https-9848736cf4.patch",
-        "//:.yarn/patches/@bazel-concatjs-npm-5.8.1-1bf81df846.patch",
-        "//:.yarn/patches/@bazel-jasmine-npm-5.8.1-3370fee155.patch",
         "//:.yarn/releases/yarn-4.5.0.cjs",
         "//:.yarnrc.yml",
+        "//:patches/@angular+bazel+19.0.0-next.7.patch",
+        "//:patches/@bazel+concatjs+5.8.1.patch",
+        "//:patches/@bazel+jasmine+5.8.1.patch",
     ],
     # Currently disabled due to:
     #  1. Missing Windows support currently.
     #  2. Incompatibilites with the `ts_library` rule.
     exports_directories_only = False,
     package_json = "//:package.json",
-    # We prefer to symlink the `node_modules` to only maintain a single install.
-    # See https://github.com/angular/dev-infra/pull/446#issuecomment-1059820287 for details.
-    symlink_node_modules = True,
     yarn = "//:.yarn/releases/yarn-4.5.0.cjs",
     yarn_lock = "//:yarn.lock",
 )
 
 http_archive(
     name = "aspect_bazel_lib",
-    sha256 = "349aabd3c2b96caeda6181eb0ae1f14f2a1d9f3cd3c8b05d57f709ceb12e9fb3",
-    strip_prefix = "bazel-lib-2.9.4",
-    url = "https://github.com/aspect-build/bazel-lib/releases/download/v2.9.4/bazel-lib-v2.9.4.tar.gz",
+    sha256 = "7b39d9f38b82260a8151b18dd4a6219d2d7fc4a0ac313d4f5a630ae6907d205d",
+    strip_prefix = "bazel-lib-2.10.0",
+    url = "https://github.com/aspect-build/bazel-lib/releases/download/v2.10.0/bazel-lib-v2.10.0.tar.gz",
 )
 
 load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies", "aspect_bazel_lib_register_toolchains")
@@ -157,4 +177,51 @@ load("@build_bazel_rules_nodejs//toolchains/esbuild:esbuild_repositories.bzl", "
 
 esbuild_repositories(
     npm_repository = "npm",
+)
+
+load("@aspect_rules_js//npm:repositories.bzl", "npm_translate_lock")
+
+npm_translate_lock(
+    name = "npm2",
+    data = [
+        "//:package.json",
+        "//:pnpm-workspace.yaml",
+    ],
+    npmrc = "//:.npmrc",
+    patches = {
+        # Note: Patches not needed as the existing patches are only
+        # for `rules_nodejs` dependencies :)
+    },
+    pnpm_lock = "//:pnpm-lock.yaml",
+    update_pnpm_lock = True,
+    verify_node_modules_ignored = "//:.bazelignore",
+    yarn_lock = "//:yarn.lock",
+)
+
+load("@npm2//:repositories.bzl", "npm_repositories")
+
+npm_repositories()
+
+http_archive(
+    name = "aspect_rules_ts",
+    patch_args = ["-p1"],
+    patches = ["//tools:rules_ts_windows.patch"],
+    sha256 = "cff3137b043ff6bf1a2542fd9691dc762432370cd39eb4bb0756d288de52067d",
+    strip_prefix = "rules_ts-3.3.2",
+    url = "https://github.com/aspect-build/rules_ts/releases/download/v3.3.2/rules_ts-v3.3.2.tar.gz",
+)
+
+load("@aspect_rules_ts//ts:repositories.bzl", "rules_ts_dependencies")
+
+rules_ts_dependencies(
+    # ts_version_from = "//:package.json",
+    # Obtained by: curl --silent https://registry.npmjs.org/typescript/5.7.2 | jq -r '.dist.integrity'
+    ts_integrity = "sha512-i5t66RHxDvVN40HfDd1PsEThGNnlMCMT3jMUuoh9/0TaqWevNontacunWyN02LA9/fIbEWlcHZcgTKb9QoaLfg==",
+    ts_version = "5.7.2",
+)
+
+http_file(
+    name = "tsc_worker",
+    sha256 = "",
+    urls = ["https://raw.githubusercontent.com/devversion/rules_angular/a270a74d1e64577bddba96a5484c7c5d2c5d2770/dist/worker.mjs"],
 )

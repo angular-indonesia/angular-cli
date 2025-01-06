@@ -40,6 +40,7 @@ export interface CompilerPluginOptions {
   sourcemap: boolean | 'external';
   tsconfig: string;
   jit?: boolean;
+  browserOnlyBuild?: boolean;
 
   /** Skip TypeScript compilation setup. This is useful to re-use the TypeScript compilation from another plugin. */
   noopTypeScriptCompilation?: boolean;
@@ -119,7 +120,7 @@ export function createCompilerPlugin(
       // Create new reusable compilation for the appropriate mode based on the `jit` plugin option
       const compilation: AngularCompilation = pluginOptions.noopTypeScriptCompilation
         ? new NoopCompilation()
-        : await createAngularCompilation(!!pluginOptions.jit);
+        : await createAngularCompilation(!!pluginOptions.jit, !!pluginOptions.browserOnlyBuild);
       // Compilation is initially assumed to have errors until emitted
       let hasCompilationErrors = true;
 
@@ -198,7 +199,7 @@ export function createCompilerPlugin(
                 // invalid the output and force a full page reload for HMR cases. The containing file and order
                 // of the style within the containing file is used.
                 pluginOptions.externalRuntimeStyles
-                  ? createHash('sha-256')
+                  ? createHash('sha256')
                       .update(containingFile)
                       .update((order ?? 0).toString())
                       .update(className ?? '')
@@ -511,6 +512,31 @@ export function createCompilerPlugin(
           );
         }),
       );
+
+      // Add a load handler if there are file replacement option entries for JSON files
+      if (
+        pluginOptions.fileReplacements &&
+        Object.keys(pluginOptions.fileReplacements).some((value) => value.endsWith('.json'))
+      ) {
+        build.onLoad(
+          { filter: /\.json$/ },
+          createCachedLoad(pluginOptions.loadResultCache, async (args) => {
+            const replacement = pluginOptions.fileReplacements?.[path.normalize(args.path)];
+            if (replacement) {
+              return {
+                contents: await import('fs/promises').then(({ readFile }) =>
+                  readFile(path.normalize(replacement)),
+                ),
+                loader: 'json' as const,
+                watchFiles: [replacement],
+              };
+            }
+
+            // If no replacement defined, let esbuild handle it directly
+            return null;
+          }),
+        );
+      }
 
       // Setup bundling of component templates and stylesheets when in JIT mode
       if (pluginOptions.jit) {

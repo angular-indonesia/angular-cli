@@ -61,7 +61,6 @@ describeBuilder(buildWebpackBrowser, BROWSER_BUILDER_INFO, (harness) => {
       const { result } = await harness.executeOnce();
 
       expect(result?.success).toBe(true);
-      debugger;
       harness.expectFile(MAIN_OUTPUT).toExist();
       harness.expectFile(NAMED_LAZY_OUTPUT).toNotExist();
       harness.expectFile(UNNAMED_LAZY_OUTPUT).toExist();

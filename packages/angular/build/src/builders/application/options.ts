@@ -168,7 +168,7 @@ export async function normalizeOptions(
   const i18nOptions: I18nOptions & {
     duplicateTranslationBehavior?: I18NTranslation;
     missingTranslationBehavior?: I18NTranslation;
-  } = createI18nOptions(projectMetadata, options.localize);
+  } = createI18nOptions(projectMetadata, options.localize, context.logger);
   i18nOptions.duplicateTranslationBehavior = options.i18nDuplicateTranslation;
   i18nOptions.missingTranslationBehavior = options.i18nMissingTranslation;
   if (options.forceI18nFlatOutput) {
@@ -327,23 +327,25 @@ export async function normalizeOptions(
     let indexOutput: string;
     // The output file will be created within the configured output path
     if (typeof options.index === 'string') {
-      /**
-       * If SSR is activated, create a distinct entry file for the `index.html`.
-       * This is necessary because numerous server/cloud providers automatically serve the `index.html` as a static file
-       * if it exists (handling SSG).
-       *
-       * For instance, accessing `foo.com/` would lead to `foo.com/index.html` being served instead of hitting the server.
-       *
-       * This approach can also be applied to service workers, where the `index.csr.html` is served instead of the prerendered `index.html`.
-       */
-      const indexBaseName = path.basename(options.index);
-      indexOutput =
-        (ssrOptions || prerenderOptions) && indexBaseName === 'index.html'
-          ? INDEX_HTML_CSR
-          : indexBaseName;
+      indexOutput = options.index;
     } else {
       indexOutput = options.index.output || 'index.html';
     }
+
+    /**
+     * If SSR is activated, create a distinct entry file for the `index.html`.
+     * This is necessary because numerous server/cloud providers automatically serve the `index.html` as a static file
+     * if it exists (handling SSG).
+     *
+     * For instance, accessing `foo.com/` would lead to `foo.com/index.html` being served instead of hitting the server.
+     *
+     * This approach can also be applied to service workers, where the `index.csr.html` is served instead of the prerendered `index.html`.
+     */
+    const indexBaseName = path.basename(indexOutput);
+    indexOutput =
+      (ssrOptions || prerenderOptions) && indexBaseName === 'index.html'
+        ? INDEX_HTML_CSR
+        : indexBaseName;
 
     indexHtmlOptions = {
       input: path.join(
@@ -381,7 +383,7 @@ export async function normalizeOptions(
   // Initial options to keep
   const {
     allowedCommonJsDependencies,
-    aot,
+    aot = true,
     baseHref,
     crossOrigin,
     externalDependencies,
@@ -469,7 +471,7 @@ export async function normalizeOptions(
     clearScreen,
     define,
     partialSSRBuild: usePartialSsrBuild || partialSSRBuild,
-    externalRuntimeStyles,
+    externalRuntimeStyles: aot && externalRuntimeStyles,
     instrumentForCoverage,
     security,
     templateUpdates: !!options.templateUpdates,
@@ -643,7 +645,7 @@ function normalizeGlobalEntries(
 }
 
 export function getLocaleBaseHref(
-  baseHref: string | undefined,
+  baseHref: string | undefined = '',
   i18n: NormalizedApplicationBuildOptions['i18nOptions'],
   locale: string,
 ): string | undefined {
@@ -651,9 +653,12 @@ export function getLocaleBaseHref(
     return undefined;
   }
 
-  if (i18n.locales[locale] && i18n.locales[locale].baseHref !== '') {
-    return urlJoin(baseHref || '', i18n.locales[locale].baseHref ?? `/${locale}/`);
+  const localeData = i18n.locales[locale];
+  if (!localeData) {
+    return undefined;
   }
 
-  return undefined;
+  const baseHrefSuffix = localeData.baseHref ?? localeData.subPath + '/';
+
+  return baseHrefSuffix !== '' ? urlJoin(baseHref, baseHrefSuffix) : undefined;
 }

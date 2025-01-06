@@ -1,6 +1,10 @@
 # Disable NG CLI TTY mode
 build --action_env=NG_FORCE_TTY=false
 
+# Required by `rules_ts`.
+common --@aspect_rules_ts//ts:skipLibCheck=always
+common --@aspect_rules_ts//ts:default_to_tsc_transpiler
+
 # Make TypeScript compilation fast, by keeping a few copies of the compiler
 # running as daemons, and cache SourceFile AST's to reduce parse time.
 build --strategy=TypeScriptCompile=worker
@@ -129,8 +133,6 @@ build:remote --jobs=150
 
 # Setup the toolchain and platform for the remote build execution. The platform
 # is provided by the shared dev-infra package and targets k8 remote containers.
-build:remote --crosstool_top=@npm//@angular/build-tooling/bazel/remote-execution/cpp:cc_toolchain_suite
-build:remote --extra_toolchains=@npm//@angular/build-tooling/bazel/remote-execution/cpp:cc_toolchain
 build:remote --extra_execution_platforms=@npm//@angular/build-tooling/bazel/remote-execution:platform_with_network
 build:remote --host_platform=@npm//@angular/build-tooling/bazel/remote-execution:platform_with_network
 build:remote --platforms=@npm//@angular/build-tooling/bazel/remote-execution:platform_with_network

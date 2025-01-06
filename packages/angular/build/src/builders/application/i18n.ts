@@ -7,6 +7,7 @@
  */
 
 import { BuilderContext } from '@angular-devkit/architect';
+import type { Metafile } from 'esbuild';
 import { join } from 'node:path';
 import { BuildOutputFileType, InitialFileRecord } from '../../tools/esbuild/bundler-context';
 import {
@@ -23,11 +24,13 @@ import { NormalizedApplicationBuildOptions, getLocaleBaseHref } from './options'
 /**
  * Inlines all active locales as specified by the application build options into all
  * application JavaScript files created during the build.
+ * @param metafile An esbuild metafile object.
  * @param options The normalized application builder options used to create the build.
  * @param executionResult The result of an executed build.
  * @param initialFiles A map containing initial file information for the executed build.
  */
 export async function inlineI18n(
+  metafile: Metafile,
   options: NormalizedApplicationBuildOptions,
   executionResult: ExecutionResult,
   initialFiles: Map<string, InitialFileRecord>,
@@ -36,12 +39,14 @@ export async function inlineI18n(
   warnings: string[];
   prerenderedRoutes: PrerenderedRoutesRecord;
 }> {
+  const { i18nOptions, optimizationOptions, baseHref } = options;
+
   // Create the multi-threaded inliner with common options and the files generated from the build.
   const inliner = new I18nInliner(
     {
-      missingTranslation: options.i18nOptions.missingTranslationBehavior ?? 'warning',
+      missingTranslation: i18nOptions.missingTranslationBehavior ?? 'warning',
       outputFiles: executionResult.outputFiles,
-      shouldOptimize: options.optimizationOptions.scripts,
+      shouldOptimize: optimizationOptions.scripts,
     },
     maxWorkers,
   );
@@ -60,18 +65,15 @@ export async function inlineI18n(
   const updatedOutputFiles = [];
   const updatedAssetFiles = [];
   try {
-    for (const locale of options.i18nOptions.inlineLocales) {
+    for (const locale of i18nOptions.inlineLocales) {
       // A locale specific set of files is returned from the inliner.
       const localeInlineResult = await inliner.inlineForLocale(
         locale,
-        options.i18nOptions.locales[locale].translation,
+        i18nOptions.locales[locale].translation,
       );
       const localeOutputFiles = localeInlineResult.outputFiles;
       inlineResult.errors.push(...localeInlineResult.errors);
       inlineResult.warnings.push(...localeInlineResult.warnings);
-
-      const baseHref =
-        getLocaleBaseHref(options.baseHref, options.i18nOptions, locale) ?? options.baseHref;
 
       const {
         errors,
@@ -80,9 +82,10 @@ export async function inlineI18n(
         additionalOutputFiles,
         prerenderedRoutes: generatedRoutes,
       } = await executePostBundleSteps(
+        metafile,
         {
           ...options,
-          baseHref,
+          baseHref: getLocaleBaseHref(baseHref, i18nOptions, locale) ?? baseHref,
         },
         localeOutputFiles,
         executionResult.assetFiles,
@@ -94,16 +97,17 @@ export async function inlineI18n(
       inlineResult.errors.push(...errors);
       inlineResult.warnings.push(...warnings);
 
-      // Update directory with locale base
-      if (options.i18nOptions.flatOutput !== true) {
+      // Update directory with locale base or subPath
+      const subPath = i18nOptions.locales[locale].subPath;
+      if (i18nOptions.flatOutput !== true) {
         localeOutputFiles.forEach((file) => {
-          file.path = join(locale, file.path);
+          file.path = join(subPath, file.path);
         });
 
         for (const assetFile of [...executionResult.assetFiles, ...additionalAssets]) {
           updatedAssetFiles.push({
             source: assetFile.source,
-            destination: join(locale, assetFile.destination),
+            destination: join(subPath, assetFile.destination),
           });
         }
       } else {
@@ -128,7 +132,7 @@ export async function inlineI18n(
   ];
 
   // Assets are only changed if not using the flat output option
-  if (options.i18nOptions.flatOutput !== true) {
+  if (!i18nOptions.flatOutput) {
     executionResult.assetFiles = updatedAssetFiles;
   }
 
