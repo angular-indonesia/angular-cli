@@ -49,6 +49,11 @@ interface OutputFileRecord {
   type: BuildOutputFileType;
 }
 
+interface OutputAssetRecord {
+  source: string;
+  updated: boolean;
+}
+
 interface DevServerExternalResultMetadata extends Omit<ExternalResultMetadata, 'explicit'> {
   explicitBrowser: string[];
   explicitServer: string[];
@@ -138,7 +143,7 @@ export async function* serveWithVite(
     process.setSourceMapsEnabled(true);
   }
 
-  // Enable to support link-based component style hot reloading (`NG_HMR_CSTYLES=0` can be used to disable selectively)
+  // Enable to support link-based component style hot reloading (`NG_HMR_CSTYLES=1` can be used to enable)
   browserOptions.externalRuntimeStyles =
     serverOptions.liveReload && serverOptions.hmr && useComponentStyleHmr;
 
@@ -146,6 +151,14 @@ export async function* serveWithVite(
   // This will also replace file-based/inline styles as code if external runtime styles are not enabled.
   browserOptions.templateUpdates =
     serverOptions.liveReload && serverOptions.hmr && useComponentTemplateHmr;
+  if (browserOptions.templateUpdates) {
+    context.logger.warn(
+      'Component HMR has been enabled.\n' +
+        'If you encounter application reload issues, you can manually reload the page to bypass HMR and/or disable this feature with the' +
+        ' `--no-hmr` command line option.\n' +
+        'Please consider reporting any issues you encounter here: https://github.com/angular/angular-cli/issues\n',
+    );
+  }
 
   browserOptions.incrementalResults = true;
 
@@ -168,7 +181,7 @@ export async function* serveWithVite(
   let serverUrl: URL | undefined;
   let hadError = false;
   const generatedFiles = new Map<string, OutputFileRecord>();
-  const assetFiles = new Map<string, string>();
+  const assetFiles = new Map<string, OutputAssetRecord>();
   const externalMetadata: DevServerExternalResultMetadata = {
     implicitBrowser: [],
     implicitServer: [],
@@ -212,6 +225,7 @@ export async function* serveWithVite(
       });
     }
 
+    let needClientUpdate = true;
     switch (result.kind) {
       case ResultKind.Full:
         if (result.detail?.['htmlIndexPath']) {
@@ -229,28 +243,19 @@ export async function* serveWithVite(
         assetFiles.clear();
         componentStyles.clear();
         generatedFiles.clear();
-        for (const entry of Object.entries(result.files)) {
-          const [outputPath, file] = entry;
-          if (file.origin === 'disk') {
-            assetFiles.set('/' + normalizePath(outputPath), normalizePath(file.inputPath));
-            continue;
-          }
 
+        for (const [outputPath, file] of Object.entries(result.files)) {
           updateResultRecord(
             outputPath,
             file,
             normalizePath,
             htmlIndexPath,
             generatedFiles,
+            assetFiles,
             componentStyles,
             // The initial build will not yet have a server setup
             !server,
           );
-        }
-
-        // Invalidate SSR module graph to ensure that only new rebuild is used and not stale component updates
-        if (server && browserOptions.ssr && templateUpdates.size > 0) {
-          server.moduleGraph.invalidateAll();
         }
 
         // Clear stale template updates on code rebuilds
@@ -260,11 +265,15 @@ export async function* serveWithVite(
       case ResultKind.Incremental:
         assert(server, 'Builder must provide an initial full build before incremental results.');
 
+        // Background updates should only update server files/options
+        needClientUpdate = !result.background;
+
         for (const removed of result.removed) {
           const filePath = '/' + normalizePath(removed.path);
           generatedFiles.delete(filePath);
           assetFiles.delete(filePath);
         }
+
         for (const modified of result.modified) {
           updateResultRecord(
             modified,
@@ -272,9 +281,11 @@ export async function* serveWithVite(
             normalizePath,
             htmlIndexPath,
             generatedFiles,
+            assetFiles,
             componentStyles,
           );
         }
+
         for (const added of result.added) {
           updateResultRecord(
             added,
@@ -282,6 +293,7 @@ export async function* serveWithVite(
             normalizePath,
             htmlIndexPath,
             generatedFiles,
+            assetFiles,
             componentStyles,
           );
         }
@@ -294,16 +306,6 @@ export async function* serveWithVite(
           'Builder must provide an initial full build before component update results.',
         );
 
-        // Invalidate SSR module graph to ensure that new component updates are used
-        // TODO: Use fine-grained invalidation of only the component update modules
-        if (browserOptions.ssr) {
-          server.moduleGraph.invalidateAll();
-          const { ɵresetCompiledComponents } = (await server.ssrLoadModule('/main.server.mjs')) as {
-            ɵresetCompiledComponents: () => void;
-          };
-          ɵresetCompiledComponents();
-        }
-
         for (const componentUpdate of result.updates) {
           if (componentUpdate.type === 'template') {
             templateUpdates.set(componentUpdate.id, componentUpdate.content);
@@ -313,6 +315,7 @@ export async function* serveWithVite(
             });
           }
         }
+
         context.logger.info('Component update sent to client(s).');
         continue;
       default:
@@ -352,17 +355,22 @@ export async function* serveWithVite(
     if (server) {
       // Update fs allow list to include any new assets from the build option.
       server.config.server.fs.allow = [
-        ...new Set([...server.config.server.fs.allow, ...assetFiles.values()]),
+        ...new Set([
+          ...server.config.server.fs.allow,
+          ...[...assetFiles.values()].map(({ source }) => source),
+        ]),
       ];
 
-      await handleUpdate(
+      const updatedFiles = await invalidateUpdatedFiles(
         normalizePath,
         generatedFiles,
+        assetFiles,
         server,
-        serverOptions,
-        context.logger,
-        componentStyles,
       );
+
+      if (needClientUpdate) {
+        handleUpdate(server, serverOptions, context.logger, componentStyles, updatedFiles);
+      }
     } else {
       const projectName = context.target?.project;
       if (!projectName) {
@@ -422,6 +430,7 @@ export async function* serveWithVite(
         componentStyles,
         templateUpdates,
         browserOptions.loader as EsbuildLoaderOption | undefined,
+        browserOptions.define,
         extensions?.middleware,
         transformers?.indexHtml,
         thirdPartySourcemaps,
@@ -429,6 +438,24 @@ export async function* serveWithVite(
 
       server = await createServer(serverConfiguration);
       await server.listen();
+
+      // Setup builder context logging for browser clients
+      server.hot.on('angular:log', (data: { text: string; kind?: string }) => {
+        if (typeof data?.text !== 'string') {
+          context.logger.warn('Development server client sent invalid internal log event.');
+        }
+        switch (data.kind) {
+          case 'error':
+            context.logger.error(`[CLIENT ERROR]: ${data.text}`);
+            break;
+          case 'warning':
+            context.logger.warn(`[CLIENT WARNING]: ${data.text}`);
+            break;
+          default:
+            context.logger.info(`[CLIENT INFO]: ${data.text}`);
+            break;
+        }
+      });
 
       const urls = server.resolvedUrls;
       if (urls && (urls.local.length || urls.network.length)) {
@@ -467,36 +494,40 @@ export async function* serveWithVite(
   await new Promise<void>((resolve) => (deferred = resolve));
 }
 
-async function handleUpdate(
+/**
+ * Invalidates any updated asset or generated files and resets their `updated` state.
+ * This function also clears the server application cache when necessary.
+ *
+ * @returns A list of files that were updated and invalidated.
+ */
+async function invalidateUpdatedFiles(
   normalizePath: (id: string) => string,
   generatedFiles: Map<string, OutputFileRecord>,
+  assetFiles: Map<string, OutputAssetRecord>,
   server: ViteDevServer,
-  serverOptions: NormalizedDevServerOptions,
-  logger: BuilderContext['logger'],
-  componentStyles: Map<string, ComponentStyleRecord>,
-): Promise<void> {
+): Promise<string[]> {
   const updatedFiles: string[] = [];
-  let destroyAngularServerAppCalled = false;
+
+  // Invalidate any updated asset
+  for (const [file, record] of assetFiles) {
+    if (!record.updated) {
+      continue;
+    }
+
+    record.updated = false;
+    updatedFiles.push(file);
+  }
 
   // Invalidate any updated files
+  let serverApplicationChanged = false;
   for (const [file, record] of generatedFiles) {
     if (!record.updated) {
       continue;
     }
+
     record.updated = false;
-
-    if (record.type === BuildOutputFileType.ServerApplication && !destroyAngularServerAppCalled) {
-      // Clear the server app cache
-      // This must be done before module invalidation.
-      const { ɵdestroyAngularServerApp } = (await server.ssrLoadModule('/main.server.mjs')) as {
-        ɵdestroyAngularServerApp: typeof destroyAngularServerApp;
-      };
-
-      ɵdestroyAngularServerApp();
-      destroyAngularServerAppCalled = true;
-    }
-
     updatedFiles.push(file);
+    serverApplicationChanged ||= record.type === BuildOutputFileType.ServerApplication;
 
     const updatedModules = server.moduleGraph.getModulesByFile(
       normalizePath(join(server.config.root, file)),
@@ -504,13 +535,33 @@ async function handleUpdate(
     updatedModules?.forEach((m) => server.moduleGraph.invalidateModule(m));
   }
 
-  if (!updatedFiles.length) {
-    return;
+  if (serverApplicationChanged) {
+    // Clear the server app cache and
+    // trigger module evaluation before reload to initiate dependency optimization.
+    const { ɵdestroyAngularServerApp } = (await server.ssrLoadModule('/main.server.mjs')) as {
+      ɵdestroyAngularServerApp: typeof destroyAngularServerApp;
+    };
+
+    ɵdestroyAngularServerApp();
   }
 
-  if (destroyAngularServerAppCalled) {
-    // Trigger module evaluation before reload to initiate dependency optimization.
-    await server.ssrLoadModule('/main.server.mjs');
+  return updatedFiles;
+}
+
+/**
+ * Handles updates for the client by sending HMR or full page reload commands
+ * based on the updated files. It also ensures proper tracking of component styles and determines if
+ * a full reload is needed.
+ */
+function handleUpdate(
+  server: ViteDevServer,
+  serverOptions: NormalizedDevServerOptions,
+  logger: BuilderContext['logger'],
+  componentStyles: Map<string, ComponentStyleRecord>,
+  updatedFiles: string[],
+): void {
+  if (!updatedFiles.length) {
+    return;
   }
 
   if (serverOptions.hmr) {
@@ -556,7 +607,7 @@ async function handleUpdate(
           type: 'update',
           updates,
         });
-        logger.info('HMR update sent to client(s).');
+        logger.info('Stylesheet update sent to client(s).');
 
         return;
       }
@@ -583,10 +634,16 @@ function updateResultRecord(
   normalizePath: (id: string) => string,
   htmlIndexPath: string,
   generatedFiles: Map<string, OutputFileRecord>,
+  assetFiles: Map<string, OutputAssetRecord>,
   componentStyles: Map<string, ComponentStyleRecord>,
   initial = false,
 ): void {
   if (file.origin === 'disk') {
+    assetFiles.set('/' + normalizePath(outputPath), {
+      source: normalizePath(file.inputPath),
+      updated: !initial,
+    });
+
     return;
   }
 
@@ -643,7 +700,7 @@ function updateResultRecord(
 export async function setupServer(
   serverOptions: NormalizedDevServerOptions,
   outputFiles: Map<string, OutputFileRecord>,
-  assets: Map<string, string>,
+  assets: Map<string, OutputAssetRecord>,
   preserveSymlinks: boolean | undefined,
   externalMetadata: DevServerExternalResultMetadata,
   ssrMode: ServerSsrMode,
@@ -653,6 +710,7 @@ export async function setupServer(
   componentStyles: Map<string, ComponentStyleRecord>,
   templateUpdates: Map<string, string>,
   prebundleLoaderExtensions: EsbuildLoaderOption | undefined,
+  define: ApplicationBuilderInternalOptions['define'],
   extensionMiddleware?: Connect.NextHandleFunction[],
   indexHtmlTransformer?: (content: string) => Promise<string>,
   thirdPartySourcemaps = false,
@@ -669,6 +727,17 @@ export async function setupServer(
   const virtualProjectRoot = normalizePath(
     join(serverOptions.workspaceRoot, `.angular/vite-root`, serverOptions.buildTarget.project),
   );
+
+  // Files used for SSR warmup.
+  let ssrFiles: string[] | undefined;
+  switch (ssrMode) {
+    case ServerSsrMode.InternalSsrMiddleware:
+      ssrFiles = ['./main.server.mjs'];
+      break;
+    case ServerSsrMode.ExternalSsrMiddleware:
+      ssrFiles = ['./main.server.mjs', './server.mjs'];
+      break;
+  }
 
   const cacheDir = join(serverOptions.cacheOptions.path, serverOptions.buildTarget.project, 'vite');
   const configuration: InlineConfig = {
@@ -701,12 +770,13 @@ export async function setupServer(
     },
     server: {
       warmup: {
-        ssrFiles: ['./main.server.mjs', './server.mjs'],
+        ssrFiles,
       },
       port: serverOptions.port,
       strictPort: true,
       host: serverOptions.host,
       open: serverOptions.open,
+      allowedHosts: serverOptions.allowedHosts,
       headers: serverOptions.headers,
       // Disable the websocket if live reload is disabled (false/undefined are the only valid values)
       ws: serverOptions.liveReload === false && serverOptions.hmr === false ? false : undefined,
@@ -730,11 +800,19 @@ export async function setupServer(
         // The first two are required for Vite to function in prebundling mode (the default) and to load
         // the Vite client-side code for browser reloading. These would be available by default but when
         // the `allow` option is explicitly configured, they must be included manually.
-        allow: [cacheDir, join(serverOptions.workspaceRoot, 'node_modules'), ...assets.values()],
+        allow: [
+          cacheDir,
+          join(serverOptions.workspaceRoot, 'node_modules'),
+          ...[...assets.values()].map(({ source }) => source),
+        ],
       },
       // This is needed when `externalDependencies` is used to prevent Vite load errors.
       // NOTE: If Vite adds direct support for externals, this can be removed.
-      preTransformRequests: externalMetadata.explicitBrowser.length === 0,
+      // NOTE: Vite breaks the resolution of browser modules in SSR
+      //       when accessing a url with two or more segments (e.g., 'foo/bar'),
+      //       as they are not re-based from the base href.
+      preTransformRequests:
+        externalMetadata.explicitBrowser.length === 0 && ssrMode === ServerSsrMode.NoSsr,
     },
     ssr: {
       // Note: `true` and `/.*/` have different sematics. When true, the `external` option is ignored.
@@ -754,6 +832,7 @@ export async function setupServer(
         target,
         loader: prebundleLoaderExtensions,
         thirdPartySourcemaps,
+        define,
       }),
     },
     plugins: [
@@ -766,6 +845,7 @@ export async function setupServer(
         componentStyles,
         templateUpdates,
         ssrMode,
+        resetComponentUpdates: () => templateUpdates.clear(),
       }),
       createRemoveIdPrefixPlugin(externalMetadata.explicitBrowser),
       await createAngularSsrTransformPlugin(serverOptions.workspaceRoot),
@@ -791,20 +871,20 @@ export async function setupServer(
       zoneless,
       loader: prebundleLoaderExtensions,
       thirdPartySourcemaps,
+      define,
     }),
   };
 
   if (serverOptions.ssl) {
     if (serverOptions.sslCert && serverOptions.sslKey) {
+      configuration.server ??= {};
       // server configuration is defined above
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      configuration.server!.https = {
+      configuration.server.https = {
         cert: await readFile(serverOptions.sslCert),
         key: await readFile(serverOptions.sslKey),
       };
     } else {
       const { default: basicSslPlugin } = await import('@vitejs/plugin-basic-ssl');
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       configuration.plugins ??= [];
       configuration.plugins.push(basicSslPlugin());
     }

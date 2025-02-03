@@ -18,6 +18,8 @@ export type AngularMemoryOutputFiles = Map<
   { contents: Uint8Array; hash: string; servable: boolean }
 >;
 
+export type AngularOutputAssets = Map<string, { source: string }>;
+
 export function pathnameWithoutBasePath(url: string, basePath: string): string {
   const parsedUrl = new URL(url, 'http://localhost');
   const pathname = decodeURIComponent(parsedUrl.pathname);
@@ -57,6 +59,7 @@ export function getDepOptimizationConfig({
   ssr,
   loader,
   thirdPartySourcemaps,
+  define = {},
 }: {
   disabled: boolean;
   exclude: string[];
@@ -67,6 +70,7 @@ export function getDepOptimizationConfig({
   zoneless: boolean;
   loader?: EsbuildLoaderOption;
   thirdPartySourcemaps: boolean;
+  define: Record<string, string> | undefined;
 }): DepOptimizationConfig {
   const plugins: ViteEsBuildPlugin[] = [
     {
@@ -99,6 +103,7 @@ export function getDepOptimizationConfig({
       plugins,
       loader,
       define: {
+        ...define,
         'ngServerMode': `${ssr}`,
       },
       resolveExtensions: ['.mjs', '.js', '.cjs'],

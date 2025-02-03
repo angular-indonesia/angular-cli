@@ -6,13 +6,19 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import { Component, Type, provideExperimentalZonelessChangeDetection } from '@angular/core';
+import {
+  Component,
+  EnvironmentProviders,
+  Provider,
+  Type,
+  provideExperimentalZonelessChangeDetection,
+} from '@angular/core';
 import { bootstrapApplication } from '@angular/platform-browser';
 import { provideServerRendering } from '@angular/platform-server';
 import { RouterOutlet, Routes, provideRouter } from '@angular/router';
 import { destroyAngularServerApp } from '../src/app';
 import { ServerAsset, setAngularAppManifest } from '../src/manifest';
-import { ServerRoute, provideServerRoutesConfig } from '../src/routes/route-config';
+import { ServerRoute, provideServerRouting } from '../src/routes/route-config';
 
 @Component({
   standalone: true,
@@ -35,6 +41,8 @@ class AppComponent {}
  *                                  where the keys are asset paths and the values are asset details.
  * @param locale - An optional locale to configure for the application during testing.
  * @param rootComponent - The root Angular component to bootstrap the application.
+ * @param extraProviders - An optional array of additional providers that should be available to the
+ *                         root component and all its children.
  */
 export function setAngularAppTestingManifest(
   routes: Routes,
@@ -43,6 +51,7 @@ export function setAngularAppTestingManifest(
   additionalServerAssets: Record<string, ServerAsset> = {},
   locale?: string,
   rootComponent: Type<unknown> = AppComponent,
+  extraProviders: Array<Provider | EnvironmentProviders> = [],
 ): void {
   destroyAngularServerApp();
 
@@ -88,7 +97,8 @@ export function setAngularAppTestingManifest(
           provideServerRendering(),
           provideExperimentalZonelessChangeDetection(),
           provideRouter(routes),
-          provideServerRoutesConfig(serverRoutes),
+          provideServerRouting(serverRoutes),
+          ...extraProviders,
         ],
       });
     },

@@ -1,5 +1,5 @@
-load("//tools:defaults.bzl", "pkg_npm")
-load("//tools:interop.bzl", "ts_project")
+load("@npm2//:defs.bzl", "npm_link_all_packages")
+load("//tools:defaults2.bzl", "npm_package", "ts_project")
 
 # Copyright Google Inc. All Rights Reserved.
 #
@@ -9,23 +9,21 @@ licenses(["notice"])
 
 package(default_visibility = ["//visibility:public"])
 
+npm_link_all_packages()
+
 ts_project(
     name = "architect_cli",
     srcs = [
         "bin/architect.ts",
     ] + glob(["src/**/*.ts"]),
-    interop_deps = [
-        "//packages/angular_devkit/core",
-        "//packages/angular_devkit/core/node",
-    ],
     module_name = "@angular-devkit/architect-cli",
     deps = [
-        "//:root_modules/@types/node",
-        "//:root_modules/@types/progress",
-        "//:root_modules/@types/yargs-parser",
-        "//:root_modules/ansi-colors",
-        "//packages/angular_devkit/architect:architect_rjs",
-        "//packages/angular_devkit/architect/node:node_rjs",
+        ":node_modules/@angular-devkit/architect",
+        ":node_modules/@angular-devkit/core",
+        "//:node_modules/@types/node",
+        "//:node_modules/@types/progress",
+        "//:node_modules/@types/yargs-parser",
+        "//:node_modules/ansi-colors",
     ],
 )
 
@@ -36,8 +34,8 @@ genrule(
     cmd = "cp $(execpath //:LICENSE) $@",
 )
 
-pkg_npm(
-    name = "npm_package",
+npm_package(
+    name = "pkg",
     pkg_deps = [
         "//packages/angular_devkit/architect:package.json",
         "//packages/angular_devkit/core:package.json",
@@ -45,7 +43,7 @@ pkg_npm(
     tags = ["release-package"],
     deps = [
         ":README.md",
-        ":architect_cli",
+        ":architect_cli_rjs",
         ":license",
     ],
 )

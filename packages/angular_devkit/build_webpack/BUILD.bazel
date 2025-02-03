@@ -4,14 +4,15 @@
 # found in the LICENSE file at https://angular.dev/license
 
 load("@npm//@angular/build-tooling/bazel/api-golden:index.bzl", "api_golden_test_npm_package")
-load("@npm//@bazel/jasmine:index.bzl", "jasmine_node_test")
-load("//tools:defaults.bzl", "pkg_npm")
-load("//tools:interop.bzl", "ts_project")
+load("@npm2//:defs.bzl", "npm_link_all_packages")
+load("//tools:defaults2.bzl", "jasmine_test", "npm_package", "ts_project")
 load("//tools:ts_json_schema.bzl", "ts_json_schema")
 
 licenses(["notice"])
 
 package(default_visibility = ["//visibility:public"])
+
+npm_link_all_packages()
 
 ts_json_schema(
     name = "webpack_schema",
@@ -22,6 +23,13 @@ ts_json_schema(
     name = "webpack_dev_server_schema",
     src = "src/builders/webpack-dev-server/schema.json",
 )
+
+RUNTIME_ASSETS = [
+    "builders.json",
+    "package.json",
+    "src/builders/webpack-dev-server/schema.json",
+    "src/builders/webpack/schema.json",
+]
 
 ts_project(
     name = "build_webpack",
@@ -36,21 +44,14 @@ ts_project(
         "//packages/angular_devkit/build_webpack:src/builders/webpack-dev-server/schema.ts",
         "//packages/angular_devkit/build_webpack:src/builders/webpack/schema.ts",
     ],
-    data = [
-        "builders.json",
-        "package.json",
-        "src/builders/webpack-dev-server/schema.json",
-        "src/builders/webpack/schema.json",
-    ],
-    interop_deps = [
-        "//packages/angular_devkit/architect",
-    ],
+    data = RUNTIME_ASSETS,
     module_name = "@angular-devkit/build-webpack",
     deps = [
-        "//:root_modules/@types/node",
-        "//:root_modules/rxjs",
-        "//:root_modules/webpack",
-        "//:root_modules/webpack-dev-server",
+        ":node_modules/@angular-devkit/architect",
+        "//:node_modules/@types/node",
+        "//:node_modules/rxjs",
+        "//:node_modules/webpack",
+        "//:node_modules/webpack-dev-server",
     ],
 )
 
@@ -67,32 +68,28 @@ ts_project(
             "test/**/*",
         ],
     ),
-    interop_deps = [
-        "//packages/angular_devkit/core",
-        "//packages/angular_devkit/core/node",
-        "//packages/ngtools/webpack",
-        "//packages/angular_devkit/architect",
-        "//packages/angular_devkit/architect/node",
-        "//packages/angular_devkit/architect/testing",
-    ],
     deps = [
         ":build_webpack_rjs",
-        "//:root_modules/@types/jasmine",
+        ":node_modules/@angular-devkit/architect",
+        ":node_modules/@angular-devkit/core",
+        ":node_modules/@ngtools/webpack",
+        "//:node_modules/@types/jasmine",
     ],
 )
 
-jasmine_node_test(
+jasmine_test(
     name = "build_webpack_test",
-    srcs = [":build_webpack_test_lib"],
     data = [
-        "//:root_modules/@angular/common",
-        "//:root_modules/@angular/compiler",
-        "//:root_modules/@angular/compiler-cli",
-        "//:root_modules/@angular/core",
-        "//:root_modules/@angular/platform-browser",
-        "//:root_modules/@angular/platform-browser-dynamic",
-        "//:root_modules/tslib",
-        "//:root_modules/zone.js",
+        "build_webpack_test_lib_rjs",
+        "//:node_modules/@angular/common",
+        "//:node_modules/@angular/compiler",
+        "//:node_modules/@angular/compiler-cli",
+        "//:node_modules/@angular/core",
+        "//:node_modules/@angular/platform-browser",
+        "//:node_modules/@angular/platform-browser-dynamic",
+        "//:node_modules/tslib",
+        "//:node_modules/typescript",
+        "//:node_modules/zone.js",
     ],
 )
 
@@ -103,16 +100,15 @@ genrule(
     cmd = "cp $(execpath //:LICENSE) $@",
 )
 
-pkg_npm(
-    name = "npm_package",
+npm_package(
+    name = "pkg",
     pkg_deps = [
         "//packages/angular_devkit/architect:package.json",
     ],
     tags = ["release-package"],
-    deps = [
+    deps = RUNTIME_ASSETS + [
         ":README.md",
-        ":build_webpack",
-        ":builders.json",
+        ":build_webpack_rjs",
         ":license",
     ],
 )

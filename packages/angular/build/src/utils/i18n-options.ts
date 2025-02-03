@@ -65,7 +65,7 @@ function ensureString(value: unknown, name: string): asserts value is string {
   }
 }
 
-function ensureValidsubPath(value: unknown, name: string): asserts value is string {
+function ensureValidSubPath(value: unknown, name: string): asserts value is string {
   ensureString(value, name);
 
   if (!/^[\w-]*$/.test(value)) {
@@ -80,6 +80,7 @@ export function createI18nOptions(
   logger?: {
     warn(message: string): void;
   },
+  ssrEnabled?: boolean,
 ): I18nOptions {
   const { i18n: metadata = {} } = projectMetadata;
 
@@ -110,18 +111,20 @@ export function createI18nOptions(
 
     if (metadata.sourceLocale.baseHref !== undefined) {
       ensureString(metadata.sourceLocale.baseHref, 'i18n.sourceLocale.baseHref');
-      logger?.warn(
-        `The 'baseHref' field under 'i18n.sourceLocale' is deprecated and will be removed in future versions. ` +
-          `Please use 'subPath' instead.\nNote: 'subPath' defines the URL segment for the locale, acting ` +
-          `as both the HTML base HREF and the directory name for output.\nBy default, ` +
-          `if not specified, 'subPath' uses the locale code.`,
-      );
+      if (ssrEnabled) {
+        logger?.warn(
+          `'baseHref' in 'i18n.sourceLocale' may lead to undefined behavior when used with SSR. ` +
+            `Consider using 'subPath' instead.\n\n` +
+            `Note: 'subPath' specifies the URL segment for the locale, serving as both the HTML base HREF ` +
+            `and the output directory name.\nBy default, if not explicitly set, 'subPath' defaults to the locale code.`,
+        );
+      }
 
       rawSourceLocaleBaseHref = metadata.sourceLocale.baseHref;
     }
 
     if (metadata.sourceLocale.subPath !== undefined) {
-      ensureValidsubPath(metadata.sourceLocale.subPath, 'i18n.sourceLocale.subPath');
+      ensureValidSubPath(metadata.sourceLocale.subPath, 'i18n.sourceLocale.subPath');
       rawsubPath = metadata.sourceLocale.subPath;
     }
 
@@ -156,17 +159,20 @@ export function createI18nOptions(
 
         if ('baseHref' in options) {
           ensureString(options.baseHref, `i18n.locales.${locale}.baseHref`);
-          logger?.warn(
-            `The 'baseHref' field under 'i18n.locales.${locale}' is deprecated and will be removed in future versions. ` +
-              `Please use 'subPath' instead.\nNote: 'subPath' defines the URL segment for the locale, acting ` +
-              `as both the HTML base HREF and the directory name for output.\nBy default, ` +
-              `if not specified, 'subPath' uses the locale code.`,
-          );
+
+          if (ssrEnabled) {
+            logger?.warn(
+              `'baseHref' in 'i18n.locales.${locale}' may lead to undefined behavior when used with SSR. ` +
+                `Consider using 'subPath' instead.\n\n` +
+                `Note: 'subPath' specifies the URL segment for the locale, serving as both the HTML base HREF ` +
+                `and the output directory name.\nBy default, if not explicitly set, 'subPath' defaults to the locale code.`,
+            );
+          }
           baseHref = options.baseHref;
         }
 
         if ('subPath' in options) {
-          ensureString(options.subPath, `i18n.locales.${locale}.subPath`);
+          ensureValidSubPath(options.subPath, `i18n.locales.${locale}.subPath`);
           subPath = options.subPath;
         }
 
@@ -193,8 +199,24 @@ export function createI18nOptions(
     }
   }
 
-  // Check that subPaths are unique.
-  const localesData = Object.entries(i18n.locales);
+  if (inline === true) {
+    i18n.inlineLocales.add(i18n.sourceLocale);
+    Object.keys(i18n.locales).forEach((locale) => i18n.inlineLocales.add(locale));
+  } else if (inline) {
+    for (const locale of inline) {
+      if (!i18n.locales[locale] && i18n.sourceLocale !== locale) {
+        throw new Error(`Requested locale '${locale}' is not defined for the project.`);
+      }
+
+      i18n.inlineLocales.add(locale);
+    }
+  }
+
+  // Check that subPaths are unique only the locales that we are inlining.
+  const localesData = Object.entries(i18n.locales).filter(([locale]) =>
+    i18n.inlineLocales.has(locale),
+  );
+
   for (let i = 0; i < localesData.length; i++) {
     const [localeA, { subPath: subPathA }] = localesData[i];
 
@@ -206,19 +228,6 @@ export function createI18nOptions(
           `Invalid i18n configuration: Locales '${localeA}' and '${localeB}' cannot have the same subPath: '${subPathB}'.`,
         );
       }
-    }
-  }
-
-  if (inline === true) {
-    i18n.inlineLocales.add(i18n.sourceLocale);
-    Object.keys(i18n.locales).forEach((locale) => i18n.inlineLocales.add(locale));
-  } else if (inline) {
-    for (const locale of inline) {
-      if (!i18n.locales[locale] && i18n.sourceLocale !== locale) {
-        throw new Error(`Requested locale '${locale}' is not defined for the project.`);
-      }
-
-      i18n.inlineLocales.add(locale);
     }
   }
 

@@ -17,9 +17,11 @@ import {
   SERVER_APP_ENGINE_MANIFEST_FILENAME,
   SERVER_APP_MANIFEST_FILENAME,
 } from '../../utils/server-rendering/manifest';
+import { AngularCompilation, NoopCompilation } from '../angular/compilation';
 import { createCompilerPlugin } from './angular/compiler-plugin';
 import { ComponentStylesheetBundler } from './angular/component-stylesheets';
 import { SourceFileCache } from './angular/source-file-cache';
+import { createAngularLocalizeInitWarningPlugin } from './angular-localize-init-warning-plugin';
 import { BundlerOptionsFactory } from './bundler-context';
 import { createCompilerPluginOptions } from './compiler-plugin-options';
 import { createExternalPackagesPlugin } from './external-packages-plugin';
@@ -38,6 +40,7 @@ export function createBrowserCodeBundleOptions(
   target: string[],
   sourceFileCache: SourceFileCache,
   stylesheetBundler: ComponentStylesheetBundler,
+  angularCompilation: AngularCompilation,
   templateUpdates: Map<string, string> | undefined,
 ): BundlerOptionsFactory {
   return (loadCache) => {
@@ -68,9 +71,11 @@ export function createBrowserCodeBundleOptions(
         createLoaderImportAttributePlugin(),
         createWasmPlugin({ allowAsync: zoneless, cache: loadCache }),
         createSourcemapIgnorelistPlugin(),
+        createAngularLocalizeInitWarningPlugin(),
         createCompilerPlugin(
           // JS/TS options
           pluginOptions,
+          angularCompilation,
           // Component stylesheet bundler
           stylesheetBundler,
         ),
@@ -81,24 +86,7 @@ export function createBrowserCodeBundleOptions(
       buildOptions.plugins?.push(...options.plugins);
     }
 
-    if (options.externalPackages) {
-      // Package files affected by a customized loader should not be implicitly marked as external
-      if (
-        options.loaderExtensions ||
-        options.plugins ||
-        typeof options.externalPackages === 'object'
-      ) {
-        // Plugin must be added after custom plugins to ensure any added loader options are considered
-        buildOptions.plugins?.push(
-          createExternalPackagesPlugin(
-            options.externalPackages !== true ? options.externalPackages : undefined,
-          ),
-        );
-      } else {
-        // Safe to use the packages external option directly
-        buildOptions.packages = 'external';
-      }
-    }
+    appendOptionsForExternalPackages(options, buildOptions);
 
     return buildOptions;
   };
@@ -150,7 +138,9 @@ export function createBrowserPolyfillBundleOptions(
     buildOptions.plugins.push(
       createCompilerPlugin(
         // JS/TS options
-        { ...pluginOptions, noopTypeScriptCompilation: true },
+        pluginOptions,
+        // Browser compilation handles the actual Angular code compilation
+        new NoopCompilation(),
         // Component stylesheet options are unused for polyfills but required by the plugin
         stylesheetBundler,
       ),
@@ -288,9 +278,12 @@ export function createServerMainCodeBundleOptions(
       plugins: [
         createWasmPlugin({ allowAsync: zoneless, cache: loadResultCache }),
         createSourcemapIgnorelistPlugin(),
+        createAngularLocalizeInitWarningPlugin(),
         createCompilerPlugin(
           // JS/TS options
-          { ...pluginOptions, noopTypeScriptCompilation: true },
+          pluginOptions,
+          // Browser compilation handles the actual Angular code compilation
+          new NoopCompilation(),
           // Component stylesheet bundler
           stylesheetBundler,
         ),
@@ -299,9 +292,7 @@ export function createServerMainCodeBundleOptions(
 
     buildOptions.plugins ??= [];
 
-    if (externalPackages) {
-      buildOptions.packages = 'external';
-    } else {
+    if (!externalPackages) {
       buildOptions.plugins.push(createRxjsEsmResolutionPlugin());
     }
 
@@ -378,6 +369,8 @@ export function createServerMainCodeBundleOptions(
       buildOptions.plugins.push(...options.plugins);
     }
 
+    appendOptionsForExternalPackages(options, buildOptions);
+
     return buildOptions;
   };
 }
@@ -427,9 +420,12 @@ export function createSsrEntryCodeBundleOptions(
       supported: getFeatureSupport(target, true),
       plugins: [
         createSourcemapIgnorelistPlugin(),
+        createAngularLocalizeInitWarningPlugin(),
         createCompilerPlugin(
           // JS/TS options
-          { ...pluginOptions, noopTypeScriptCompilation: true },
+          pluginOptions,
+          // Browser compilation handles the actual Angular code compilation
+          new NoopCompilation(),
           // Component stylesheet bundler
           stylesheetBundler,
         ),
@@ -438,9 +434,7 @@ export function createSsrEntryCodeBundleOptions(
 
     buildOptions.plugins ??= [];
 
-    if (externalPackages) {
-      buildOptions.packages = 'external';
-    } else {
+    if (!externalPackages) {
       buildOptions.plugins.push(createRxjsEsmResolutionPlugin());
     }
 
@@ -511,6 +505,8 @@ export function createSsrEntryCodeBundleOptions(
     if (options.plugins) {
       buildOptions.plugins.push(...options.plugins);
     }
+
+    appendOptionsForExternalPackages(options, buildOptions);
 
     return buildOptions;
   };
@@ -716,4 +712,30 @@ function entryFileToWorkspaceRelative(workspaceRoot: string, entryFile: string):
       .replace(/.[mc]?ts$/, '')
       .replace(/\\/g, '/')
   );
+}
+
+function appendOptionsForExternalPackages(
+  options: NormalizedApplicationBuildOptions,
+  buildOptions: BuildOptions,
+): void {
+  if (!options.externalPackages) {
+    return;
+  }
+
+  buildOptions.plugins ??= [];
+
+  // Package files affected by a customized loader should not be implicitly marked as external
+  if (options.loaderExtensions || options.plugins || typeof options.externalPackages === 'object') {
+    // Plugin must be added after custom plugins to ensure any added loader options are considered
+    buildOptions.plugins.push(
+      createExternalPackagesPlugin(
+        options.externalPackages !== true ? options.externalPackages : undefined,
+      ),
+    );
+
+    buildOptions.packages = undefined;
+  } else {
+    // Safe to use the packages external option directly
+    buildOptions.packages = 'external';
+  }
 }

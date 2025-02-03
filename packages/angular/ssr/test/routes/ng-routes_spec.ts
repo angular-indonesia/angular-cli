@@ -12,6 +12,7 @@ import '@angular/compiler';
 /* eslint-enable import/no-unassigned-import */
 
 import { Component } from '@angular/core';
+import { Routes, provideRouter, withEnabledBlockingInitialNavigation } from '@angular/router';
 import { extractRoutesAndCreateRouteTree } from '../../src/routes/ng-routes';
 import { PrerenderFallback, RenderMode } from '../../src/routes/route-config';
 import { setAngularAppTestingManifest } from '../testing-utils';
@@ -51,19 +52,139 @@ describe('extractRoutesAndCreateRouteTree', () => {
     ]);
   });
 
-  it('should handle invalid route configuration path', async () => {
-    setAngularAppTestingManifest(
-      [{ path: 'home', component: DummyComponent }],
-      [
-        // This path starts with a slash, which should trigger an error
-        { path: '/invalid', renderMode: RenderMode.Client },
-      ],
-    );
+  describe('route configuration validation', () => {
+    it(`should error when a route starts with a '/'`, async () => {
+      setAngularAppTestingManifest(
+        [{ path: 'home', component: DummyComponent }],
+        [
+          // This path starts with a slash, which should trigger an error
+          { path: '/invalid', renderMode: RenderMode.Client },
+        ],
+      );
 
-    const { errors } = await extractRoutesAndCreateRouteTree({ url });
-    expect(errors[0]).toContain(
-      `Invalid '/invalid' route configuration: the path cannot start with a slash.`,
-    );
+      const { errors } = await extractRoutesAndCreateRouteTree({ url });
+      expect(errors[0]).toContain(
+        `Invalid '/invalid' route configuration: the path cannot start with a slash.`,
+      );
+    });
+
+    it("should error when 'getPrerenderParams' is used with a '**' route", async () => {
+      setAngularAppTestingManifest(
+        [{ path: 'home', component: DummyComponent }],
+        [
+          {
+            path: '**',
+            renderMode: RenderMode.Prerender,
+            getPrerenderParams() {
+              return Promise.resolve([]);
+            },
+          },
+        ],
+      );
+
+      const { errors } = await extractRoutesAndCreateRouteTree({ url });
+      expect(errors[0]).toContain(
+        "Invalid '**' route configuration: 'getPrerenderParams' cannot be used with a '*' or '**' route.",
+      );
+    });
+
+    it("should error when 'getPrerenderParams' is used with a '*' route", async () => {
+      setAngularAppTestingManifest(
+        [{ path: 'invalid/:id', component: DummyComponent }],
+        [
+          {
+            path: 'invalid/*',
+            renderMode: RenderMode.Prerender,
+            getPrerenderParams() {
+              return Promise.resolve([]);
+            },
+          },
+        ],
+      );
+
+      const { errors } = await extractRoutesAndCreateRouteTree({ url });
+      expect(errors[0]).toContain(
+        "Invalid 'invalid/*' route configuration: 'getPrerenderParams' cannot be used with a '*' or '**' route.",
+      );
+    });
+
+    it(`should not error when a catch-all route didn't match any Angular route.`, async () => {
+      setAngularAppTestingManifest(
+        [{ path: 'home', component: DummyComponent }],
+        [
+          { path: 'home', renderMode: RenderMode.Server },
+          { path: '**', renderMode: RenderMode.Server },
+        ],
+      );
+
+      const { errors } = await extractRoutesAndCreateRouteTree({
+        url,
+        invokeGetPrerenderParams: false,
+        includePrerenderFallbackRoutes: false,
+      });
+
+      expect(errors).toHaveSize(0);
+    });
+
+    it('should error when a route is not defined in the server routing configuration', async () => {
+      setAngularAppTestingManifest(
+        [{ path: 'home', component: DummyComponent }],
+        [
+          { path: 'home', renderMode: RenderMode.Server },
+          { path: 'invalid', renderMode: RenderMode.Server },
+        ],
+      );
+
+      const { errors } = await extractRoutesAndCreateRouteTree({
+        url,
+        invokeGetPrerenderParams: false,
+        includePrerenderFallbackRoutes: false,
+      });
+
+      expect(errors).toHaveSize(1);
+      expect(errors[0]).toContain(
+        `The 'invalid' server route does not match any routes defined in the Angular routing configuration`,
+      );
+    });
+
+    it('should error when a server route is not defined in the Angular routing configuration', async () => {
+      setAngularAppTestingManifest(
+        [
+          { path: 'home', component: DummyComponent },
+          { path: 'invalid', component: DummyComponent },
+        ],
+        [{ path: 'home', renderMode: RenderMode.Server }],
+      );
+
+      const { errors } = await extractRoutesAndCreateRouteTree({
+        url,
+        invokeGetPrerenderParams: false,
+        includePrerenderFallbackRoutes: false,
+      });
+
+      expect(errors).toHaveSize(1);
+      expect(errors[0]).toContain(
+        `The 'invalid' route does not match any route defined in the server routing configuration`,
+      );
+    });
+
+    it('should error when a route with a matcher when render mode is Prerender.', async () => {
+      setAngularAppTestingManifest(
+        [{ matcher: () => null, component: DummyComponent }],
+        [
+          {
+            path: '**',
+            renderMode: RenderMode.Prerender,
+          },
+        ],
+      );
+
+      const { errors } = await extractRoutesAndCreateRouteTree({ url });
+      expect(errors[0]).toContain(
+        `The route '**' is set for prerendering but has a defined matcher. ` +
+          `Routes with matchers cannot use prerendering. Please specify a different 'renderMode'.`,
+      );
+    });
   });
 
   describe('when `invokeGetPrerenderParams` is true', () => {
@@ -215,6 +336,7 @@ describe('extractRoutesAndCreateRouteTree', () => {
         invokeGetPrerenderParams: true,
         includePrerenderFallbackRoutes: true,
       });
+
       expect(errors).toHaveSize(0);
       expect(routeTree.toObject()).toEqual([
         { route: '/', renderMode: RenderMode.Prerender, redirectTo: '/some' },
@@ -224,6 +346,54 @@ describe('extractRoutesAndCreateRouteTree', () => {
         { route: '/*/thing', renderMode: RenderMode.Server },
       ]);
     });
+  });
+
+  it('should extract routes with a route level matcher', async () => {
+    setAngularAppTestingManifest(
+      [
+        {
+          path: '',
+          component: DummyComponent,
+        },
+        {
+          path: 'product',
+          component: DummyComponent,
+          children: [
+            {
+              path: '',
+              component: DummyComponent,
+            },
+            {
+              matcher: () => null,
+              component: DummyComponent,
+            },
+            {
+              path: 'list',
+              component: DummyComponent,
+            },
+          ],
+        },
+      ],
+      [
+        { path: '**', renderMode: RenderMode.Client },
+        { path: 'product', renderMode: RenderMode.Client },
+        { path: 'product/*', renderMode: RenderMode.Client },
+        { path: 'product/**/overview/details', renderMode: RenderMode.Server },
+        { path: 'product/**/overview', renderMode: RenderMode.Server },
+        { path: 'product/**/overview/about', renderMode: RenderMode.Server },
+      ],
+    );
+
+    const { routeTree, errors } = await extractRoutesAndCreateRouteTree({ url });
+    expect(errors).toHaveSize(0);
+    expect(routeTree.toObject()).toEqual([
+      { route: '/', renderMode: RenderMode.Client },
+      { route: '/product', renderMode: RenderMode.Client },
+      { route: '/product/**/overview', renderMode: RenderMode.Server },
+      { route: '/product/**/overview/details', renderMode: RenderMode.Server },
+      { route: '/product/**/overview/about', renderMode: RenderMode.Server },
+      { route: '/product/list', renderMode: RenderMode.Client },
+    ]);
   });
 
   it('should extract nested redirects that are not explicitly defined.', async () => {
@@ -317,7 +487,6 @@ describe('extractRoutesAndCreateRouteTree', () => {
 
     const { routeTree, errors } = await extractRoutesAndCreateRouteTree({
       url,
-
       invokeGetPrerenderParams: true,
       includePrerenderFallbackRoutes: false,
     });
@@ -371,66 +540,6 @@ describe('extractRoutesAndCreateRouteTree', () => {
       },
       { route: '/user/*/role/*', renderMode: RenderMode.Client },
     ]);
-  });
-
-  it(`should not error when a catch-all route didn't match any Angular route.`, async () => {
-    setAngularAppTestingManifest(
-      [{ path: 'home', component: DummyComponent }],
-      [
-        { path: 'home', renderMode: RenderMode.Server },
-        { path: '**', renderMode: RenderMode.Server },
-      ],
-    );
-
-    const { errors } = await extractRoutesAndCreateRouteTree({
-      url,
-      invokeGetPrerenderParams: false,
-      includePrerenderFallbackRoutes: false,
-    });
-
-    expect(errors).toHaveSize(0);
-  });
-
-  it('should error when a route is not defined in the server routing configuration', async () => {
-    setAngularAppTestingManifest(
-      [{ path: 'home', component: DummyComponent }],
-      [
-        { path: 'home', renderMode: RenderMode.Server },
-        { path: 'invalid', renderMode: RenderMode.Server },
-      ],
-    );
-
-    const { errors } = await extractRoutesAndCreateRouteTree({
-      url,
-      invokeGetPrerenderParams: false,
-      includePrerenderFallbackRoutes: false,
-    });
-
-    expect(errors).toHaveSize(1);
-    expect(errors[0]).toContain(
-      `The 'invalid' server route does not match any routes defined in the Angular routing configuration`,
-    );
-  });
-
-  it('should error when a server route is not defined in the Angular routing configuration', async () => {
-    setAngularAppTestingManifest(
-      [
-        { path: 'home', component: DummyComponent },
-        { path: 'invalid', component: DummyComponent },
-      ],
-      [{ path: 'home', renderMode: RenderMode.Server }],
-    );
-
-    const { errors } = await extractRoutesAndCreateRouteTree({
-      url,
-      invokeGetPrerenderParams: false,
-      includePrerenderFallbackRoutes: false,
-    });
-
-    expect(errors).toHaveSize(1);
-    expect(errors[0]).toContain(
-      `The 'invalid' route does not match any route defined in the server routing configuration`,
-    );
   });
 
   it('should use wildcard configuration when no Angular routes are defined', async () => {
@@ -489,6 +598,38 @@ describe('extractRoutesAndCreateRouteTree', () => {
       undefined,
       undefined,
       RootComponent,
+    );
+
+    const { routeTree, errors } = await extractRoutesAndCreateRouteTree({ url });
+    expect(errors).toHaveSize(0);
+    expect(routeTree.toObject()).toHaveSize(2);
+  });
+
+  it('should not bootstrap the root component when using `withEnabledBlockingInitialNavigation`', async () => {
+    @Component({
+      standalone: true,
+      selector: 'app-root',
+      template: '',
+    })
+    class RootComponent {
+      constructor() {
+        throw new Error('RootComponent should not be bootstrapped.');
+      }
+    }
+
+    const routes: Routes = [
+      { path: '', component: DummyComponent },
+      { path: 'home', component: DummyComponent },
+    ];
+
+    setAngularAppTestingManifest(
+      routes,
+      [{ path: '**', renderMode: RenderMode.Server }],
+      undefined,
+      undefined,
+      undefined,
+      RootComponent,
+      [provideRouter(routes, withEnabledBlockingInitialNavigation())],
     );
 
     const { routeTree, errors } = await extractRoutesAndCreateRouteTree({ url });

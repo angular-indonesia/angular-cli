@@ -13,6 +13,7 @@ import { BuildOutputFileType } from '../../tools/esbuild/bundler-context';
 import { ExecutionResult, RebuildState } from '../../tools/esbuild/bundler-execution-result';
 import { shutdownSassWorkerPool } from '../../tools/esbuild/stylesheets/sass-language';
 import { logMessages, withNoProgress, withSpinner } from '../../tools/esbuild/utils';
+import { ChangedFiles } from '../../tools/esbuild/watcher';
 import { shouldWatchRoot } from '../../utils/environment-options';
 import { NormalizedCachedOptions } from '../../utils/normalize-cache';
 import { NormalizedApplicationBuildOptions, NormalizedOutputOptions } from './options';
@@ -144,7 +145,7 @@ export async function* runEsBuildBuildAction(
   // Output the first build results after setting up the watcher to ensure that any code executed
   // higher in the iterator call stack will trigger the watcher. This is particularly relevant for
   // unit tests which execute the builder and modify the file system programmatically.
-  yield emitOutputResult(result, outputOptions);
+  yield* emitOutputResults(result, outputOptions);
 
   // Finish if watch mode is not enabled
   if (!watcher) {
@@ -196,11 +197,14 @@ export async function* runEsBuildBuildAction(
         watcher.remove([...staleWatchFiles]);
       }
 
-      yield emitOutputResult(
+      for (const outputResult of emitOutputResults(
         result,
         outputOptions,
-        incrementalResults ? rebuildState.previousOutputInfo : undefined,
-      );
+        changes,
+        incrementalResults ? rebuildState : undefined,
+      )) {
+        yield outputResult;
+      }
     }
   } finally {
     // Stop the watcher and cleanup incremental rebuild state
@@ -210,7 +214,7 @@ export async function* runEsBuildBuildAction(
   }
 }
 
-function emitOutputResult(
+function* emitOutputResults(
   {
     outputFiles,
     assetFiles,
@@ -222,10 +226,11 @@ function emitOutputResult(
     templateUpdates,
   }: ExecutionResult,
   outputOptions: NormalizedApplicationBuildOptions['outputOptions'],
-  previousOutputInfo?: ReadonlyMap<string, { hash: string; type: BuildOutputFileType }>,
-): Result {
+  changes?: ChangedFiles,
+  rebuildState?: RebuildState,
+): Iterable<Result> {
   if (errors.length > 0) {
-    return {
+    yield {
       kind: ResultKind.Failure,
       errors: errors as ResultMessage[],
       warnings: warnings as ResultMessage[],
@@ -233,11 +238,167 @@ function emitOutputResult(
         outputOptions,
       },
     };
+
+    return;
   }
 
-  // Template updates only exist if no other JS changes have occurred
+  // Use a full result if there is no rebuild state (no prior build result)
+  if (!rebuildState || !changes) {
+    const result: FullResult = {
+      kind: ResultKind.Full,
+      warnings: warnings as ResultMessage[],
+      files: {},
+      detail: {
+        externalMetadata,
+        htmlIndexPath,
+        htmlBaseHref,
+        outputOptions,
+      },
+    };
+    for (const file of assetFiles) {
+      result.files[file.destination] = {
+        type: BuildOutputFileType.Browser,
+        inputPath: file.source,
+        origin: 'disk',
+      };
+    }
+    for (const file of outputFiles) {
+      result.files[file.path] = {
+        type: file.type,
+        contents: file.contents,
+        origin: 'memory',
+        hash: file.hash,
+      };
+    }
+
+    yield result;
+
+    return;
+  }
+
+  // Template updates only exist if no other JS changes have occurred.
+  // A full page reload may be required based on the following incremental output change analysis.
   const hasTemplateUpdates = !!templateUpdates?.size;
-  if (hasTemplateUpdates) {
+
+  // Use an incremental result if previous output information is available
+  const { previousAssetsInfo, previousOutputInfo } = rebuildState;
+
+  const incrementalResult: IncrementalResult = {
+    kind: ResultKind.Incremental,
+    warnings: warnings as ResultMessage[],
+    // Initially attempt to use a background update of files to support component updates.
+    background: hasTemplateUpdates,
+    added: [],
+    removed: [],
+    modified: [],
+    files: {},
+    detail: {
+      externalMetadata,
+      htmlIndexPath,
+      htmlBaseHref,
+      outputOptions,
+    },
+  };
+
+  let hasCssUpdates = false;
+
+  // Initially assume all previous output files have been removed
+  const removedOutputFiles = new Map(previousOutputInfo);
+  for (const file of outputFiles) {
+    removedOutputFiles.delete(file.path);
+
+    const previousHash = previousOutputInfo.get(file.path)?.hash;
+    let needFile = false;
+    if (previousHash === undefined) {
+      needFile = true;
+      incrementalResult.added.push(file.path);
+    } else if (previousHash !== file.hash) {
+      needFile = true;
+      incrementalResult.modified.push(file.path);
+    }
+
+    if (needFile) {
+      if (file.path.endsWith('.css')) {
+        hasCssUpdates = true;
+      } else if (!/(?:\.m?js|\.map)$/.test(file.path)) {
+        // Updates to non-JS files must signal an update with the dev server
+        incrementalResult.background = false;
+      }
+
+      incrementalResult.files[file.path] = {
+        type: file.type,
+        contents: file.contents,
+        origin: 'memory',
+        hash: file.hash,
+      };
+    }
+  }
+
+  // Initially assume all previous assets files have been removed
+  const removedAssetFiles = new Map(previousAssetsInfo);
+  for (const { source, destination } of assetFiles) {
+    removedAssetFiles.delete(source);
+
+    if (!previousAssetsInfo.has(source)) {
+      incrementalResult.added.push(destination);
+      incrementalResult.background = false;
+    } else if (changes.modified.has(source)) {
+      incrementalResult.modified.push(destination);
+      incrementalResult.background = false;
+    } else {
+      continue;
+    }
+
+    hasCssUpdates ||= destination.endsWith('.css');
+
+    incrementalResult.files[destination] = {
+      type: BuildOutputFileType.Browser,
+      inputPath: source,
+      origin: 'disk',
+    };
+  }
+
+  // Do not remove stale files yet if there are template updates.
+  // Component chunk files may still be referenced in running browser code.
+  // Module evaluation time component updates will update any of these files.
+  // This typically occurs when a lazy component is changed that has not yet
+  // been accessed at runtime.
+  if (hasTemplateUpdates && incrementalResult.background) {
+    removedOutputFiles.clear();
+  }
+
+  // Include the removed output and asset files
+  incrementalResult.removed.push(
+    ...Array.from(removedOutputFiles, ([file, { type }]) => ({
+      path: file,
+      type,
+    })),
+    ...Array.from(removedAssetFiles.values(), (file) => ({
+      path: file,
+      type: BuildOutputFileType.Browser,
+    })),
+  );
+
+  yield incrementalResult;
+
+  // If there are template updates and the incremental update was background only, a component
+  // update is possible.
+  if (hasTemplateUpdates && incrementalResult.background) {
+    // Template changes may be accompanied by stylesheet changes and these should also be updated hot when possible.
+    if (hasCssUpdates) {
+      const styleResult: IncrementalResult = {
+        kind: ResultKind.Incremental,
+        added: incrementalResult.added.filter(isCssFilePath),
+        removed: incrementalResult.removed.filter(({ path }) => isCssFilePath(path)),
+        modified: incrementalResult.modified.filter(isCssFilePath),
+        files: Object.fromEntries(
+          Object.entries(incrementalResult.files).filter(([path]) => isCssFilePath(path)),
+        ),
+      };
+
+      yield styleResult;
+    }
+
     const updateResult: ComponentUpdateResult = {
       kind: ResultKind.ComponentUpdate,
       updates: Array.from(templateUpdates, ([id, content]) => ({
@@ -247,101 +408,10 @@ function emitOutputResult(
       })),
     };
 
-    return updateResult;
+    yield updateResult;
   }
+}
 
-  // Use an incremental result if previous output information is available
-  if (previousOutputInfo) {
-    const incrementalResult: IncrementalResult = {
-      kind: ResultKind.Incremental,
-      warnings: warnings as ResultMessage[],
-      added: [],
-      removed: [],
-      modified: [],
-      files: {},
-      detail: {
-        externalMetadata,
-        htmlIndexPath,
-        htmlBaseHref,
-        outputOptions,
-      },
-    };
-
-    // Initially assume all previous output files have been removed
-    const removedOutputFiles = new Map(previousOutputInfo);
-
-    for (const file of outputFiles) {
-      removedOutputFiles.delete(file.path);
-
-      const previousHash = previousOutputInfo.get(file.path)?.hash;
-      let needFile = false;
-      if (previousHash === undefined) {
-        needFile = true;
-        incrementalResult.added.push(file.path);
-      } else if (previousHash !== file.hash) {
-        needFile = true;
-        incrementalResult.modified.push(file.path);
-      }
-
-      if (needFile) {
-        incrementalResult.files[file.path] = {
-          type: file.type,
-          contents: file.contents,
-          origin: 'memory',
-          hash: file.hash,
-        };
-      }
-    }
-
-    // Include the removed output files
-    incrementalResult.removed.push(
-      ...Array.from(removedOutputFiles, ([file, { type }]) => ({
-        path: file,
-        type,
-      })),
-    );
-
-    // Always consider asset files as added to ensure new/modified assets are available.
-    // TODO: Consider more comprehensive asset analysis.
-    for (const file of assetFiles) {
-      incrementalResult.added.push(file.destination);
-      incrementalResult.files[file.destination] = {
-        type: BuildOutputFileType.Browser,
-        inputPath: file.source,
-        origin: 'disk',
-      };
-    }
-
-    return incrementalResult;
-  }
-
-  // Otherwise, use a full result
-  const result: FullResult = {
-    kind: ResultKind.Full,
-    warnings: warnings as ResultMessage[],
-    files: {},
-    detail: {
-      externalMetadata,
-      htmlIndexPath,
-      htmlBaseHref,
-      outputOptions,
-    },
-  };
-  for (const file of assetFiles) {
-    result.files[file.destination] = {
-      type: BuildOutputFileType.Browser,
-      inputPath: file.source,
-      origin: 'disk',
-    };
-  }
-  for (const file of outputFiles) {
-    result.files[file.path] = {
-      type: file.type,
-      contents: file.contents,
-      origin: 'memory',
-      hash: file.hash,
-    };
-  }
-
-  return result;
+function isCssFilePath(filePath: string): boolean {
+  return /\.css(?:\.map)?$/i.test(filePath);
 }

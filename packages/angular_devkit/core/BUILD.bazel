@@ -1,7 +1,5 @@
 load("@npm//@angular/build-tooling/bazel/api-golden:index.bzl", "api_golden_test_npm_package")
-load("@npm//@bazel/jasmine:index.bzl", "jasmine_node_test")
-load("//tools:defaults.bzl", "pkg_npm")
-load("//tools:interop.bzl", "ts_project")
+load("//tools:defaults2.bzl", "jasmine_test", "npm_package", "ts_project")
 
 # Copyright Google Inc. All Rights Reserved.
 #
@@ -11,7 +9,14 @@ package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
 
-# @angular-devkit/core
+RUNTIME_ASSETS = glob(
+    include = ["**/*.json"],
+    # NB: we need to exclude the nested node_modules that is laid out by yarn workspaces
+    exclude = [
+        "node_modules/**",
+        "src/workspace/json/test/**",
+    ],
+)
 
 ts_project(
     name = "core",
@@ -21,25 +26,18 @@ ts_project(
             "src/**/*_spec.ts",
         ],
     ) + ["index.ts"],
-    data = glob(
-        include = ["**/*.json"],
-        # NB: we need to exclude the nested node_modules that is laid out by yarn workspaces
-        exclude = [
-            "node_modules/**",
-            "src/workspace/json/test/**",
-        ],
-    ),
+    data = RUNTIME_ASSETS,
     module_name = "@angular-devkit/core",
     deps = [
-        "//:root_modules/@types/node",
-        "//:root_modules/@types/picomatch",
-        "//:root_modules/@types/jasmine",
-        "//:root_modules/ajv",
-        "//:root_modules/ajv-formats",
-        "//:root_modules/jsonc-parser",
-        "//:root_modules/picomatch",
-        "//:root_modules/rxjs",
-        "//:root_modules/source-map",
+        "//:node_modules/@types/node",
+        "//:node_modules/@types/picomatch",
+        "//:node_modules/@types/jasmine",
+        "//:node_modules/ajv",
+        "//:node_modules/ajv-formats",
+        "//:node_modules/jsonc-parser",
+        "//:node_modules/picomatch",
+        "//:node_modules/rxjs",
+        "//:node_modules/source-map",
         # @node_module: typescript:es2015.proxy
         # @node_module: typescript:es2015.reflect
         # @node_module: typescript:es2015.symbol.wellknown
@@ -56,14 +54,14 @@ ts_project(
     data = glob(["src/workspace/json/test/**/*.json"]),
     deps = [
         ":core_rjs",
-        "//:root_modules/rxjs",
+        "//:node_modules/rxjs",
         "//packages/angular_devkit/core/node:node_rjs",
     ],
 )
 
-jasmine_node_test(
+jasmine_test(
     name = "core_test",
-    srcs = [":core_test_lib"],
+    data = [":core_test_lib_rjs"],
 )
 
 genrule(
@@ -73,15 +71,15 @@ genrule(
     cmd = "cp $(execpath //:LICENSE) $@",
 )
 
-pkg_npm(
-    name = "npm_package",
+npm_package(
+    name = "pkg",
     tags = ["release-package"],
-    deps = [
+    deps = RUNTIME_ASSETS + [
         ":README.md",
-        ":core",
+        ":core_rjs",
         ":license",
-        "//packages/angular_devkit/core/node",
-        "//packages/angular_devkit/core/node/testing",
+        "//packages/angular_devkit/core/node:node_rjs",
+        "//packages/angular_devkit/core/node/testing:testing_rjs",
     ],
 )
 

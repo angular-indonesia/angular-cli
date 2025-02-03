@@ -37,9 +37,9 @@ build_bazel_rules_nodejs_dependencies()
 
 http_archive(
     name = "aspect_rules_js",
-    sha256 = "fbc34d815a0cc52183a1a26732fc0329e26774a51abbe0f26fc9fd2dab6133b4",
-    strip_prefix = "rules_js-2.1.2",
-    url = "https://github.com/aspect-build/rules_js/releases/download/v2.1.2/rules_js-v2.1.2.tar.gz",
+    sha256 = "875b8d01af629dbf626eddc5cf239c9f0da20330f4d99ad956afc961096448dd",
+    strip_prefix = "rules_js-2.1.3",
+    url = "https://github.com/aspect-build/rules_js/releases/download/v2.1.3/rules_js-v2.1.3.tar.gz",
 )
 
 load("@aspect_rules_js//js:repositories.bzl", "rules_js_dependencies")
@@ -136,9 +136,7 @@ yarn_install(
     data = [
         "//:.yarn/releases/yarn-4.5.0.cjs",
         "//:.yarnrc.yml",
-        "//:patches/@angular+bazel+19.0.0-next.7.patch",
-        "//:patches/@bazel+concatjs+5.8.1.patch",
-        "//:patches/@bazel+jasmine+5.8.1.patch",
+        "//:patches/@angular+bazel+19.1.0-next.4.patch",
     ],
     # Currently disabled due to:
     #  1. Missing Windows support currently.
@@ -151,9 +149,9 @@ yarn_install(
 
 http_archive(
     name = "aspect_bazel_lib",
-    sha256 = "7b39d9f38b82260a8151b18dd4a6219d2d7fc4a0ac313d4f5a630ae6907d205d",
-    strip_prefix = "bazel-lib-2.10.0",
-    url = "https://github.com/aspect-build/bazel-lib/releases/download/v2.10.0/bazel-lib-v2.10.0.tar.gz",
+    sha256 = "57a777c5d4d0b79ad675995ee20fc1d6d2514a1ef3000d98f5c70cf0c09458a3",
+    strip_prefix = "bazel-lib-2.13.0",
+    url = "https://github.com/aspect-build/bazel-lib/releases/download/v2.13.0/bazel-lib-v2.13.0.tar.gz",
 )
 
 load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies", "aspect_bazel_lib_register_toolchains")
@@ -183,10 +181,38 @@ load("@aspect_rules_js//npm:repositories.bzl", "npm_translate_lock")
 
 npm_translate_lock(
     name = "npm2",
+    custom_postinstalls = {
+        # TODO: Standardize browser management for `rules_js`
+        "webdriver-manager": "node ./bin/webdriver-manager update --standalone false --gecko false --versions.chrome 106.0.5249.21",
+    },
     data = [
         "//:package.json",
         "//:pnpm-workspace.yaml",
+        "//modules/testing/builder:package.json",
+        "//packages/angular/build:package.json",
+        "//packages/angular/cli:package.json",
+        "//packages/angular/pwa:package.json",
+        "//packages/angular/ssr:package.json",
+        "//packages/angular_devkit/architect:package.json",
+        "//packages/angular_devkit/architect_cli:package.json",
+        "//packages/angular_devkit/build_angular:package.json",
+        "//packages/angular_devkit/build_webpack:package.json",
+        "//packages/angular_devkit/core:package.json",
+        "//packages/angular_devkit/schematics:package.json",
+        "//packages/angular_devkit/schematics_cli:package.json",
+        "//packages/ngtools/webpack:package.json",
+        "//packages/schematics/angular:package.json",
     ],
+    lifecycle_hooks_envs = {
+        # TODO: Standardize browser management for `rules_js`
+        "puppeteer": ["PUPPETEER_DOWNLOAD_PATH=./downloads"],
+    },
+    lifecycle_hooks_execution_requirements = {
+        # Needed for downloading chromedriver.
+        # Also `update-config` of webdriver manager would store an absolute path;
+        # which would then break execution.
+        "webdriver-manager": ["local"],
+    },
     npmrc = "//:.npmrc",
     patches = {
         # Note: Patches not needed as the existing patches are only
@@ -206,9 +232,9 @@ http_archive(
     name = "aspect_rules_ts",
     patch_args = ["-p1"],
     patches = ["//tools:rules_ts_windows.patch"],
-    sha256 = "cff3137b043ff6bf1a2542fd9691dc762432370cd39eb4bb0756d288de52067d",
-    strip_prefix = "rules_ts-3.3.2",
-    url = "https://github.com/aspect-build/rules_ts/releases/download/v3.3.2/rules_ts-v3.3.2.tar.gz",
+    sha256 = "013a10b2b457add73b081780e604778eb50a141709f9194298f97761acdcc169",
+    strip_prefix = "rules_ts-3.4.0",
+    url = "https://github.com/aspect-build/rules_ts/releases/download/v3.4.0/rules_ts-v3.4.0.tar.gz",
 )
 
 load("@aspect_rules_ts//ts:repositories.bzl", "rules_ts_dependencies")
@@ -222,6 +248,17 @@ rules_ts_dependencies(
 
 http_file(
     name = "tsc_worker",
-    sha256 = "",
-    urls = ["https://raw.githubusercontent.com/devversion/rules_angular/a270a74d1e64577bddba96a5484c7c5d2c5d2770/dist/worker.mjs"],
+    sha256 = "5a5c46846ecda83e05b9da26f1672ad51c59bce08fed88419850d0e29c993b30",
+    urls = ["https://raw.githubusercontent.com/devversion/rules_angular/4b7532ba2b29078d005899cd15b415593d03cceb/dist/worker.mjs"],
 )
+
+http_archive(
+    name = "aspect_rules_jasmine",
+    sha256 = "0d2f9c977842685895020cac721d8cc4f1b37aae15af46128cf619741dc61529",
+    strip_prefix = "rules_jasmine-2.0.0",
+    url = "https://github.com/aspect-build/rules_jasmine/releases/download/v2.0.0/rules_jasmine-v2.0.0.tar.gz",
+)
+
+load("@aspect_rules_jasmine//jasmine:dependencies.bzl", "rules_jasmine_dependencies")
+
+rules_jasmine_dependencies()
