@@ -1,12 +1,19 @@
 # Engine versions to stamp in a release package.json
-RELEASE_ENGINES_NODE = "^18.19.1 || ^20.11.1 || >=22.0.0"
+RELEASE_ENGINES_NODE = "^20.11.1 || ^22.11.0 || >=24.0.0"
 RELEASE_ENGINES_NPM = "^6.11.0 || ^7.5.6 || >=8.0.0"
 RELEASE_ENGINES_YARN = ">= 1.13.0"
 
-NG_PACKAGR_VERSION = "^19.2.0-next.0"
-ANGULAR_FW_VERSION = "^19.2.0-next.0"
-ANGULAR_FW_PEER_DEP = "^19.0.0 || ^19.2.0-next.0"
-NG_PACKAGR_PEER_DEP = "^19.0.0 || ^19.2.0-next.0"
+NG_PACKAGR_VERSION = "^20.0.0-next.0"
+ANGULAR_FW_VERSION = "^20.0.0-next.0"
+ANGULAR_FW_PEER_DEP = "^20.0.0 || ^20.0.0-next.0"
+NG_PACKAGR_PEER_DEP = "^20.0.0 || ^20.0.0-next.0"
+
+# Baseline widely-available date in `YYYY-MM-DD` format which defines Angular's
+# browser support. This date serves as the source of truth for the Angular CLI's
+# default browser set used to determine what downleveling is necessary.
+#
+# See: https://web.dev/baseline
+BASELINE_DATE = "2025-04-30"
 
 SNAPSHOT_REPOS = {
     "@angular/cli": "angular/cli-builds",

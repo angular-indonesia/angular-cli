@@ -48,7 +48,7 @@ describeServeBuilder(executeDevServer, DEV_SERVER_BUILDER_INFO, (harness, setupT
 
     it('respects import specifiers when using baseHref with trailing slash', async () => {
       setupTarget(harness, {
-        externalDependencies: ['rxjs', 'rxjs/operators'],
+        externalDependencies: ['rxjs'],
         baseHref: '/test/',
       });
 
@@ -67,7 +67,7 @@ describeServeBuilder(executeDevServer, DEV_SERVER_BUILDER_INFO, (harness, setupT
 
     it('respects import specifiers when using baseHref without trailing slash', async () => {
       setupTarget(harness, {
-        externalDependencies: ['rxjs', 'rxjs/operators'],
+        externalDependencies: ['rxjs/*'],
         baseHref: '/test',
       });
 
@@ -82,6 +82,22 @@ describeServeBuilder(executeDevServer, DEV_SERVER_BUILDER_INFO, (harness, setupT
       const text = await response?.text();
       expect(text).toContain(`import { BehaviorSubject } from "rxjs";`);
       expect(text).toContain(`import { map } from "rxjs/operators";`);
+    });
+
+    // TODO: Enable when Vite has a custom logger setup to redirect logging into the builder system
+    xit('does not show pre-transform errors in the console for external dependencies', async () => {
+      harness.useTarget('serve', {
+        ...BASE_OPTIONS,
+      });
+
+      const { result, logs } = await executeOnceAndFetch(harness, 'main.js');
+
+      expect(result?.success).toBeTrue();
+      expect(logs).not.toContain(
+        jasmine.objectContaining({
+          message: jasmine.stringMatching('Pre-transform error'),
+        }),
+      );
     });
   });
 });

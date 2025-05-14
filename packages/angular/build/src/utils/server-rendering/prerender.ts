@@ -113,7 +113,7 @@ export async function prerenderPages(
     outputMode,
   ).catch((err) => {
     return {
-      errors: [`An error occurred while extracting routes.\n\n${err.stack ?? err.message ?? err}`],
+      errors: [`An error occurred while extracting routes.\n\n${err.message ?? err.stack ?? err}`],
       serializedRouteTree: [],
       appShellRoute: undefined,
     };
@@ -228,12 +228,14 @@ async function renderPages(
   try {
     const renderingPromises: Promise<void>[] = [];
     const appShellRouteWithLeadingSlash = appShellRoute && addLeadingSlash(appShellRoute);
-    const baseHrefWithLeadingSlash = addLeadingSlash(baseHref);
+    const baseHrefPathnameWithLeadingSlash = new URL(baseHref, 'http://localhost').pathname;
 
     for (const { route, redirectTo } of serializableRouteTreeNode) {
       // Remove the base href from the file output path.
-      const routeWithoutBaseHref = addTrailingSlash(route).startsWith(baseHrefWithLeadingSlash)
-        ? addLeadingSlash(route.slice(baseHrefWithLeadingSlash.length))
+      const routeWithoutBaseHref = addTrailingSlash(route).startsWith(
+        baseHrefPathnameWithLeadingSlash,
+      )
+        ? addLeadingSlash(route.slice(baseHrefPathnameWithLeadingSlash.length))
         : route;
 
       const outPath = posix.join(removeLeadingSlash(routeWithoutBaseHref), 'index.html');
@@ -256,7 +258,7 @@ async function renderPages(
         })
         .catch((err) => {
           errors.push(
-            `An error occurred while prerendering route '${route}'.\n\n${err.stack ?? err.message ?? err.code ?? err}`,
+            `An error occurred while prerendering route '${route}'.\n\n${err.message ?? err.stack ?? err.code ?? err}`,
           );
           void renderWorker.destroy();
         });
@@ -357,7 +359,7 @@ async function getAllRoutes(
 
     return {
       errors: [
-        `An error occurred while extracting routes.\n\n${err.stack ?? err.message ?? err.code ?? err}`,
+        `An error occurred while extracting routes.\n\n${err.message ?? err.stack ?? err.code ?? err}`,
       ],
       serializedRouteTree: [],
     };

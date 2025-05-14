@@ -1,4 +1,4 @@
-import { join } from 'path';
+import { join } from 'node:path';
 import { ng } from '../../../utils/process';
 
 import { expectFileToExist } from '../../../utils/fs';
@@ -8,10 +8,10 @@ export default function () {
   const pipeDir = join('src', 'app');
 
   return (
-    ng('generate', 'pipe', 'test-pipe')
+    ng('generate', 'pipe', 'test')
       .then(() => expectFileToExist(pipeDir))
-      .then(() => expectFileToExist(join(pipeDir, 'test-pipe.pipe.ts')))
-      .then(() => expectFileToExist(join(pipeDir, 'test-pipe.pipe.spec.ts')))
+      .then(() => expectFileToExist(join(pipeDir, 'test-pipe.ts')))
+      .then(() => expectFileToExist(join(pipeDir, 'test-pipe.spec.ts')))
 
       // Try to run the unit tests.
       .then(() => ng('test', '--watch=false'))

@@ -7,7 +7,7 @@
  */
 
 import { Architect } from '@angular-devkit/architect';
-import * as path from 'path';
+import * as path from 'node:path';
 import { browserBuild, createArchitect, host } from '../../../testing/test-utils';
 
 // Following the naming conventions from
@@ -104,11 +104,14 @@ describe('Identifying third-party code in source maps', () => {
     expect(thirdPartyInVendor).toBe(true, `vendor.js.map should include some node modules`);
 
     // All sources in the main map are first-party.
-    expect(mainMap.sources.filter((_, i) => !mainMap[IGNORE_LIST].includes(i))).toEqual([
+    const sources = mainMap.sources.filter((_, i) => !mainMap[IGNORE_LIST].includes(i));
+    sources.sort();
+
+    expect(sources).toEqual([
+      './src/app/app.component.css',
       './src/app/app.component.ts',
       './src/app/app.module.ts',
       './src/main.ts',
-      './src/app/app.component.css',
     ]);
 
     // Only some sources in the polyfills map are first-party.

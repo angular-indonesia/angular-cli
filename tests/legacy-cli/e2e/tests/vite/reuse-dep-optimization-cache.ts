@@ -1,24 +1,30 @@
 import assert from 'node:assert';
-import { setTimeout } from 'node:timers/promises';
 import { findFreePort } from '../../utils/network';
-import { execAndWaitForOutputToMatch, killAllProcesses, ng } from '../../utils/process';
+import {
+  execAndWaitForOutputToMatch,
+  killAllProcesses,
+  ng,
+  waitForAnyProcessOutputToMatch,
+} from '../../utils/process';
 
 export default async function () {
   await ng('cache', 'clean');
   await ng('cache', 'on');
 
   const port = await findFreePort();
+  const serveReady = execAndWaitForOutputToMatch(
+    'ng',
+    ['serve', '--port', `${port}`],
+    /Application bundle generation complete/,
+    // Use CI:0 to force caching
+    { ...process.env, DEBUG: 'vite:deps', CI: '0', NO_COLOR: 'true' },
+  );
 
-  const [, response] = await Promise.all([
-    execAndWaitForOutputToMatch(
-      'ng',
-      ['serve', '--port', `${port}`],
-      /dependencies optimized/,
-      // Use CI:0 to force caching
-      { DEBUG: 'vite:deps', CI: '0', NO_COLOR: 'true' },
-    ),
-    setTimeout(4_000).then(() => fetch(`http://localhost:${port}/main.js`)),
-  ]);
+  // Note: Don't await `serveReady` before, as otherwise we might not see
+  // the dependencies optimized output. There is some debouncing for `ng serve`
+  // going on that could cause this.
+  await Promise.all([serveReady, waitForAnyProcessOutputToMatch(/dependencies optimized/, 10_000)]);
+  const response = await fetch(`http://localhost:${port}/main.js`);
 
   assert(response.ok, `Expected 'response.ok' to be 'true'.`);
 
@@ -30,6 +36,6 @@ export default async function () {
     ['serve', '--port=0'],
     /Hash is consistent\. Skipping/,
     // Use CI:0 to force caching
-    { DEBUG: 'vite:deps', CI: '0', NO_COLOR: 'true' },
+    { ...process.env, DEBUG: 'vite:deps', CI: '0', NO_COLOR: 'true' },
   );
 }

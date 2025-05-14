@@ -1,4 +1,4 @@
-import { join } from 'path';
+import { join } from 'node:path';
 import { ng } from '../../../utils/process';
 import { expectFileToExist } from '../../../utils/fs';
 
@@ -9,8 +9,8 @@ export default function () {
   return (
     ng('generate', 'service', 'test-service')
       .then(() => expectFileToExist(serviceDir))
-      .then(() => expectFileToExist(join(serviceDir, 'test-service.service.ts')))
-      .then(() => expectFileToExist(join(serviceDir, 'test-service.service.spec.ts')))
+      .then(() => expectFileToExist(join(serviceDir, 'test-service.ts')))
+      .then(() => expectFileToExist(join(serviceDir, 'test-service.spec.ts')))
 
       // Try to run the unit tests.
       .then(() => ng('test', '--watch=false'))

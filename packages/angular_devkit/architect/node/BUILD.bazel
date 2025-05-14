@@ -3,7 +3,7 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file at https://angular.dev/license
 
-load("//tools:defaults2.bzl", "jasmine_test", "ts_project")
+load("//tools:defaults.bzl", "jasmine_test", "ts_project")
 
 licenses(["notice"])
 
@@ -15,12 +15,11 @@ ts_project(
         include = ["**/*.ts"],
         exclude = ["**/*_spec.ts"],
     ),
-    module_name = "@angular-devkit/architect/node",
     deps = [
         "//:node_modules/@types/node",
-        "//:node_modules/rxjs",
-        "//packages/angular_devkit/architect:architect_rjs",
+        "//packages/angular_devkit/architect",
         "//packages/angular_devkit/architect:node_modules/@angular-devkit/core",
+        "//packages/angular_devkit/architect:node_modules/rxjs",
     ],
 )
 
@@ -33,15 +32,16 @@ ts_project(
         ],
     ),
     deps = [
-        ":node_rjs",
+        ":node",
         "//:node_modules/@types/jasmine",
-        "//:node_modules/rxjs",
-        "//packages/angular_devkit/architect:architect_rjs",
-        "//packages/angular_devkit/architect/node/test:test_lib_rjs",
+        "//:node_modules/@types/node",
+        "//packages/angular_devkit/architect",
+        "//packages/angular_devkit/architect:node_modules/rxjs",
+        "//packages/angular_devkit/architect/node/test:test_lib",
     ],
 )
 
 jasmine_test(
     name = "node_test",
-    data = [":node_test_lib_rjs"],
+    data = [":node_test_lib"],
 )

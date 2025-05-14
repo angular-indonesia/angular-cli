@@ -35,6 +35,7 @@ export interface CompilerPluginOptions {
   sourcemap: boolean | 'external';
   tsconfig: string;
   jit?: boolean;
+  includeTestMetadata?: boolean;
 
   advancedOptimizations?: boolean;
   thirdPartySourcemaps?: boolean;
@@ -516,7 +517,7 @@ export function createCompilerPlugin(
             const replacement = pluginOptions.fileReplacements?.[path.normalize(args.path)];
             if (replacement) {
               return {
-                contents: await import('fs/promises').then(({ readFile }) =>
+                contents: await import('node:fs/promises').then(({ readFile }) =>
                   readFile(path.normalize(replacement)),
                 ),
                 loader: 'json' as const,
@@ -697,13 +698,17 @@ function createCompilerOptionsTransformer(
 
     // Synchronize custom resolve conditions.
     // Set if using the supported bundler resolution mode (bundler is the default in new projects)
-    if (compilerOptions.moduleResolution === 100 /* ModuleResolutionKind.Bundler */) {
+    if (
+      compilerOptions.moduleResolution === 100 /* ModuleResolutionKind.Bundler */ ||
+      compilerOptions.module === 200 /** ModuleKind.Preserve */
+    ) {
       compilerOptions.customConditions = customConditions;
     }
 
     return {
       ...compilerOptions,
       noEmitOnError: false,
+      composite: false,
       inlineSources: !!pluginOptions.sourcemap,
       inlineSourceMap: !!pluginOptions.sourcemap,
       sourceMap: undefined,
@@ -712,6 +717,7 @@ function createCompilerOptionsTransformer(
       preserveSymlinks,
       externalRuntimeStyles: pluginOptions.externalRuntimeStyles,
       _enableHmr: !!pluginOptions.templateUpdates,
+      supportTestBed: !!pluginOptions.includeTestMetadata,
     };
   };
 }

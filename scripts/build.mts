@@ -9,12 +9,11 @@
 import { spawn } from 'node:child_process';
 import { COPYFILE_FICLONE } from 'node:constants';
 import fs from 'node:fs';
-import path, { dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { dirname, join, relative, resolve } from 'node:path';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = import.meta.dirname;
 const baseDir = resolve(`${__dirname}/..`);
-const bazelCmd = process.env.BAZEL ?? `yarn --cwd "${baseDir}" bazel`;
+const bazelCmd = process.env.BAZEL ?? `pnpm -s bazel`;
 const distRoot = join(baseDir, '/dist');
 
 type BuildMode = 'local' | 'snapshot' | 'release';
@@ -66,6 +65,7 @@ function _exec(cmd: string, captureStdout: boolean, logger: Console): Promise<st
     const proc = spawn(cmd, {
       stdio: 'pipe',
       shell: true,
+      cwd: baseDir,
     });
 
     let output = '';

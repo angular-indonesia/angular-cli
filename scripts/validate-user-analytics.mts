@@ -6,19 +6,18 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import assert from 'assert';
 import glob from 'fast-glob';
-import * as fs from 'fs';
 import lodash from 'lodash';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
+import assert from 'node:assert';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import {
   EventCustomDimension,
   EventCustomMetric,
   UserCustomDimension,
 } from '../packages/angular/cli/src/analytics/analytics-parameters.mjs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = import.meta.dirname;
 const userAnalyticsTable = lodash.template(
   fs.readFileSync(path.join(__dirname, './templates/user-analytics-table.ejs'), 'utf-8'),
 );

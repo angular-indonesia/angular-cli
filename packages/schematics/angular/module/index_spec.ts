@@ -49,33 +49,33 @@ describe('Module Schematic', () => {
 
     const tree = await schematicRunner.runSchematic('module', options, appTree);
     const files = tree.files;
-    expect(files).toContain('/projects/bar/src/app/foo/foo.module.ts');
+    expect(files).toContain('/projects/bar/src/app/foo/foo-module.ts');
   });
 
   it('should import into another module', async () => {
-    const options = { ...defaultOptions, module: 'app.module.ts' };
+    const options = { ...defaultOptions, module: 'app-module.ts' };
 
     const tree = await schematicRunner.runSchematic('module', options, appTree);
-    const content = tree.readContent('/projects/bar/src/app/app.module.ts');
-    expect(content).toMatch(/import { FooModule } from '.\/foo\/foo.module'/);
+    const content = tree.readContent('/projects/bar/src/app/app-module.ts');
+    expect(content).toMatch(/import { FooModule } from '.\/foo\/foo-module'/);
     expect(content).toMatch(/imports: \[[^\]]*FooModule[^\]]*\]/m);
   });
 
   it('should import into another module when using flat', async () => {
-    const options = { ...defaultOptions, flat: true, module: 'app.module.ts' };
+    const options = { ...defaultOptions, flat: true, module: 'app-module.ts' };
 
     const tree = await schematicRunner.runSchematic('module', options, appTree);
-    const content = tree.readContent('/projects/bar/src/app/app.module.ts');
-    expect(content).toMatch(/import { FooModule } from '.\/foo.module'/);
+    const content = tree.readContent('/projects/bar/src/app/app-module.ts');
+    expect(content).toMatch(/import { FooModule } from '.\/foo-module'/);
     expect(content).toMatch(/imports: \[[^\]]*FooModule[^\]]*\]/m);
   });
 
   it('should import into another module when using flat', async () => {
-    const options = { ...defaultOptions, flat: true, module: 'app.module.ts' };
+    const options = { ...defaultOptions, flat: true, module: 'app-module.ts' };
 
     const tree = await schematicRunner.runSchematic('module', options, appTree);
-    const content = tree.readContent('/projects/bar/src/app/app.module.ts');
-    expect(content).toMatch(/import { FooModule } from '.\/foo.module'/);
+    const content = tree.readContent('/projects/bar/src/app/app-module.ts');
+    expect(content).toMatch(/import { FooModule } from '.\/foo-module'/);
     expect(content).toMatch(/imports: \[[^\]]*FooModule[^\]]*\]/m);
   });
 
@@ -102,8 +102,8 @@ describe('Module Schematic', () => {
       tree,
     );
 
-    const content = tree.readContent('/projects/bar/src/app/sub1/test1/test1.module.ts');
-    expect(content).toMatch(/import { Test2Module } from '..\/..\/sub2\/test2\/test2.module'/);
+    const content = tree.readContent('/projects/bar/src/app/sub1/test1/test1-module.ts');
+    expect(content).toMatch(/import { Test2Module } from '..\/..\/sub2\/test2\/test2-module'/);
   });
 
   it('should create a routing module', async () => {
@@ -111,12 +111,12 @@ describe('Module Schematic', () => {
 
     const tree = await schematicRunner.runSchematic('module', options, appTree);
     const files = tree.files;
-    expect(files).toContain('/projects/bar/src/app/foo/foo.module.ts');
-    expect(files).toContain('/projects/bar/src/app/foo/foo-routing.module.ts');
-    const moduleContent = tree.readContent('/projects/bar/src/app/foo/foo.module.ts');
-    expect(moduleContent).toMatch(/import { FooRoutingModule } from '.\/foo-routing.module'/);
+    expect(files).toContain('/projects/bar/src/app/foo/foo-module.ts');
+    expect(files).toContain('/projects/bar/src/app/foo/foo-routing-module.ts');
+    const moduleContent = tree.readContent('/projects/bar/src/app/foo/foo-module.ts');
+    expect(moduleContent).toMatch(/import { FooRoutingModule } from '.\/foo-routing-module'/);
     const routingModuleContent = tree.readContent(
-      '/projects/bar/src/app/foo/foo-routing.module.ts',
+      '/projects/bar/src/app/foo/foo-routing-module.ts',
     );
     expect(routingModuleContent).toMatch(/RouterModule.forChild\(routes\)/);
   });
@@ -126,7 +126,7 @@ describe('Module Schematic', () => {
 
     const tree = await schematicRunner.runSchematic('module', options, appTree);
     const files = tree.files;
-    expect(files).toContain('/projects/bar/src/app/two-word/two-word.module.ts');
+    expect(files).toContain('/projects/bar/src/app/two-word/two-word-module.ts');
   });
 
   it('should respect the sourceRoot value', async () => {
@@ -134,7 +134,7 @@ describe('Module Schematic', () => {
     config.projects.bar.sourceRoot = 'projects/bar/custom';
     appTree.overwrite('/angular.json', JSON.stringify(config, null, 2));
     appTree = await schematicRunner.runSchematic('module', defaultOptions, appTree);
-    expect(appTree.files).toContain('/projects/bar/custom/app/foo/foo.module.ts');
+    expect(appTree.files).toContain('/projects/bar/custom/app/foo/foo-module.ts');
   });
 
   describe('lazy route generator', () => {
@@ -150,36 +150,36 @@ describe('Module Schematic', () => {
 
       expect(files).toEqual(
         jasmine.arrayContaining([
-          '/projects/bar/src/app/foo/foo.module.ts',
-          '/projects/bar/src/app/foo/foo-routing.module.ts',
-          '/projects/bar/src/app/foo/foo.component.ts',
-          '/projects/bar/src/app/foo/foo.component.html',
-          '/projects/bar/src/app/foo/foo.component.css',
+          '/projects/bar/src/app/foo/foo-module.ts',
+          '/projects/bar/src/app/foo/foo-routing-module.ts',
+          '/projects/bar/src/app/foo/foo.ts',
+          '/projects/bar/src/app/foo/foo.html',
+          '/projects/bar/src/app/foo/foo.css',
         ]),
       );
 
       const appRoutingModuleContent = tree.readContent(
-        '/projects/bar/src/app/app-routing.module.ts',
+        '/projects/bar/src/app/app-routing-module.ts',
       );
       expect(appRoutingModuleContent).toMatch(
-        /path: '\/new-route', loadChildren: \(\) => import\('.\/foo\/foo.module'\).then\(m => m.FooModule\)/,
+        /path: '\/new-route', loadChildren: \(\) => import\('.\/foo\/foo-module'\).then\(m => m.FooModule\)/,
       );
 
       const fooRoutingModuleContent = tree.readContent(
-        '/projects/bar/src/app/foo/foo-routing.module.ts',
+        '/projects/bar/src/app/foo/foo-routing-module.ts',
       );
       expect(fooRoutingModuleContent).toMatch(/RouterModule.forChild\(routes\)/);
       expect(fooRoutingModuleContent).toMatch(
-        /const routes: Routes = \[\r?\n?\s*{ path: '', component: FooComponent }\r?\n?\s*\];/,
+        /const routes: Routes = \[\r?\n?\s*{ path: '', component: Foo }\r?\n?\s*\];/,
       );
     });
 
     it('should generate a lazy loaded module with embedded route declarations', async () => {
       appTree.overwrite(
-        '/projects/bar/src/app/app.module.ts',
+        '/projects/bar/src/app/app-module.ts',
         `
         import { NgModule } from '@angular/core';
-        import { AppComponent } from './app.component';
+        import { AppComponent } from './app';
 
         @NgModule({
           declarations: [
@@ -195,26 +195,26 @@ describe('Module Schematic', () => {
         export class AppModule { }
         `,
       );
-      appTree.delete('/projects/bar/src/app/app-routing.module.ts');
+      appTree.delete('/projects/bar/src/app/app-routing-module.ts');
 
       const tree = await schematicRunner.runSchematic('module', options, appTree);
       const files = tree.files;
 
-      expect(files).toContain('/projects/bar/src/app/foo/foo.module.ts');
-      expect(files).not.toContain('/projects/bar/src/app/foo/foo-routing.module.ts');
-      expect(files).toContain('/projects/bar/src/app/foo/foo.component.ts');
-      expect(files).toContain('/projects/bar/src/app/foo/foo.component.html');
-      expect(files).toContain('/projects/bar/src/app/foo/foo.component.css');
+      expect(files).toContain('/projects/bar/src/app/foo/foo-module.ts');
+      expect(files).not.toContain('/projects/bar/src/app/foo/foo-routing-module.ts');
+      expect(files).toContain('/projects/bar/src/app/foo/foo.ts');
+      expect(files).toContain('/projects/bar/src/app/foo/foo.html');
+      expect(files).toContain('/projects/bar/src/app/foo/foo.css');
 
-      const appModuleContent = tree.readContent('/projects/bar/src/app/app.module.ts');
+      const appModuleContent = tree.readContent('/projects/bar/src/app/app-module.ts');
       expect(appModuleContent).toMatch(
-        /path: '\/new-route', loadChildren: \(\) => import\('.\/foo\/foo.module'\).then\(m => m.FooModule\)/,
+        /path: '\/new-route', loadChildren: \(\) => import\('.\/foo\/foo-module'\).then\(m => m.FooModule\)/,
       );
 
-      const fooModuleContent = tree.readContent('/projects/bar/src/app/foo/foo.module.ts');
+      const fooModuleContent = tree.readContent('/projects/bar/src/app/foo/foo-module.ts');
       expect(fooModuleContent).toMatch(/RouterModule.forChild\(routes\)/);
       expect(fooModuleContent).toMatch(
-        /const routes: Routes = \[\r?\n?\s*{ path: '', component: FooComponent }\r?\n?\s*\];/,
+        /const routes: Routes = \[\r?\n?\s*{ path: '', component: Foo }\r?\n?\s*\];/,
       );
     });
 
@@ -228,19 +228,19 @@ describe('Module Schematic', () => {
 
       expect(files).toEqual(
         jasmine.arrayContaining([
-          '/projects/bar/src/app/foo.module.ts',
-          '/projects/bar/src/app/foo-routing.module.ts',
-          '/projects/bar/src/app/foo.component.ts',
-          '/projects/bar/src/app/foo.component.html',
-          '/projects/bar/src/app/foo.component.css',
+          '/projects/bar/src/app/foo-module.ts',
+          '/projects/bar/src/app/foo-routing-module.ts',
+          '/projects/bar/src/app/foo.ts',
+          '/projects/bar/src/app/foo.html',
+          '/projects/bar/src/app/foo.css',
         ]),
       );
 
       const appRoutingModuleContent = tree.readContent(
-        '/projects/bar/src/app/app-routing.module.ts',
+        '/projects/bar/src/app/app-routing-module.ts',
       );
       expect(appRoutingModuleContent).toMatch(
-        /path: '\/new-route', loadChildren: \(\) => import\('.\/foo.module'\).then\(m => m.FooModule\)/,
+        /path: '\/new-route', loadChildren: \(\) => import\('.\/foo-module'\).then\(m => m.FooModule\)/,
       );
     });
 
@@ -267,34 +267,34 @@ describe('Module Schematic', () => {
       );
       expect(tree.files).toEqual(
         jasmine.arrayContaining([
-          '/projects/bar/src/app/foo/foo-routing.module.ts',
-          '/projects/bar/src/app/foo/foo.module.ts',
-          '/projects/bar/src/app/bar/bar-routing.module.ts',
-          '/projects/bar/src/app/bar/bar.module.ts',
-          '/projects/bar/src/app/bar/bar.component.ts',
+          '/projects/bar/src/app/foo/foo-routing-module.ts',
+          '/projects/bar/src/app/foo/foo-module.ts',
+          '/projects/bar/src/app/bar/bar-routing-module.ts',
+          '/projects/bar/src/app/bar/bar-module.ts',
+          '/projects/bar/src/app/bar/bar.ts',
         ]),
       );
 
       const barRoutingModuleContent = tree.readContent(
-        '/projects/bar/src/app/bar/bar-routing.module.ts',
+        '/projects/bar/src/app/bar/bar-routing-module.ts',
       );
-      expect(barRoutingModuleContent).toContain(`path: '', component: BarComponent `);
+      expect(barRoutingModuleContent).toContain(`path: '', component: Bar `);
 
       const fooRoutingModuleContent = tree.readContent(
-        '/projects/bar/src/app/foo/foo-routing.module.ts',
+        '/projects/bar/src/app/foo/foo-routing-module.ts',
       );
       expect(fooRoutingModuleContent).toContain(
-        `loadChildren: () => import('../bar/bar.module').then(m => m.BarModule)`,
+        `loadChildren: () => import('../bar/bar-module').then(m => m.BarModule)`,
       );
     });
 
     it('should not add reference to RouterModule when referencing lazy routing module', async () => {
       // Delete routing module
-      appTree.delete('/projects/bar/src/app/app-routing.module.ts');
+      appTree.delete('/projects/bar/src/app/app-routing-module.ts');
 
-      // Update app.module to contain the route config.
+      // Update app-module to contain the route config.
       appTree.overwrite(
-        'projects/bar/src/app/app.module.ts',
+        'projects/bar/src/app/app-module.ts',
         `
           import { NgModule } from '@angular/core';
           import { RouterModule } from '@angular/router';
@@ -317,11 +317,11 @@ describe('Module Schematic', () => {
           name: 'bar',
           route: 'bar',
           routing: true,
-          module: 'app.module.ts',
+          module: 'app-module.ts',
         },
         appTree,
       );
-      const content = tree.readContent('/projects/bar/src/app/bar/bar.module.ts');
+      const content = tree.readContent('/projects/bar/src/app/bar/bar-module.ts');
       expect(content).toContain('RouterModule.forChild(routes)');
       expect(content).not.toContain('BarRoutingModule');
     });

@@ -14,19 +14,19 @@ export default async function () {
 
   // Forcibly remove in case another test doesn't clean itself up.
   await uninstallPackage('@angular/ssr');
-  await ng('add', '@angular/ssr', '--server-routing', '--skip-confirmation', '--skip-install');
+  await ng('add', '@angular/ssr', '--skip-confirmation', '--skip-install');
   await useSha();
   await installWorkspacePackages();
 
   await writeMultipleFiles({
-    // Replace the template of app.component.html as it makes it harder to debug
-    'src/app/app.component.html': '<router-outlet />',
+    // Replace the template of app.ng.html as it makes it harder to debug
+    'src/app/app.html': '<router-outlet />',
     'src/app/app.routes.ts': `
       import { Routes } from '@angular/router';
-      import { HomeComponent } from './home/home.component';
+      import { Home } from './home/home';
 
       export const routes: Routes = [
-        { path: 'home', component: HomeComponent }
+        { path: 'home', component: Home }
       ];
     `,
     'src/app/app.routes.server.ts': `
@@ -39,26 +39,29 @@ export default async function () {
     'src/server.ts': `
       import { AngularNodeAppEngine, writeResponseToNodeResponse, isMainModule, createNodeRequestHandler } from '@angular/ssr/node';
       import express from 'express';
-      import { fileURLToPath } from 'node:url';
-      import { dirname, resolve } from 'node:path';
+      import { join } from 'node:path';
 
       export function app(): express.Express {
         const server = express();
-        const serverDistFolder = dirname(fileURLToPath(import.meta.url));
-        const browserDistFolder = resolve(serverDistFolder, '../browser');
+        const browserDistFolder = join(import.meta.dirname, '../browser');
         const angularNodeAppEngine = new AngularNodeAppEngine();
 
-        server.use('/api/**', (req, res) => res.json({ hello: 'foo' }));
+        server.use('/api/{*splat}', (req, res) => {
+          res.json({ hello: 'foo' })
+        });
 
-        server.get('**', express.static(browserDistFolder, {
+        server.use(express.static(browserDistFolder, {
           maxAge: '1y',
           index: 'index.html'
         }));
 
-        server.get('**', (req, res, next) => {
-          angularNodeAppEngine.handle(req)
-            .then((response) => response ? writeResponseToNodeResponse(response, res) : next())
-            .catch(next);
+        server.use(async(req, res, next) => {
+          const response = await angularNodeAppEngine.handle(req);
+          if (response) {
+            writeResponseToNodeResponse(response, res);
+          } else {
+            next();
+          }
         });
 
         return server;
@@ -67,7 +70,11 @@ export default async function () {
       const server = app();
       if (isMainModule(import.meta.url)) {
         const port = process.env['PORT'] || 4000;
-        server.listen(port, () => {
+        server.listen(port, (error) => {
+          if (error) {
+            throw error;
+          }
+
           console.log(\`Node Express server listening on http://localhost:\${port}\`);
         });
       }
@@ -87,7 +94,7 @@ export default async function () {
 
   // Modify the home component and validate the change.
   await modifyFileAndWaitUntilUpdated(
-    'src/app/home/home.component.html',
+    'src/app/home/home.html',
     'home works',
     'yay home works!!!',
     true,

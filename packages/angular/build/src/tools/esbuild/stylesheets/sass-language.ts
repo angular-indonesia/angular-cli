@@ -7,7 +7,7 @@
  */
 
 import type { OnLoadResult, PartialMessage, PartialNote, ResolveResult } from 'esbuild';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { CanonicalizeContext, CompileResult, Exception, Syntax } from 'sass';
 import type { SassWorkerImplementation } from '../../sass/sass-service';
@@ -43,7 +43,8 @@ export const SassStylesheetLanguage = Object.freeze<StylesheetLanguage>({
         resolveDir = dirname(fileURLToPath(options.containingUrl));
       }
 
-      const result = await build.resolve(url, {
+      const path = url.startsWith('pkg:') ? url.slice(4) : url;
+      const result = await build.resolve(path, {
         kind: 'import-rule',
         resolveDir,
       });
@@ -56,8 +57,8 @@ export const SassStylesheetLanguage = Object.freeze<StylesheetLanguage>({
 });
 
 function parsePackageName(url: string): { packageName: string; readonly pathSegments: string[] } {
-  const parts = url.split('/');
-  const hasScope = parts.length >= 2 && parts[0].startsWith('@');
+  const parts = (url.startsWith('pkg:') ? url.slice(4) : url).split('/');
+  const hasScope = parts.length >= 2 && parts[0][0] === '@';
   const [nameOrScope, nameOrFirstPath, ...pathPart] = parts;
   const packageName = hasScope ? `${nameOrScope}/${nameOrFirstPath}` : nameOrScope;
 
@@ -170,7 +171,7 @@ async function compileString(
 
     return {
       loader: 'css',
-      contents: sourceMap ? `${css}\n${sourceMapToUrlComment(sourceMap, dirname(filePath))}` : css,
+      contents: sourceMap ? `${css}\n${sourceMapToUrlComment(sourceMap)}` : css,
       watchFiles: loadedUrls.map((url) => fileURLToPath(url)),
       warnings,
     };
@@ -199,14 +200,7 @@ async function compileString(
   }
 }
 
-function sourceMapToUrlComment(
-  sourceMap: Exclude<CompileResult['sourceMap'], undefined>,
-  root: string,
-): string {
-  // Remove `file` protocol from all sourcemap sources and adjust to be relative to the input file.
-  // This allows esbuild to correctly process the paths.
-  sourceMap.sources = sourceMap.sources.map((source) => relative(root, fileURLToPath(source)));
-
+function sourceMapToUrlComment(sourceMap: Exclude<CompileResult['sourceMap'], undefined>): string {
   const urlSourceMap = Buffer.from(JSON.stringify(sourceMap), 'utf-8').toString('base64');
 
   return `/*# sourceMappingURL=data:application/json;charset=utf-8;base64,${urlSourceMap} */`;

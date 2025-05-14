@@ -32,7 +32,6 @@ describe('Application Schematic', () => {
   const defaultOptions: ApplicationOptions = {
     name: 'foo',
     skipPackageJson: false,
-    serverRouting: false,
   };
 
   let workspaceTree: UnitTestTree;
@@ -55,11 +54,11 @@ describe('Application Schematic', () => {
         '/projects/foo/src/index.html',
         '/projects/foo/src/main.ts',
         '/projects/foo/src/styles.css',
-        '/projects/foo/src/app/app.module.ts',
-        '/projects/foo/src/app/app.component.css',
-        '/projects/foo/src/app/app.component.html',
-        '/projects/foo/src/app/app.component.spec.ts',
-        '/projects/foo/src/app/app.component.ts',
+        '/projects/foo/src/app/app-module.ts',
+        '/projects/foo/src/app/app.css',
+        '/projects/foo/src/app/app.html',
+        '/projects/foo/src/app/app.spec.ts',
+        '/projects/foo/src/app/app.ts',
       ]),
     );
   });
@@ -94,8 +93,13 @@ describe('Application Schematic', () => {
   it('should set the right paths in the tsconfig.app.json', async () => {
     const tree = await schematicRunner.runSchematic('application', defaultOptions, workspaceTree);
 
-    const { files, extends: _extends } = readJsonFile(tree, '/projects/foo/tsconfig.app.json');
-    expect(files).toEqual(['src/main.ts']);
+    const {
+      include,
+      exclude,
+      extends: _extends,
+    } = readJsonFile(tree, '/projects/foo/tsconfig.app.json');
+    expect(include).toEqual(['src/**/*.ts']);
+    expect(exclude).toEqual(['src/**/*.spec.ts']);
     expect(_extends).toBe('../../tsconfig.json');
   });
 
@@ -104,6 +108,50 @@ describe('Application Schematic', () => {
 
     const { extends: _extends } = readJsonFile(tree, '/projects/foo/tsconfig.spec.json');
     expect(_extends).toBe('../../tsconfig.json');
+  });
+
+  it('should add project references in the root tsconfig.json', async () => {
+    const tree = await schematicRunner.runSchematic('application', defaultOptions, workspaceTree);
+
+    const { references } = readJsonFile(tree, '/tsconfig.json');
+    expect(references).toContain(
+      jasmine.objectContaining({ path: './projects/foo/tsconfig.app.json' }),
+    );
+    expect(references).toContain(
+      jasmine.objectContaining({ path: './projects/foo/tsconfig.spec.json' }),
+    );
+  });
+
+  it('should not add spec project reference in the root tsconfig.json with "skipTests" enabled', async () => {
+    const tree = await schematicRunner.runSchematic(
+      'application',
+      { ...defaultOptions, skipTests: true },
+      workspaceTree,
+    );
+
+    const { references } = readJsonFile(tree, '/tsconfig.json');
+    expect(references).toContain(
+      jasmine.objectContaining({ path: './projects/foo/tsconfig.app.json' }),
+    );
+    expect(references).not.toContain(
+      jasmine.objectContaining({ path: './projects/foo/tsconfig.spec.json' }),
+    );
+  });
+
+  it('should not add spec project reference in the root tsconfig.json with "minimal" enabled', async () => {
+    const tree = await schematicRunner.runSchematic(
+      'application',
+      { ...defaultOptions, minimal: true },
+      workspaceTree,
+    );
+
+    const { references } = readJsonFile(tree, '/tsconfig.json');
+    expect(references).toContain(
+      jasmine.objectContaining({ path: './projects/foo/tsconfig.app.json' }),
+    );
+    expect(references).not.toContain(
+      jasmine.objectContaining({ path: './projects/foo/tsconfig.spec.json' }),
+    );
   });
 
   it('should install npm dependencies when `skipInstall` is false', async () => {
@@ -205,13 +253,11 @@ describe('Application Schematic', () => {
   });
 
   describe(`update package.json`, () => {
-    it(`should add build-angular to devDependencies`, async () => {
+    it(`should add @angular/build to devDependencies`, async () => {
       const tree = await schematicRunner.runSchematic('application', defaultOptions, workspaceTree);
 
       const packageJson = JSON.parse(tree.readContent('package.json'));
-      expect(packageJson.devDependencies['@angular-devkit/build-angular']).toEqual(
-        latestVersions.DevkitBuildAngular,
-      );
+      expect(packageJson.devDependencies['@angular/build']).toEqual(latestVersions.AngularBuild);
     });
 
     it('should use the latest known versions in package.json', async () => {
@@ -268,10 +314,10 @@ describe('Application Schematic', () => {
           '/src/index.html',
           '/src/main.ts',
           '/src/styles.css',
-          '/src/app/app.component.css',
-          '/src/app/app.component.html',
-          '/src/app/app.component.spec.ts',
-          '/src/app/app.component.ts',
+          '/src/app/app.css',
+          '/src/app/app.html',
+          '/src/app/app.spec.ts',
+          '/src/app/app.ts',
         ]),
       );
     });
@@ -284,7 +330,7 @@ describe('Application Schematic', () => {
       const prj = config.projects.foo;
       expect(prj.root).toEqual('');
       const buildOpt = prj.architect.build.options;
-      expect(buildOpt.index).toEqual('src/index.html');
+      expect(buildOpt.index).toBeUndefined();
       expect(buildOpt.browser).toEqual('src/main.ts');
       expect(buildOpt.assets).toEqual([{ 'glob': '**/*', 'input': 'public' }]);
       expect(buildOpt.polyfills).toEqual(['zone.js']);
@@ -375,7 +421,6 @@ describe('Application Schematic', () => {
       const project = config.projects.foo;
       expect(project.root).toEqual('foo');
       const buildOpt = project.architect.build.options;
-      expect(buildOpt.index).toEqual('foo/src/index.html');
       expect(buildOpt.browser).toEqual('foo/src/main.ts');
       expect(buildOpt.polyfills).toEqual(['zone.js']);
       expect(buildOpt.tsConfig).toEqual('foo/tsconfig.app.json');
@@ -449,9 +494,9 @@ describe('Application Schematic', () => {
     const files = tree.files;
     [
       '/projects/foo/tsconfig.spec.json',
-      '/projects/foo/src/app/app.component.css',
-      '/projects/foo/src/app/app.component.html',
-      '/projects/foo/src/app/app.component.spec.ts',
+      '/projects/foo/src/app/app.css',
+      '/projects/foo/src/app/app.html',
+      '/projects/foo/src/app/app.spec.ts',
     ].forEach((x) => expect(files).not.toContain(x));
 
     expect(files).toEqual(
@@ -461,7 +506,7 @@ describe('Application Schematic', () => {
         '/projects/foo/src/index.html',
         '/projects/foo/src/main.ts',
         '/projects/foo/src/styles.css',
-        '/projects/foo/src/app/app.component.ts',
+        '/projects/foo/src/app/app.ts',
       ]),
     );
   });
@@ -475,8 +520,8 @@ describe('Application Schematic', () => {
       '/projects/foo/tsconfig.spec.json',
       '/projects/foo/karma.conf.js',
       '/projects/foo/src/test.ts',
-      '/projects/foo/src/app/app.component.html',
-      '/projects/foo/src/app/app.component.spec.ts',
+      '/projects/foo/src/app/app.html',
+      '/projects/foo/src/app/app.spec.ts',
     ].forEach((x) => expect(files).not.toContain(x));
 
     expect(files).toEqual(
@@ -486,8 +531,8 @@ describe('Application Schematic', () => {
         '/projects/foo/src/index.html',
         '/projects/foo/src/main.ts',
         '/projects/foo/src/styles.css',
-        '/projects/foo/src/app/app.component.css',
-        '/projects/foo/src/app/app.component.ts',
+        '/projects/foo/src/app/app.css',
+        '/projects/foo/src/app/app.ts',
       ]),
     );
   });
@@ -501,8 +546,8 @@ describe('Application Schematic', () => {
       '/projects/foo/tsconfig.spec.json',
       '/projects/foo/karma.conf.js',
       '/projects/foo/src/test.ts',
-      '/projects/foo/src/app/app.component.css',
-      '/projects/foo/src/app/app.component.spec.ts',
+      '/projects/foo/src/app/app.css',
+      '/projects/foo/src/app/app.spec.ts',
     ].forEach((x) => expect(files).not.toContain(x));
 
     expect(files).toEqual(
@@ -512,8 +557,8 @@ describe('Application Schematic', () => {
         '/projects/foo/src/index.html',
         '/projects/foo/src/main.ts',
         '/projects/foo/src/styles.css',
-        '/projects/foo/src/app/app.component.html',
-        '/projects/foo/src/app/app.component.ts',
+        '/projects/foo/src/app/app.html',
+        '/projects/foo/src/app/app.ts',
       ]),
     );
   });
@@ -533,10 +578,10 @@ describe('Application Schematic', () => {
         '/projects/foo/src/main.ts',
         '/projects/foo/src/styles.css',
         '/projects/foo/src/app/app.config.ts',
-        '/projects/foo/src/app/app.component.css',
-        '/projects/foo/src/app/app.component.html',
-        '/projects/foo/src/app/app.component.spec.ts',
-        '/projects/foo/src/app/app.component.ts',
+        '/projects/foo/src/app/app.css',
+        '/projects/foo/src/app/app.html',
+        '/projects/foo/src/app/app.spec.ts',
+        '/projects/foo/src/app/app.ts',
       ]),
     );
   });
@@ -545,7 +590,7 @@ describe('Application Schematic', () => {
     const options = { ...defaultOptions, standalone: true };
 
     const tree = await schematicRunner.runSchematic('application', options, workspaceTree);
-    const moduleFiles = tree.files.filter((file) => file.endsWith('.module.ts'));
+    const moduleFiles = tree.files.filter((file) => file.endsWith('-module.ts'));
     expect(moduleFiles.length).toEqual(0);
   });
 
@@ -560,7 +605,7 @@ describe('Application Schematic', () => {
   it('should create a standalone component', async () => {
     const options = { ...defaultOptions, standalone: true };
     const tree = await schematicRunner.runSchematic('application', options, workspaceTree);
-    const component = tree.readContent('/projects/foo/src/app/app.component.ts');
+    const component = tree.readContent('/projects/foo/src/app/app.ts');
 
     expect(component).not.toContain('standalone');
   });
@@ -572,7 +617,7 @@ describe('Application Schematic', () => {
 
     expect(tree.files).toContain('/projects/foo/src/app/app.routes.ts');
 
-    const component = tree.readContent('/projects/foo/src/app/app.component.ts');
+    const component = tree.readContent('/projects/foo/src/app/app.ts');
     expect(component).toContain(`import { RouterOutlet } from '@angular/router';`);
     expect(component).toContain(`imports: [RouterOutlet]`);
 
@@ -628,11 +673,11 @@ describe('Application Schematic', () => {
       const tree = await schematicRunner.runSchematic('application', options, workspaceTree);
 
       const files = tree.files;
-      expect(files).toContain('/projects/foo/src/app/app.module.ts');
-      expect(files).toContain('/projects/foo/src/app/app-routing.module.ts');
-      const moduleContent = tree.readContent('/projects/foo/src/app/app.module.ts');
-      expect(moduleContent).toMatch(/import { AppRoutingModule } from '.\/app-routing.module'/);
-      const routingModuleContent = tree.readContent('/projects/foo/src/app/app-routing.module.ts');
+      expect(files).toContain('/projects/foo/src/app/app-module.ts');
+      expect(files).toContain('/projects/foo/src/app/app-routing-module.ts');
+      const moduleContent = tree.readContent('/projects/foo/src/app/app-module.ts');
+      expect(moduleContent).toMatch(/import { AppRoutingModule } from '.\/app-routing-module'/);
+      const routingModuleContent = tree.readContent('/projects/foo/src/app/app-routing-module.ts');
       expect(routingModuleContent).toMatch(/RouterModule.forRoot\(routes\)/);
     });
 
@@ -643,7 +688,7 @@ describe('Application Schematic', () => {
         workspaceTree,
       );
 
-      const path = '/projects/foo/src/app/app.module.ts';
+      const path = '/projects/foo/src/app/app-module.ts';
       const content = tree.readContent(path);
       expect(content).toMatch(/import { BrowserModule } from '@angular\/platform-browser';/);
     });
@@ -655,9 +700,9 @@ describe('Application Schematic', () => {
         workspaceTree,
       );
 
-      const path = '/projects/foo/src/app/app.module.ts';
+      const path = '/projects/foo/src/app/app-module.ts';
       const content = tree.readContent(path);
-      expect(content).toMatch(/import { AppComponent } from '\.\/app\.component';/);
+      expect(content).toMatch(/import { App } from '\.\/app';/);
     });
 
     it('should create all files of an application', async () => {
@@ -672,12 +717,12 @@ describe('Application Schematic', () => {
           '/projects/foo/tsconfig.spec.json',
           '/projects/foo/src/main.ts',
           '/projects/foo/src/styles.css',
-          '/projects/foo/src/app/app-routing.module.ts',
-          '/projects/foo/src/app/app.module.ts',
-          '/projects/foo/src/app/app.component.css',
-          '/projects/foo/src/app/app.component.html',
-          '/projects/foo/src/app/app.component.spec.ts',
-          '/projects/foo/src/app/app.component.ts',
+          '/projects/foo/src/app/app-routing-module.ts',
+          '/projects/foo/src/app/app-module.ts',
+          '/projects/foo/src/app/app.css',
+          '/projects/foo/src/app/app.html',
+          '/projects/foo/src/app/app.spec.ts',
+          '/projects/foo/src/app/app.ts',
         ]),
       );
     });
@@ -699,70 +744,70 @@ describe('Application Schematic', () => {
       );
     });
 
-    it('should add provideExperimentalZonelessChangeDetection() in app.module.ts when experimentalZoneless is true', async () => {
+    it('should add provideZonelessChangeDetection() in app-module.ts when zoneless is true', async () => {
       const tree = await schematicRunner.runSchematic(
         'application',
         {
           ...defaultOptions,
-          experimentalZoneless: true,
+          zoneless: true,
           standalone: false,
         },
         workspaceTree,
       );
-      const path = '/projects/foo/src/app/app.module.ts';
+      const path = '/projects/foo/src/app/app-module.ts';
       const fileContent = tree.readContent(path);
-      expect(fileContent).toContain('provideExperimentalZonelessChangeDetection()');
+      expect(fileContent).toContain('provideZonelessChangeDetection()');
     });
 
-    it('should not add provideExperimentalZonelessChangeDetection() in app.module.ts when experimentalZoneless is false', async () => {
+    it('should not add provideZonelessChangeDetection() in app-module.ts when zoneless is false', async () => {
       const tree = await schematicRunner.runSchematic(
         'application',
         {
           ...defaultOptions,
-          experimentalZoneless: false,
+          zoneless: false,
           standalone: false,
         },
         workspaceTree,
       );
-      const path = '/projects/foo/src/app/app.module.ts';
+      const path = '/projects/foo/src/app/app-module.ts';
       const fileContent = tree.readContent(path);
-      expect(fileContent).not.toContain('provideExperimentalZonelessChangeDetection()');
+      expect(fileContent).not.toContain('provideZonelessChangeDetection()');
     });
 
-    it('should add provideExperimentalZonelessChangeDetection() when experimentalZoneless is true', async () => {
+    it('should add provideZonelessChangeDetection() when zoneless is true', async () => {
       const tree = await schematicRunner.runSchematic(
         'application',
         {
           ...defaultOptions,
-          experimentalZoneless: true,
+          zoneless: true,
         },
         workspaceTree,
       );
       const path = '/projects/foo/src/app/app.config.ts';
       const fileContent = tree.readContent(path);
-      expect(fileContent).toContain('provideExperimentalZonelessChangeDetection()');
+      expect(fileContent).toContain('provideZonelessChangeDetection()');
     });
 
-    it('should not add provideExperimentalZonelessChangeDetection() when experimentalZoneless is false', async () => {
+    it('should not add provideZonelessChangeDetection() when zoneless is false', async () => {
       const tree = await schematicRunner.runSchematic(
         'application',
         {
           ...defaultOptions,
-          experimentalZoneless: false,
+          zoneless: false,
         },
         workspaceTree,
       );
       const path = '/projects/foo/src/app/app.config.ts';
       const fileContent = tree.readContent(path);
-      expect(fileContent).not.toContain('provideExperimentalZonelessChangeDetection()');
+      expect(fileContent).not.toContain('provideZonelessChangeDetection()');
     });
 
-    it('should not add provideZoneChangeDetection when experimentalZoneless is true', async () => {
+    it('should not add provideZoneChangeDetection when zoneless is true', async () => {
       const tree = await schematicRunner.runSchematic(
         'application',
         {
           ...defaultOptions,
-          experimentalZoneless: true,
+          zoneless: true,
         },
         workspaceTree,
       );

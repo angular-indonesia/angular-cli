@@ -7,8 +7,8 @@
  */
 
 import { tags } from '@angular-devkit/core';
-import { promises as fs } from 'fs';
-import { join } from 'path';
+import * as fs from 'node:fs/promises';
+import { join } from 'node:path';
 import { Argv } from 'yargs';
 import {
   CommandModule,

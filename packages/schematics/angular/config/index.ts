@@ -17,9 +17,11 @@ import {
   strings,
   url,
 } from '@angular-devkit/schematics';
-import { AngularBuilder, readWorkspace, updateWorkspace } from '@schematics/angular/utility';
-import { posix as path } from 'path';
+import { readFile } from 'node:fs/promises';
+import { posix as path } from 'node:path';
 import { relativePathToWorkspaceRoot } from '../utility/paths';
+import { getWorkspace as readWorkspace, updateWorkspace } from '../utility/workspace';
+import { Builders as AngularBuilder } from '../utility/workspace-models';
 import { Schema as ConfigOptions, Type as ConfigType } from './schema';
 
 export default function (options: ConfigOptions): Rule {
@@ -41,10 +43,13 @@ function addBrowserslistConfig(options: ConfigOptions): Rule {
       throw new SchematicsException(`Project name "${options.project}" doesn't not exist.`);
     }
 
+    // Read Angular's default vendored `.browserslistrc` file.
+    const config = await readFile(path.join(__dirname, '.browserslistrc'), 'utf8');
+
     return mergeWith(
       apply(url('./files'), [
         filter((p) => p.endsWith('.browserslistrc.template')),
-        applyTemplates({}),
+        applyTemplates({ config }),
         move(project.root),
       ]),
     );
@@ -66,9 +71,13 @@ function addKarmaConfig(options: ConfigOptions): Rule {
       );
     }
 
-    if (testTarget.builder !== AngularBuilder.Karma) {
+    if (
+      testTarget.builder !== AngularBuilder.Karma &&
+      testTarget.builder !== AngularBuilder.BuildKarma
+    ) {
       throw new SchematicsException(
-        `Cannot add a karma configuration as builder for "test" target in project does not use "${AngularBuilder.Karma}".`,
+        `Cannot add a karma configuration as builder for "test" target in project does not` +
+          ` use "${AngularBuilder.Karma}" or "${AngularBuilder.BuildKarma}".`,
       );
     }
 
@@ -87,6 +96,7 @@ function addKarmaConfig(options: ConfigOptions): Rule {
         applyTemplates({
           relativePathToWorkspaceRoot: relativePathToWorkspaceRoot(project.root),
           folderName,
+          needDevkitPlugin: testTarget.builder === AngularBuilder.Karma,
         }),
         move(project.root),
       ]),

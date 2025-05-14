@@ -33,6 +33,8 @@ export default async function () {
           ...build.options,
           main: build.options.browser,
           browser: undefined,
+          outputPath: 'dist/subdirectory-test-project',
+          index: 'src/index.html',
         };
 
         build.configurations.development = {
@@ -41,6 +43,9 @@ export default async function () {
           namedChunks: true,
           buildOptimizer: false,
         };
+
+        const serve = json['projects']['subdirectory-test-project']['architect']['serve'];
+        serve.builder = '@angular-devkit/build-angular:dev-server';
       });
     }
 

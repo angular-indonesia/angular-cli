@@ -163,29 +163,54 @@ export async function executeBuild(
   // Analyze external imports if external options are enabled
   if (options.externalPackages || bundlingResult.externalConfiguration) {
     const {
-      externalConfiguration,
-      externalImports: { browser, server },
+      externalConfiguration = [],
+      externalImports: { browser = [], server = [] },
     } = bundlingResult;
-    const implicitBrowser = browser ? [...browser] : [];
-    const implicitServer = server ? [...server] : [];
-    // TODO: Implement wildcard externalConfiguration filtering
-    executionResult.setExternalMetadata(
-      externalConfiguration
-        ? implicitBrowser.filter((value) => !externalConfiguration.includes(value))
-        : implicitBrowser,
-      externalConfiguration
-        ? implicitServer.filter((value) => !externalConfiguration.includes(value))
-        : implicitServer,
-      externalConfiguration,
-    );
+    // Similar to esbuild, --external:@foo/bar automatically implies --external:@foo/bar/*,
+    // which matches import paths like @foo/bar/baz.
+    // This means all paths within the @foo/bar package are also marked as external.
+    const exclusionsPrefixes = externalConfiguration.map((exclusion) => exclusion + '/');
+    const exclusions = new Set(externalConfiguration);
+    const explicitExternal = new Set<string>();
+
+    const isExplicitExternal = (dep: string): boolean => {
+      if (exclusions.has(dep)) {
+        return true;
+      }
+
+      for (const prefix of exclusionsPrefixes) {
+        if (dep.startsWith(prefix)) {
+          return true;
+        }
+      }
+
+      return false;
+    };
+
+    const implicitBrowser: string[] = [];
+    for (const dep of browser) {
+      if (isExplicitExternal(dep)) {
+        explicitExternal.add(dep);
+      } else {
+        implicitBrowser.push(dep);
+      }
+    }
+
+    const implicitServer: string[] = [];
+    for (const dep of server) {
+      if (isExplicitExternal(dep)) {
+        explicitExternal.add(dep);
+      } else {
+        implicitServer.push(dep);
+      }
+    }
+
+    executionResult.setExternalMetadata(implicitBrowser, implicitServer, [...explicitExternal]);
   }
 
   const { metafile, initialFiles, outputFiles } = bundlingResult;
 
   executionResult.outputFiles.push(...outputFiles);
-
-  const changedFiles =
-    rebuildState && executionResult.findChangedFiles(rebuildState.previousOutputInfo);
 
   // Analyze files for bundle budget failures if present
   let budgetFailures: BudgetCalculatorResult[] | undefined;
@@ -243,11 +268,6 @@ export async function executeBuild(
     );
   }
 
-  // Override auto-CSP settings if we are serving through Vite middleware.
-  if (context.builder.builderName === 'dev-server' && options.security) {
-    options.security.autoCsp = false;
-  }
-
   // Perform i18n translation inlining if enabled
   if (i18nOptions.shouldInline) {
     const result = await inlineI18n(metafile, options, executionResult, initialFiles);
@@ -265,8 +285,10 @@ export async function executeBuild(
       i18nOptions.hasDefinedSourceLocale ? i18nOptions.sourceLocale : undefined,
     );
 
-    executionResult.addErrors(result.errors);
-    executionResult.addWarnings(result.warnings);
+    // Deduplicate and add errors and warnings
+    executionResult.addErrors([...new Set(result.errors)]);
+    executionResult.addWarnings([...new Set(result.warnings)]);
+
     executionResult.addPrerenderedRoutes(result.prerenderedRoutes);
     executionResult.outputFiles.push(...result.additionalOutputFiles);
     executionResult.assetFiles.push(...result.additionalAssets);
@@ -288,6 +310,8 @@ export async function executeBuild(
   }
 
   if (!jsonLogs) {
+    const changedFiles =
+      rebuildState && executionResult.findChangedFiles(rebuildState.previousOutputInfo);
     executionResult.addLog(
       logBuildStats(
         metafile,

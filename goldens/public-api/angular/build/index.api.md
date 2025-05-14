@@ -25,9 +25,10 @@ export type ApplicationBuilderOptions = {
     appShell?: boolean;
     assets?: AssetPattern[];
     baseHref?: string;
-    browser: string;
+    browser?: string;
     budgets?: Budget[];
     clearScreen?: boolean;
+    conditions?: string[];
     crossOrigin?: CrossOrigin;
     define?: {
         [key: string]: string;
@@ -39,7 +40,7 @@ export type ApplicationBuilderOptions = {
     fileReplacements?: FileReplacement[];
     i18nDuplicateTranslation?: I18NTranslation;
     i18nMissingTranslation?: I18NTranslation;
-    index: IndexUnion;
+    index?: IndexUnion;
     inlineStyleLanguage?: InlineStyleLanguage;
     loader?: {
         [key: string]: any;
@@ -49,7 +50,7 @@ export type ApplicationBuilderOptions = {
     optimization?: OptimizationUnion;
     outputHashing?: OutputHashing;
     outputMode?: OutputMode;
-    outputPath: OutputPathUnion;
+    outputPath?: OutputPathUnion;
     poll?: number;
     polyfills?: string[];
     prerender?: PrerenderUnion;
@@ -57,8 +58,8 @@ export type ApplicationBuilderOptions = {
     progress?: boolean;
     scripts?: ScriptElement[];
     security?: Security;
-    server?: string;
-    serviceWorker?: ServiceWorker_2;
+    server?: Serv;
+    serviceWorker?: Serv;
     sourceMap?: SourceMapUnion;
     ssr?: SsrUnion;
     statsJson?: boolean;
@@ -165,7 +166,7 @@ export type ExtractI18nBuilderOptions = {
 // @public
 export type NgPackagrBuilderOptions = {
     poll?: number;
-    project: string;
+    project?: string;
     tsConfig?: string;
     watch?: boolean;
 };

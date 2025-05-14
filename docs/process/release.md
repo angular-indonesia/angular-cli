@@ -30,7 +30,7 @@ the access group to now include the next caretakers. To perform this update to t
 the caretaker can run:
 
 ```bash
-$ yarn ng-dev caretaker handoff
+$ pnpm ng-dev caretaker handoff
 ```
 
 ## Merging PRs
@@ -39,12 +39,12 @@ The list of PRs which are currently ready to merge (approved with passing status
 be found with [this search](https://github.com/angular/angular-cli/pulls?q=is%3Apr+is%3Aopen+label%3A%22action%3A+merge%22+-is%3Adraft).
 This list should be checked daily and any ready PRs should be merged. For each PR, check the
 `target` label to understand where it should be merged to. You can find which branches a specific
-PR will be merged into with the `yarn ng-dev pr check-target-branches <pr>` command.
+PR will be merged into with the `pnpm ng-dev pr check-target-branches <pr>` command.
 
 When ready to merge a PR, run the following command:
 
-```
-yarn ng-dev pr merge <pr>
+```bash
+pnpm ng-dev pr merge <pr>
 ```
 
 ### Maintaining LTS branches
@@ -88,7 +88,7 @@ After confirming that the above steps have been done or are not necessary, run t
 navigate the prompts:
 
 ```sh
-yarn ng-dev release publish
+pnpm ng-dev release publish
 ```
 
 Releases should be done in "reverse semver order", meaning they should follow:
@@ -119,8 +119,8 @@ will block the next weekly release.
 1.  Trigger a release build locally.
     ```shell
     nvm install
-    yarn --frozen-lockfile
-    yarn -s ng-dev release build
+    pnpm install --frozen-lockfile
+    pnpm ng-dev release build
     ```
 1.  Log in to NPM as `angular`.
     ```shell
@@ -145,3 +145,34 @@ will block the next weekly release.
     accept the invite for the new package.
 
 Once Wombat accepts the invite, regular automated releases should work as expected.
+
+## Updating Browser Support
+
+Angular's browser support is defined by a [Baseline](https://web.dev/baseline)
+"widely available" date. Before a new major version is released, this should be
+updated to approximately the current date.
+
+A few weeks before a major (around feature freeze):
+
+1.  Update `BASELINE_DATE` in
+    [`/constants.bzl`](/constants.bzl) to the end of the most recent month.
+    - For example, if it is currently May 12th, set `baselineThreshold` to April
+      30th.
+    - Picking a date at the end of a month makes it easier to cross-reference
+      Angular's support with other tools (like MDN) which state Baseline support
+      using month specificity.
+    - You can view the generated `browserlist` configuration with:
+      ```shell
+      bazel build //packages/angular/build:angular_browserslist
+      cat dist/bin/packages/angular/build/.browserslistrc
+      ```
+    - Commit and merge the change, no other alterations or automation is
+      necessary in the CLI repo.
+2.  Update
+    [`/.browserslistrc`](https://github.com/ng-packagr/ng-packagr/tree/main/.browserslistrc)
+    in the `ng-packagr` repo.
+    - Use the generated configuration from above.
+3.  Update
+    [`angular.dev` documentation](https://github.com/angular/angular/tree/main/adev/src/content/reference/versions.md#browser-support)
+    to specify the date used and link to [browsersl.ist](https://browsersl.ist)
+    with the generated configuration.

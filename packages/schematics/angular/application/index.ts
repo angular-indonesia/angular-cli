@@ -26,11 +26,27 @@ import {
 import { NodePackageInstallTask } from '@angular-devkit/schematics/tasks';
 import { Schema as ComponentOptions } from '../component/schema';
 import { NodeDependencyType, addPackageJsonDependency } from '../utility/dependencies';
+import { JSONFile } from '../utility/json-file';
 import { latestVersions } from '../utility/latest-versions';
 import { relativePathToWorkspaceRoot } from '../utility/paths';
 import { getWorkspace, updateWorkspace } from '../utility/workspace';
 import { Builders, ProjectType } from '../utility/workspace-models';
 import { Schema as ApplicationOptions, Style } from './schema';
+
+function addTsProjectReference(...paths: string[]) {
+  return (host: Tree) => {
+    if (!host.exists('tsconfig.json')) {
+      return host;
+    }
+
+    const newReferences = paths.map((path) => ({ path }));
+
+    const file = new JSONFile(host, 'tsconfig.json');
+    const jsonPath = ['references'];
+    const value = file.get(jsonPath);
+    file.modify(jsonPath, Array.isArray(value) ? [...value, ...newReferences] : newReferences);
+  };
+}
 
 export default function (options: ApplicationOptions): Rule {
   return async (host: Tree, context: SchematicContext) => {
@@ -39,6 +55,10 @@ export default function (options: ApplicationOptions): Rule {
 
     return chain([
       addAppToWorkspaceFile(options, appDir, folderName),
+      addTsProjectReference('./' + join(normalize(appDir), 'tsconfig.app.json')),
+      options.skipTests || options.minimal
+        ? noop()
+        : addTsProjectReference('./' + join(normalize(appDir), 'tsconfig.spec.json')),
       options.standalone
         ? noop()
         : schematic('module', {
@@ -84,7 +104,7 @@ export default function (options: ApplicationOptions): Rule {
             ? filter((path) => !path.endsWith('tsconfig.spec.json.template'))
             : noop(),
           componentOptions.inlineTemplate
-            ? filter((path) => !path.endsWith('component.html.template'))
+            ? filter((path) => !path.endsWith('app.html.template'))
             : noop(),
           applyTemplates({
             utils: strings,
@@ -101,7 +121,6 @@ export default function (options: ApplicationOptions): Rule {
       options.ssr
         ? schematic('ssr', {
             project: options.name,
-            serverRouting: options.serverRouting,
             skipInstall: true,
           })
         : noop(),
@@ -120,8 +139,8 @@ function addDependenciesToPackageJson(options: ApplicationOptions) {
       },
       {
         type: NodeDependencyType.Dev,
-        name: '@angular-devkit/build-angular',
-        version: latestVersions.DevkitBuildAngular,
+        name: '@angular/build',
+        version: latestVersions.AngularBuild,
       },
       {
         type: NodeDependencyType.Dev,
@@ -234,18 +253,15 @@ function addAppToWorkspaceFile(
     schematics,
     targets: {
       build: {
-        builder: Builders.Application,
+        builder: Builders.BuildApplication,
         defaultConfiguration: 'production',
         options: {
-          outputPath: `dist/${folderName}`,
-          index: `${sourceRoot}/index.html`,
           browser: `${sourceRoot}/main.ts`,
-          polyfills: options.experimentalZoneless ? [] : ['zone.js'],
+          polyfills: options.zoneless ? undefined : ['zone.js'],
           tsConfig: `${projectRoot}tsconfig.app.json`,
           inlineStyleLanguage,
           assets: [{ 'glob': '**/*', 'input': `${projectRoot}public` }],
           styles: [`${sourceRoot}/styles.${options.style}`],
-          scripts: [],
         },
         configurations: {
           production: {
@@ -260,7 +276,7 @@ function addAppToWorkspaceFile(
         },
       },
       serve: {
-        builder: Builders.DevServer,
+        builder: Builders.BuildDevServer,
         defaultConfiguration: 'development',
         options: {},
         configurations: {
@@ -273,19 +289,18 @@ function addAppToWorkspaceFile(
         },
       },
       'extract-i18n': {
-        builder: Builders.ExtractI18n,
+        builder: Builders.BuildExtractI18n,
       },
       test: options.minimal
         ? undefined
         : {
-            builder: Builders.Karma,
+            builder: Builders.BuildKarma,
             options: {
-              polyfills: options.experimentalZoneless ? [] : ['zone.js', 'zone.js/testing'],
+              polyfills: options.zoneless ? undefined : ['zone.js', 'zone.js/testing'],
               tsConfig: `${projectRoot}tsconfig.spec.json`,
               inlineStyleLanguage,
               assets: [{ 'glob': '**/*', 'input': `${projectRoot}public` }],
               styles: [`${sourceRoot}/styles.${options.style}`],
-              scripts: [],
             },
           },
     },

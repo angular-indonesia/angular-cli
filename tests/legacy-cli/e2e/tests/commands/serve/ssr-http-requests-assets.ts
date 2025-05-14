@@ -15,7 +15,7 @@ export default async function () {
     // `--server-routing` not supported in `browser` builder.
     await ng('add', '@angular/ssr', '--skip-confirmation', '--skip-install');
   } else {
-    await ng('add', '@angular/ssr', '--server-routing', '--skip-confirmation', '--skip-install');
+    await ng('add', '@angular/ssr', '--skip-confirmation', '--skip-install');
   }
 
   await useSha();
@@ -27,7 +27,7 @@ export default async function () {
       import { ApplicationConfig } from '@angular/core';
       import { provideRouter } from '@angular/router';
 
-      import { HomeComponent } from './home/home.component';
+      import { Home } from './home/home';
       import { provideClientHydration } from '@angular/platform-browser';
       import { provideHttpClient, withFetch } from '@angular/common/http';
 
@@ -35,7 +35,7 @@ export default async function () {
         providers: [
           provideRouter([{
             path: '',
-            component: HomeComponent,
+            component: Home,
           }]),
           provideClientHydration(),
           provideHttpClient(withFetch()),
@@ -45,7 +45,7 @@ export default async function () {
     // Add asset
     'public/media.json': JSON.stringify({ dataFromAssets: true }),
     // Update component to do an HTTP call to asset.
-    'src/app/app.component.ts': `
+    'src/app/app.ts': `
     import { Component, inject } from '@angular/core';
     import { CommonModule } from '@angular/common';
     import { RouterOutlet } from '@angular/router';
@@ -60,7 +60,7 @@ export default async function () {
         <router-outlet></router-outlet>
       \`,
     })
-    export class AppComponent {
+    export class App {
       data: any;
       constructor() {
         const http = inject(HttpClient);

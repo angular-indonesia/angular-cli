@@ -6,9 +6,9 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import { existsSync } from 'fs';
-import * as path from 'path';
-import { URL, pathToFileURL } from 'url';
+import { existsSync } from 'node:fs';
+import * as path from 'node:path';
+import { URL, pathToFileURL } from 'node:url';
 import { Compilation, Configuration } from 'webpack';
 
 export interface EmittedFiles {
@@ -34,7 +34,7 @@ export function getEmittedFiles(compilation: Compilation): EmittedFiles[] {
       chunkFileNames.add(file);
       files.push({
         id: chunk.id?.toString(),
-        name: chunk.name,
+        name: chunk.name ?? undefined,
         file,
         extension: path.extname(file),
         initial: chunk.isOnlyInitial(),
@@ -90,7 +90,10 @@ export async function getWebpackConfig(configPath: string): Promise<Configuratio
       try {
         return require(configPath);
       } catch (e) {
-        if ((e as NodeJS.ErrnoException).code === 'ERR_REQUIRE_ESM') {
+        if (
+          (e as NodeJS.ErrnoException).code === 'ERR_REQUIRE_ESM' ||
+          (e as NodeJS.ErrnoException).code === 'ERR_REQUIRE_ASYNC_MODULE'
+        ) {
           // Load the ESM configuration file using the TypeScript dynamic import workaround.
           // Once TypeScript provides support for keeping the dynamic import this workaround can be
           // changed to a direct dynamic import.

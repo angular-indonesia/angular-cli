@@ -9,7 +9,7 @@
 import { purgeStaleBuildCache } from '@angular/build/private';
 import { BuilderContext, BuilderOutput } from '@angular-devkit/architect';
 import type { Config, ConfigOptions } from 'karma';
-import * as path from 'path';
+import * as path from 'node:path';
 import { Observable, defaultIfEmpty, from, switchMap } from 'rxjs';
 import { Configuration } from 'webpack';
 import { getCommonConfig, getStylesConfig } from '../../tools/webpack/configs';
@@ -131,7 +131,7 @@ async function initializeBrowser(
       budgets: undefined,
       optimization: false,
       buildOptimizer: false,
-      aot: false,
+      aot: options.aot,
       vendorChunk: true,
       namedChunks: true,
       extractLicenses: false,
@@ -153,13 +153,10 @@ function getBuiltInMainFile(): string {
   const content = Buffer.from(
     `
   import { getTestBed } from '@angular/core/testing';
-  import {
-    BrowserDynamicTestingModule,
-    platformBrowserDynamicTesting,
-   } from '@angular/platform-browser-dynamic/testing';
+  import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-browser/testing';
 
   // Initialize the Angular testing environment.
-  getTestBed().initTestEnvironment(BrowserDynamicTestingModule, platformBrowserDynamicTesting(), {
+  getTestBed().initTestEnvironment(BrowserTestingModule, platformBrowserTesting(), {
     errorOnUnknownElements: true,
     errorOnUnknownProperties: true
   });

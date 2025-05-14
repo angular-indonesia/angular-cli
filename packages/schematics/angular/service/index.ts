@@ -11,11 +11,5 @@ import { generateFromFiles } from '../utility/generate-from-files';
 import { Schema as ServiceOptions } from './schema';
 
 export default function (options: ServiceOptions): Rule {
-  // This schematic uses an older method to implement the flat option
-  const flat = options.flat;
-  options.flat = true;
-
-  return generateFromFiles(options, {
-    'if-flat': (s: string) => (flat ? '' : s),
-  });
+  return generateFromFiles(options);
 }

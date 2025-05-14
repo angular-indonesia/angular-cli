@@ -3,9 +3,9 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file at https://angular.dev/license
 
-load("@npm//@angular/build-tooling/bazel/api-golden:index.bzl", "api_golden_test_npm_package")
-load("@npm2//:defs.bzl", "npm_link_all_packages")
-load("//tools:defaults2.bzl", "jasmine_test", "npm_package", "ts_project")
+load("@devinfra//bazel/api-golden:index_rjs.bzl", "api_golden_test_npm_package")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("//tools:defaults.bzl", "jasmine_test", "npm_package", "ts_project")
 
 licenses(["notice"])
 
@@ -29,12 +29,11 @@ ts_project(
     data = [
         "package.json",
     ],
-    module_name = "@ngtools/webpack",
     deps = [
+        ":node_modules/webpack",
         "//:node_modules/@angular/compiler-cli",
         "//:node_modules/@types/node",
         "//:node_modules/typescript",
-        "//:node_modules/webpack",
     ],
 )
 
@@ -49,7 +48,7 @@ ts_project(
     ),
     deps = [
         ":node_modules/@angular-devkit/core",
-        ":webpack_rjs",
+        ":webpack",
         "//:node_modules/@angular/compiler",
         "//:node_modules/@types/jasmine",
         "//:node_modules/typescript",
@@ -59,8 +58,9 @@ ts_project(
 jasmine_test(
     name = "webpack_test",
     data = [
-        ":webpack_test_lib_rjs",
+        ":webpack_test_lib",
         # Needed at runtime for runtime TS compilations performed by tests.
+        ":node_modules/webpack",
         "//:node_modules/tslib",
     ],
 )
@@ -78,7 +78,7 @@ npm_package(
     deps = [
         ":README.md",
         ":license",
-        ":webpack_rjs",
+        ":webpack",
     ],
 )
 
@@ -88,6 +88,6 @@ api_golden_test_npm_package(
         ":npm_package",
         "//goldens:public-api",
     ],
-    golden_dir = "angular_cli/goldens/public-api/ngtools/webpack",
-    npm_package = "angular_cli/packages/ngtools/webpack/npm_package",
+    golden_dir = "goldens/public-api/ngtools/webpack",
+    npm_package = "packages/ngtools/webpack/npm_package",
 )

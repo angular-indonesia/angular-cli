@@ -39,7 +39,7 @@ export async function inlineI18n(
   warnings: string[];
   prerenderedRoutes: PrerenderedRoutesRecord;
 }> {
-  const { i18nOptions, optimizationOptions, baseHref } = options;
+  const { i18nOptions, optimizationOptions, baseHref, cacheOptions } = options;
 
   // Create the multi-threaded inliner with common options and the files generated from the build.
   const inliner = new I18nInliner(
@@ -47,6 +47,7 @@ export async function inlineI18n(
       missingTranslation: i18nOptions.missingTranslationBehavior ?? 'warning',
       outputFiles: executionResult.outputFiles,
       shouldOptimize: optimizationOptions.scripts,
+      persistentCachePath: cacheOptions.enabled ? cacheOptions.path : undefined,
     },
     maxWorkers,
   );
@@ -64,6 +65,11 @@ export async function inlineI18n(
   // For each active locale, use the inliner to process the output files of the build.
   const updatedOutputFiles = [];
   const updatedAssetFiles = [];
+  // Root and SSR entry files are not modified.
+  const unModifiedOutputFiles = executionResult.outputFiles.filter(
+    ({ type }) => type === BuildOutputFileType.Root || type === BuildOutputFileType.ServerRoot,
+  );
+
   try {
     for (const locale of i18nOptions.inlineLocales) {
       // A locale specific set of files is returned from the inliner.
@@ -87,7 +93,7 @@ export async function inlineI18n(
           ...options,
           baseHref: getLocaleBaseHref(baseHref, i18nOptions, locale) ?? baseHref,
         },
-        localeOutputFiles,
+        [...unModifiedOutputFiles, ...localeOutputFiles],
         executionResult.assetFiles,
         initialFiles,
         locale,
@@ -124,9 +130,7 @@ export async function inlineI18n(
   // Update the result with all localized files.
   executionResult.outputFiles = [
     // Root and SSR entry files are not modified.
-    ...executionResult.outputFiles.filter(
-      ({ type }) => type === BuildOutputFileType.Root || type === BuildOutputFileType.ServerRoot,
-    ),
+    ...unModifiedOutputFiles,
     // Updated files for each locale.
     ...updatedOutputFiles,
   ];
@@ -134,6 +138,30 @@ export async function inlineI18n(
   // Assets are only changed if not using the flat output option
   if (!i18nOptions.flatOutput) {
     executionResult.assetFiles = updatedAssetFiles;
+  }
+
+  // Inline any template updates if present
+  if (executionResult.templateUpdates?.size) {
+    // The development server only allows a single locale but issue a warning if used programmatically (experimental)
+    // with multiple locales and template HMR.
+    if (i18nOptions.inlineLocales.size > 1) {
+      inlineResult.warnings.push(
+        `Component HMR updates can only be inlined with a single locale. The first locale will be used.`,
+      );
+    }
+    const firstLocale = [...i18nOptions.inlineLocales][0];
+
+    for (const [id, content] of executionResult.templateUpdates) {
+      const templateUpdateResult = await inliner.inlineTemplateUpdate(
+        firstLocale,
+        i18nOptions.locales[firstLocale].translation,
+        content,
+        id,
+      );
+      executionResult.templateUpdates.set(id, templateUpdateResult.code);
+      inlineResult.errors.push(...templateUpdateResult.errors);
+      inlineResult.warnings.push(...templateUpdateResult.warnings);
+    }
   }
 
   return inlineResult;

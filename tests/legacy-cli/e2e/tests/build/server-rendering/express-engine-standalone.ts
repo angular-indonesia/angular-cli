@@ -3,20 +3,14 @@ import { rimraf, writeMultipleFiles } from '../../../utils/fs';
 import { findFreePort } from '../../../utils/network';
 import { installWorkspacePackages } from '../../../utils/packages';
 import { execAndWaitForOutputToMatch, ng } from '../../../utils/process';
-import { updateJsonFile, updateServerFileForWebpack, useSha } from '../../../utils/project';
+import { updateJsonFile, updateServerFileForEsbuild, useSha } from '../../../utils/project';
 
 export default async function () {
   // forcibly remove in case another test doesn't clean itself up
   await rimraf('node_modules/@angular/ssr');
 
   const useWebpackBuilder = !getGlobalVariable('argv')['esbuild'];
-
-  if (useWebpackBuilder) {
-    // `--server-routing` not supported in `browser` builder.
-    await ng('add', '@angular/ssr', '--skip-confirmation', '--skip-install');
-  } else {
-    await ng('add', '@angular/ssr', '--server-routing', '--skip-confirmation', '--skip-install');
-  }
+  await ng('add', '@angular/ssr', '--skip-confirmation', '--skip-install');
 
   if (!useWebpackBuilder) {
     // Disable prerendering
@@ -25,21 +19,21 @@ export default async function () {
       build.options.outputMode = undefined;
     });
 
-    await updateServerFileForWebpack('src/server.ts');
+    await updateServerFileForEsbuild('src/server.ts');
   }
 
   await useSha();
   await installWorkspacePackages();
 
   await writeMultipleFiles({
-    'src/app/app.component.css': `div { color: #000 }`,
+    'src/app/app.css': `div { color: #000 }`,
     'src/styles.css': `* { color: #000 }`,
     'src/main.ts': `import { bootstrapApplication } from '@angular/platform-browser';
-      import { AppComponent } from './app/app.component';
+      import { App } from './app/app';
       import { appConfig } from './app/app.config';
 
       (window as any)['doBootstrap'] = () => {
-        bootstrapApplication(AppComponent, appConfig).catch((err) => console.error(err));
+        bootstrapApplication(App, appConfig).catch((err) => console.error(err));
       };
       `,
     'e2e/src/app.e2e-spec.ts': `
@@ -118,6 +112,7 @@ export default async function () {
       ['run', runCommand],
       /Node Express server listening on/,
       {
+        ...process.env,
         'PORT': String(port),
       },
     );

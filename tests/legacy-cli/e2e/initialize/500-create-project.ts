@@ -1,4 +1,4 @@
-import { join } from 'path';
+import { join } from 'node:path';
 import { getGlobalVariable } from '../utils/env';
 import { expectFileToExist } from '../utils/fs';
 import { gitClean } from '../utils/git';
@@ -35,6 +35,7 @@ export default async function () {
           main: build.options.browser,
           browser: undefined,
           outputPath: 'dist/test-project/browser',
+          index: 'src/index.html',
         };
 
         build.configurations.development = {
@@ -43,12 +44,29 @@ export default async function () {
           namedChunks: true,
           buildOptimizer: false,
         };
+
+        const serve = json['projects']['test-project']['architect']['serve'];
+        serve.builder = '@angular-devkit/build-angular:dev-server';
+
+        const extract = json['projects']['test-project']['architect']['extract-i18n'];
+        if (extract) {
+          extract.builder = '@angular-devkit/build-angular:extract-i18n';
+        }
+
+        const test = json['projects']['test-project']['architect']['test'];
+        test.builder = '@angular-devkit/build-angular:karma';
       });
       await updateJsonFile('tsconfig.json', (tsconfig) => {
         delete tsconfig.compilerOptions.esModuleInterop;
         tsconfig.compilerOptions.allowSyntheticDefaultImports = true;
       });
     }
+
+    // Always need `@angular-devkit/build-angular` due to the use of protractor
+    await updateJsonFile('package.json', (packageJson) => {
+      packageJson.devDependencies['@angular-devkit/build-angular'] =
+        packageJson.devDependencies['@angular/build'];
+    });
   }
 
   await prepareProjectForE2e('test-project');

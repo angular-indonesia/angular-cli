@@ -1,7 +1,7 @@
-import { join } from 'path';
+import { join } from 'node:path';
 import { getGlobalVariable } from '../../../utils/env';
-import { expectFileToMatch, rimraf, writeFile } from '../../../utils/fs';
-import { installWorkspacePackages } from '../../../utils/packages';
+import { expectFileToMatch, writeFile } from '../../../utils/fs';
+import { installWorkspacePackages, uninstallPackage } from '../../../utils/packages';
 import { ng } from '../../../utils/process';
 import { updateJsonFile, useSha } from '../../../utils/project';
 
@@ -19,6 +19,7 @@ export default async function () {
         ...build.options,
         main: build.options.browser,
         browser: undefined,
+        index: 'src/index.html',
       };
 
       build.configurations.development = {
@@ -31,58 +32,44 @@ export default async function () {
   }
 
   // Forcibly remove in case another test doesn't clean itself up.
-  await rimraf('node_modules/@angular/ssr');
-  if (useWebpackBuilder) {
-    await ng(
-      'add',
-      '@angular/ssr',
-      '--project',
-      projectName,
-      '--skip-confirmation',
-      '--skip-install',
-      // Server routing is not supported on `browser` builder.
-      // '--server-routing',
-    );
-  } else {
-    await ng(
-      'add',
-      '@angular/ssr',
-      '--project',
-      projectName,
-      '--skip-confirmation',
-      '--skip-install',
-      '--server-routing',
-    );
-  }
+  await uninstallPackage('@angular/ssr');
+  await ng(
+    'add',
+    '@angular/ssr',
+    '--project',
+    projectName,
+    '--skip-confirmation',
+    '--skip-install',
+  );
 
   await useSha();
   await installWorkspacePackages();
 
   // Add routes
   await writeFile(
-    `projects/${projectName}/src/app/app-routing.module.ts`,
+    `projects/${projectName}/src/app/app-routing-module.ts`,
     `
   import { NgModule } from '@angular/core';
   import { RouterModule, Routes } from '@angular/router';
-  import { OneComponent } from './one/one.component';
-  import { TwoChildOneComponent } from './two-child-one/two-child-one.component';
-  import { TwoChildTwoComponent } from './two-child-two/two-child-two.component';
+  import { One} from './one/one';
+  import { TwoChildOne } from './two-child-one/two-child-one';
+  import { TwoChildTwo } from './two-child-two/two-child-two';
 
   const routes: Routes = [
     {
       path: '',
-      component: OneComponent,
+      component: One,
     },
     {
       path: 'two',
       children: [
         {
           path: 'two-child-one',
-          component: TwoChildOneComponent,
+          component: TwoChildOne,
         },
         {
           path: 'two-child-two',
-          component: TwoChildTwoComponent,
+          component: TwoChildTwo,
         },
       ],
     },
@@ -105,9 +92,9 @@ export default async function () {
 
   // Generate lazy routes
   const lazyModules: [route: string, moduleName: string][] = [
-    ['lazy-one', 'app.module'],
-    ['lazy-one-child', 'lazy-one/lazy-one.module'],
-    ['lazy-two', 'app.module'],
+    ['lazy-one', 'app-module'],
+    ['lazy-one-child', 'lazy-one/lazy-one-module'],
+    ['lazy-two', 'app-module'],
   ];
 
   for (const [route, moduleName] of lazyModules) {

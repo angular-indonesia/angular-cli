@@ -19,7 +19,7 @@ export default async function () {
 
   // Forcibly remove in case another test doesn't clean itself up.
   await uninstallPackage('@angular/ssr');
-  await ng('add', '@angular/ssr', '--server-routing', '--skip-confirmation', '--skip-install');
+  await ng('add', '@angular/ssr', '--skip-confirmation', '--skip-install');
   await useSha();
   await installWorkspacePackages();
 
@@ -28,21 +28,21 @@ export default async function () {
     'src/app/app.routes.ts',
     `
   import { Routes } from '@angular/router';
-  import { HomeComponent } from './home/home.component';
-  import { SsgComponent } from './ssg/ssg.component';
+  import { Home } from './home/home';
+  import { Ssg } from './ssg/ssg';
 
   export const routes: Routes = [
     {
       path: '',
-      component: HomeComponent,
+      component: Home,
     },
     {
       path: 'ssg',
-      component: SsgComponent,
+      component: Ssg,
     },
     {
       path: '**',
-      component: HomeComponent,
+      component: Home,
     },
   ];
   `,

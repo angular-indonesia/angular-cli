@@ -139,7 +139,7 @@ describe('Service Worker Schematic', () => {
     const tree = await schematicRunner.runSchematic('service-worker', defaultOptions, appTree);
     const content = tree.readContent('/projects/bar/src/app/app.config.ts');
     expect(content).toContain(
-      `import { ApplicationConfig, provideZoneChangeDetection, isDevMode } from '@angular/core';`,
+      `import { ApplicationConfig, provideBrowserGlobalErrorListeners, provideZoneChangeDetection, isDevMode } from '@angular/core';`,
     );
   });
 
@@ -171,7 +171,7 @@ describe('Service Worker Schematic', () => {
         nonStandaloneSWOptions,
         appTree,
       );
-      const pkgText = tree.readContent('/projects/buz/src/app/app.module.ts');
+      const pkgText = tree.readContent('/projects/buz/src/app/app-module.ts');
       expect(pkgText).toMatch(/import \{ ServiceWorkerModule \} from '@angular\/service-worker'/);
     });
 
@@ -181,7 +181,7 @@ describe('Service Worker Schematic', () => {
         nonStandaloneSWOptions,
         appTree,
       );
-      const pkgText = tree.readContent('/projects/buz/src/app/app.module.ts');
+      const pkgText = tree.readContent('/projects/buz/src/app/app-module.ts');
       expect(pkgText).toMatch(
         new RegExp(
           "(\\s+)ServiceWorkerModule\\.register\\('ngsw-worker\\.js', \\{\\n" +

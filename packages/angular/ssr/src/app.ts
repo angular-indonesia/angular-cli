@@ -102,6 +102,14 @@ export class AngularServerApp {
   constructor(private readonly options: Readonly<AngularServerAppOptions> = {}) {
     this.allowStaticRouteRender = this.options.allowStaticRouteRender ?? false;
     this.hooks = options.hooks ?? new Hooks();
+
+    if (this.manifest.inlineCriticalCss) {
+      this.inlineCriticalCssProcessor = new InlineCriticalCssProcessor((path: string) => {
+        const fileName = path.split('/').pop() ?? path;
+
+        return this.assets.getServerAsset(fileName).text();
+      });
+    }
   }
 
   /**
@@ -128,6 +136,11 @@ export class AngularServerApp {
    * The bootstrap mechanism for the server application.
    */
   private boostrap: AngularBootstrap | undefined;
+
+  /**
+   * Decorder used to convert a string to a Uint8Array.
+   */
+  private readonly textDecoder = new TextEncoder();
 
   /**
    * Cache for storing critical CSS for pages.
@@ -161,15 +174,7 @@ export class AngularServerApp {
 
     const { redirectTo, status, renderMode } = matchedRoute;
     if (redirectTo !== undefined) {
-      return new Response(null, {
-        // Note: The status code is validated during route extraction.
-        // 302 Found is used by default for redirections
-        // See: https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static#status
-        status: status ?? 302,
-        headers: {
-          'Location': buildPathWithParams(redirectTo, url.pathname),
-        },
-      });
+      return createRedirectResponse(buildPathWithParams(redirectTo, url.pathname), status);
     }
 
     if (renderMode === RenderMode.Prerender) {
@@ -262,7 +267,7 @@ export class AngularServerApp {
     const platformProviders: StaticProvider[] = [];
 
     const {
-      manifest: { bootstrap, inlineCriticalCss, locale },
+      manifest: { bootstrap, locale },
       assets,
     } = this;
 
@@ -310,7 +315,8 @@ export class AngularServerApp {
     this.boostrap ??= await bootstrap();
     let html = await assets.getIndexServerHtml().text();
     html = await this.runTransformsOnHtml(html, url, preload);
-    html = await renderAngular(
+
+    const result = await renderAngular(
       html,
       this.boostrap,
       url,
@@ -318,40 +324,51 @@ export class AngularServerApp {
       SERVER_CONTEXT_VALUE[renderMode],
     );
 
-    if (inlineCriticalCss) {
-      // Optionally inline critical CSS.
-      this.inlineCriticalCssProcessor ??= new InlineCriticalCssProcessor((path: string) => {
-        const fileName = path.split('/').pop() ?? path;
-
-        return this.assets.getServerAsset(fileName).text();
-      });
-
-      // TODO(alanagius): remove once Node.js version 18 is no longer supported.
-      if (renderMode === RenderMode.Server && typeof crypto === 'undefined') {
-        // eslint-disable-next-line no-console
-        console.error(
-          `The global 'crypto' module is unavailable. ` +
-            `If you are running on Node.js, please ensure you are using version 20 or later, ` +
-            `which includes built-in support for the Web Crypto module.`,
-        );
-      }
-
-      if (renderMode === RenderMode.Server && typeof crypto !== 'undefined') {
-        // Only cache if we are running in SSR Mode.
-        const cacheKey = await sha256(html);
-        let htmlWithCriticalCss = this.criticalCssLRUCache.get(cacheKey);
-        if (htmlWithCriticalCss === undefined) {
-          htmlWithCriticalCss = await this.inlineCriticalCssProcessor.process(html);
-          this.criticalCssLRUCache.put(cacheKey, htmlWithCriticalCss);
-        }
-
-        html = htmlWithCriticalCss;
-      } else {
-        html = await this.inlineCriticalCssProcessor.process(html);
-      }
+    if (result.hasNavigationError) {
+      return null;
     }
 
-    return new Response(html, responseInit);
+    if (result.redirectTo) {
+      return createRedirectResponse(result.redirectTo, status);
+    }
+
+    const { inlineCriticalCssProcessor, criticalCssLRUCache, textDecoder } = this;
+
+    // Use a stream to send the response before finishing rendering and inling critical CSS, improving performance via header flushing.
+    const stream = new ReadableStream({
+      async start(controller) {
+        const renderedHtml = await result.content();
+
+        if (!inlineCriticalCssProcessor) {
+          controller.enqueue(textDecoder.encode(renderedHtml));
+          controller.close();
+
+          return;
+        }
+
+        let htmlWithCriticalCss;
+        try {
+          if (renderMode === RenderMode.Server) {
+            const cacheKey = await sha256(renderedHtml);
+            htmlWithCriticalCss = criticalCssLRUCache.get(cacheKey);
+            if (!htmlWithCriticalCss) {
+              htmlWithCriticalCss = await inlineCriticalCssProcessor.process(renderedHtml);
+              criticalCssLRUCache.put(cacheKey, htmlWithCriticalCss);
+            }
+          } else {
+            htmlWithCriticalCss = await inlineCriticalCssProcessor.process(renderedHtml);
+          }
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error(`An error occurred while inlining critical CSS for: ${url}.`, error);
+        }
+
+        controller.enqueue(textDecoder.encode(htmlWithCriticalCss ?? renderedHtml));
+        controller.close();
+      },
+    });
+
+    return new Response(stream, responseInit);
   }
 
   /**
@@ -466,4 +483,21 @@ function appendPreloadHintsToHtml(html: string, preload: readonly string[]): str
     ...preload.map((val) => `<link rel="modulepreload" href="${val}">`),
     html.slice(bodyCloseIdx),
   ].join('\n');
+}
+
+/**
+ * Creates an HTTP redirect response with a specified location and status code.
+ *
+ * @param location - The URL to which the response should redirect.
+ * @param status - The HTTP status code for the redirection. Defaults to 302 (Found).
+ *                 See: https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static#status
+ * @returns A `Response` object representing the HTTP redirect.
+ */
+function createRedirectResponse(location: string, status = 302): Response {
+  return new Response(null, {
+    status,
+    headers: {
+      'Location': location,
+    },
+  });
 }

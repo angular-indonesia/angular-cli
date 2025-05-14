@@ -7,8 +7,9 @@
  */
 
 import { Rule, SchematicsException, chain } from '@angular-devkit/schematics';
-import { AngularBuilder, TargetDefinition, updateWorkspace } from '@schematics/angular/utility';
-import { posix as path } from 'path';
+import { posix as path } from 'node:path';
+import { TargetDefinition, updateWorkspace } from '../utility/workspace';
+import { Builders as AngularBuilder } from '../utility/workspace-models';
 import { Schema as EnvironmentOptions } from './schema';
 
 const ENVIRONMENTS_DIRECTORY = 'environments';
@@ -75,7 +76,8 @@ function* generateConfigurationEnvironments(
   if (
     buildTarget.builder !== AngularBuilder.Browser &&
     buildTarget.builder !== AngularBuilder.BrowserEsbuild &&
-    buildTarget.builder !== AngularBuilder.Application
+    buildTarget.builder !== AngularBuilder.Application &&
+    buildTarget.builder !== AngularBuilder.BuildApplication
   ) {
     yield log(
       'warn',

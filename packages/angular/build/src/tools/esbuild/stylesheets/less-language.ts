@@ -113,7 +113,7 @@ async function compileString(
   };
 
   try {
-    const result = await less.render(data, {
+    const { imports, css } = await less.render(data, {
       filename,
       paths: options.includePaths,
       plugins: [resolverPlugin],
@@ -128,9 +128,9 @@ async function compileString(
     } as Less.Options);
 
     return {
-      contents: result.css,
+      contents: css,
       loader: 'css',
-      watchFiles: [filename, ...result.imports],
+      watchFiles: [filename, ...imports],
     };
   } catch (error) {
     if (isLessException(error)) {

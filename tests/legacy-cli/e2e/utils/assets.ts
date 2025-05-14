@@ -1,14 +1,14 @@
-import { join } from 'path';
-import { chmod } from 'fs/promises';
+import { join } from 'node:path';
+import { chmod } from 'node:fs/promises';
 import glob from 'fast-glob';
 import { getGlobalVariable } from './env';
-import { resolve } from 'path';
+import { resolve } from 'node:path';
 import { copyFile } from './fs';
 import { installWorkspacePackages, setRegistry } from './packages';
 import { useBuiltPackagesVersions } from './project';
 
 export function assetDir(assetName: string) {
-  return join(__dirname, '../assets', assetName);
+  return join(__dirname, '../e2e/assets', assetName);
 }
 
 export function copyProjectAsset(assetName: string, to?: string) {

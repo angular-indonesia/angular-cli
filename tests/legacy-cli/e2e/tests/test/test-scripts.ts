@@ -10,37 +10,37 @@ export default async function () {
 
   // prepare global scripts test files
   await writeMultipleFiles({
-    'src/string-script.js': `stringScriptGlobal = 'string-scripts.js';`,
-    'src/input-script.js': `inputScriptGlobal = 'input-scripts.js';`,
+    'src/string-script.js': `globalThis.stringScriptGlobal = 'string-scripts.js';`,
+    'src/input-script.js': `globalThis.inputScriptGlobal = 'input-scripts.js';`,
     'src/typings.d.ts': `
       declare var stringScriptGlobal: any;
       declare var inputScriptGlobal: any;
     `,
-    'src/app/app.component.ts': `
+    'src/app/app.ts': `
       import { Component } from '@angular/core';
 
       @Component({ selector: 'app-root', template: '', standalone: false })
-      export class AppComponent {
+      export class App {
         stringScriptGlobalProp = stringScriptGlobal;
         inputScriptGlobalProp = inputScriptGlobal;
       }
     `,
-    'src/app/app.component.spec.ts': `
+    'src/app/app.spec.ts': `
       import { TestBed } from '@angular/core/testing';
-      import { AppComponent } from './app.component';
+      import { App } from './app';
 
-      describe('AppComponent', () => {
+      describe('App', () => {
         beforeEach(() => TestBed.configureTestingModule({
-          declarations: [AppComponent]
+          declarations: [App]
         }));
 
         it('should have access to string-script.js', () => {
-          let app = TestBed.createComponent(AppComponent).debugElement.componentInstance;
+          let app = TestBed.createComponent(App).debugElement.componentInstance;
           expect(app.stringScriptGlobalProp).toEqual('string-scripts.js');
         });
 
         it('should have access to input-script.js', () => {
-          let app = TestBed.createComponent(AppComponent).debugElement.componentInstance;
+          let app = TestBed.createComponent(App).debugElement.componentInstance;
           expect(app.inputScriptGlobalProp).toEqual('input-scripts.js');
         });
       });

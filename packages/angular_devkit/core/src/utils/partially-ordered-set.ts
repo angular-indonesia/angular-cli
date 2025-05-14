@@ -19,10 +19,10 @@ export class CircularDependencyFoundException extends BaseException {
   }
 }
 
-export class PartiallyOrderedSet<T> implements Set<T> {
+export class PartiallyOrderedSet<T> {
   private _items = new Map<T, Set<T>>();
 
-  protected _checkCircularDependencies(item: T, deps: Set<T>) {
+  protected _checkCircularDependencies(item: T, deps: Set<T>): void {
     if (deps.has(item)) {
       throw new CircularDependencyFoundException();
     }
@@ -30,13 +30,13 @@ export class PartiallyOrderedSet<T> implements Set<T> {
     deps.forEach((dep) => this._checkCircularDependencies(item, this._items.get(dep) || new Set()));
   }
 
-  clear() {
+  clear(): void {
     this._items.clear();
   }
-  has(item: T) {
+  has(item: T): boolean {
     return this._items.has(item);
   }
-  get size() {
+  get size(): number {
     return this._items.size;
   }
   forEach(
@@ -51,7 +51,7 @@ export class PartiallyOrderedSet<T> implements Set<T> {
   /**
    * Returns an iterable of [v,v] pairs for every value `v` in the set.
    */
-  *entries(): SetIterator<[T, T]> {
+  *entries(): IterableIterator<[T, T]> {
     for (const item of this) {
       yield [item, item];
     }
@@ -60,18 +60,18 @@ export class PartiallyOrderedSet<T> implements Set<T> {
   /**
    * Despite its name, returns an iterable of the values in the set,
    */
-  keys(): SetIterator<T> {
+  keys(): IterableIterator<T> {
     return this.values();
   }
 
   /**
    * Returns an iterable of values in the set.
    */
-  values(): SetIterator<T> {
+  values(): IterableIterator<T> {
     return this[Symbol.iterator]();
   }
 
-  add(item: T, deps: Set<T> | T[] = new Set()) {
+  add(item: T, deps: Set<T> | T[] = new Set()): this {
     if (Array.isArray(deps)) {
       deps = new Set(deps);
     }
@@ -119,7 +119,7 @@ export class PartiallyOrderedSet<T> implements Set<T> {
     return this;
   }
 
-  delete(item: T) {
+  delete(item: T): boolean {
     if (!this._items.has(item)) {
       return false;
     }
@@ -130,7 +130,7 @@ export class PartiallyOrderedSet<T> implements Set<T> {
     return this._items.delete(item);
   }
 
-  *[Symbol.iterator]() {
+  *[Symbol.iterator](): IterableIterator<T, undefined, unknown> {
     const copy: Map<T, Set<T>> = new Map(this._items);
 
     for (const [key, value] of copy.entries()) {
@@ -161,7 +161,7 @@ export class PartiallyOrderedSet<T> implements Set<T> {
     return undefined;
   }
 
-  get [Symbol.toStringTag](): 'Set' {
-    return 'Set';
+  get [Symbol.toStringTag](): 'PartiallyOrderedSet' {
+    return 'PartiallyOrderedSet';
   }
 }

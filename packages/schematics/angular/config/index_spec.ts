@@ -58,6 +58,24 @@ describe('Config Schematic', () => {
       expect(tree.exists('projects/foo/karma.conf.js')).toBeTrue();
     });
 
+    it('should not include devkit karma plugin by default', async () => {
+      const tree = await runConfigSchematic(ConfigType.Karma);
+      const karmaConf = tree.readText('projects/foo/karma.conf.js');
+      expect(karmaConf).not.toContain(`'@angular-devkit/build-angular'`);
+    });
+
+    it('should include devkit karma plugin when angular-devkit/build-angular:karma is used', async () => {
+      applicationTree.overwrite(
+        'angular.json',
+        applicationTree
+          .readText('angular.json')
+          .replace('@angular/build:karma', '@angular-devkit/build-angular:karma'),
+      );
+      const tree = await runConfigSchematic(ConfigType.Karma);
+      const karmaConf = tree.readText('projects/foo/karma.conf.js');
+      expect(karmaConf).toContain(`'@angular-devkit/build-angular'`);
+    });
+
     it('should set the right coverage folder', async () => {
       const tree = await runConfigSchematic(ConfigType.Karma);
       const karmaConf = tree.readText('projects/foo/karma.conf.js');
@@ -76,7 +94,7 @@ describe('Config Schematic', () => {
   describe(`when 'type' is 'browserslist'`, () => {
     it('should create a .browserslistrc file', async () => {
       const tree = await runConfigSchematic(ConfigType.Browserslist);
-      expect(tree.exists('projects/foo/.browserslistrc')).toBeTrue();
+      expect(tree.readContent('projects/foo/.browserslistrc')).toContain('Chrome >=');
     });
   });
 });

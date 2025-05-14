@@ -2,16 +2,18 @@ import { parseArgs } from 'node:util';
 import { createConsoleLogger } from '../../packages/angular_devkit/core/node';
 import colors from 'ansi-colors';
 import glob from 'fast-glob';
-import * as path from 'path';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { getGlobalVariable, setGlobalVariable } from './e2e/utils/env';
 import { gitClean } from './e2e/utils/git';
 import { createNpmRegistry } from './e2e/utils/registry';
 import { launchTestProcess } from './e2e/utils/process';
-import { delimiter, dirname, join } from 'path';
+import { delimiter, dirname, join } from 'node:path';
 import { findFreePort } from './e2e/utils/network';
 import { extractFile } from './e2e/utils/tar';
-import { realpathSync } from 'fs';
+import { realpathSync } from 'node:fs';
 import { PkgInfo } from './e2e/utils/packages';
+import { rm } from 'node:fs/promises';
 
 Error.stackTraceLimit = Infinity;
 
@@ -77,6 +79,11 @@ const argv = {
       : Number(process.env.E2E_SHARD_INDEX ?? 0) * Number(process.env.TEST_TOTAL_SHARDS ?? 1) +
         Number(process.env.TEST_SHARD_INDEX ?? 0)),
 };
+
+// Indicate sharding support for Bazel.
+if (process.env['TEST_SHARD_STATUS_FILE']) {
+  fs.writeFileSync(process.env['TEST_SHARD_STATUS_FILE'], '', 'utf8');
+}
 
 /**
  * Set the error code of the process to 255.  This is to ensure that if something forces node
@@ -173,12 +180,16 @@ const tests = allTests.filter((name) => {
   });
 });
 
+console.log(`Running with shard configuration:`);
+console.log(`Total shards: ${nbShards}, current shard: ${shardId}`);
+
 // Remove tests that are not part of this shard.
 const testsToRun = tests.filter((name, i) => shardId === null || i % nbShards == shardId);
 
 if (testsToRun.length === 0) {
   if (shardId !== null && tests.length <= shardId) {
-    console.log(`No tests to run on shard ${shardId}, exiting.`);
+    console.log(`No tests to run on shard ${shardId}, exiting`);
+    console.log(`Without sharding, there were ${tests.length} tests found.`);
     process.exit(0);
   } else {
     console.log(`No tests would be ran, aborting.`);
@@ -252,10 +263,8 @@ Promise.all([findFreePort(), findFreePort(), findPackageTars()])
         console.log(`Current Directory: ${process.cwd()}`);
         console.log('Will loop forever while you debug... CTRL-C to quit.');
 
-        /* eslint-disable no-constant-condition */
-        while (1) {
-          // That's right!
-        }
+        // Wait forever until user explicitly cancels.
+        await new Promise(() => {});
       }
 
       process.exitCode = 1;
@@ -328,7 +337,17 @@ async function runTest(absoluteName: string): Promise<void> {
   process.chdir(join(getGlobalVariable('projects-root'), 'test-project'));
 
   await launchTestProcess(absoluteName);
+  await cleanTestProject();
+}
+
+async function cleanTestProject() {
   await gitClean();
+
+  const testProject = join(getGlobalVariable('projects-root'), 'test-project');
+
+  // Note: Dist directory is not cleared between tests, as `git clean`
+  // doesn't delete it.
+  await rm(join(testProject, 'dist/'), { recursive: true, force: true });
 }
 
 function printHeader(

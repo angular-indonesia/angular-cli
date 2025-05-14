@@ -1,5 +1,6 @@
-load("@npm//@angular/build-tooling/bazel/api-golden:index.bzl", "api_golden_test_npm_package")
-load("//tools:defaults2.bzl", "jasmine_test", "npm_package", "ts_project")
+load("@devinfra//bazel/api-golden:index_rjs.bzl", "api_golden_test_npm_package")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("//tools:defaults.bzl", "jasmine_test", "npm_package", "ts_project")
 
 # Copyright Google Inc. All Rights Reserved.
 #
@@ -8,6 +9,8 @@ load("//tools:defaults2.bzl", "jasmine_test", "npm_package", "ts_project")
 package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
+
+npm_link_all_packages()
 
 RUNTIME_ASSETS = glob(
     include = ["**/*.json"],
@@ -27,21 +30,16 @@ ts_project(
         ],
     ) + ["index.ts"],
     data = RUNTIME_ASSETS,
-    module_name = "@angular-devkit/core",
     deps = [
+        ":node_modules/ajv",
+        ":node_modules/ajv-formats",
+        ":node_modules/jsonc-parser",
+        ":node_modules/picomatch",
+        ":node_modules/rxjs",
+        ":node_modules/source-map",
+        "//:node_modules/@types/jasmine",
         "//:node_modules/@types/node",
         "//:node_modules/@types/picomatch",
-        "//:node_modules/@types/jasmine",
-        "//:node_modules/ajv",
-        "//:node_modules/ajv-formats",
-        "//:node_modules/jsonc-parser",
-        "//:node_modules/picomatch",
-        "//:node_modules/rxjs",
-        "//:node_modules/source-map",
-        # @node_module: typescript:es2015.proxy
-        # @node_module: typescript:es2015.reflect
-        # @node_module: typescript:es2015.symbol.wellknown
-        # @typings: source_map
     ],
 )
 
@@ -53,15 +51,16 @@ ts_project(
     srcs = glob(["src/**/*_spec.ts"]),
     data = glob(["src/workspace/json/test/**/*.json"]),
     deps = [
-        ":core_rjs",
-        "//:node_modules/rxjs",
-        "//packages/angular_devkit/core/node:node_rjs",
+        ":core",
+        ":node_modules/rxjs",
+        "//:node_modules/@types/node",
+        "//packages/angular_devkit/core/node",
     ],
 )
 
 jasmine_test(
     name = "core_test",
-    data = [":core_test_lib_rjs"],
+    data = [":core_test_lib"],
 )
 
 genrule(
@@ -76,10 +75,10 @@ npm_package(
     tags = ["release-package"],
     deps = RUNTIME_ASSETS + [
         ":README.md",
-        ":core_rjs",
+        ":core",
         ":license",
-        "//packages/angular_devkit/core/node:node_rjs",
-        "//packages/angular_devkit/core/node/testing:testing_rjs",
+        "//packages/angular_devkit/core/node",
+        "//packages/angular_devkit/core/node/testing",
     ],
 )
 
@@ -89,8 +88,10 @@ api_golden_test_npm_package(
         ":npm_package",
         "//goldens:public-api",
     ],
-    golden_dir = "angular_cli/goldens/public-api/angular_devkit/core",
-    npm_package = "angular_cli/packages/angular_devkit/core/npm_package",
-    types = ["@npm//@types/node"],
+    golden_dir = "goldens/public-api/angular_devkit/core",
+    npm_package = "packages/angular_devkit/core/npm_package",
+    types = {
+        "//:node_modules/@types/node": "node",
+    },
 )
 # @external_end

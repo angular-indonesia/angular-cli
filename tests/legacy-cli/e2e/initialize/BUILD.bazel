@@ -1,4 +1,4 @@
-load("//tools:interop.bzl", "ts_project")
+load("//tools:defaults.bzl", "ts_project")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -10,6 +10,7 @@ ts_project(
         "//:config-files",
     ],
     deps = [
-        "//tests/legacy-cli/e2e/utils:utils_rjs",
+        "//:node_modules/@types/node",
+        "//tests/legacy-cli/e2e/utils",
     ],
 )

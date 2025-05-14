@@ -3,8 +3,8 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file at https://angular.dev/license
 
-load("@npm2//:defs.bzl", "npm_link_all_packages")
-load("//tools:defaults2.bzl", "jasmine_test", "npm_package", "ts_project")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("//tools:defaults.bzl", "jasmine_test", "npm_package", "ts_project")
 load("//tools:ng_cli_schema_generator.bzl", "cli_json_schema")
 load("//tools:ts_json_schema.bzl", "ts_json_schema")
 
@@ -43,15 +43,21 @@ ts_project(
         "//packages/angular/cli:src/commands/update/schematic/schema.ts",
     ],
     data = RUNTIME_ASSETS,
-    module_name = "@angular/cli",
     deps = [
         ":node_modules/@angular-devkit/architect",
         ":node_modules/@angular-devkit/core",
         ":node_modules/@angular-devkit/schematics",
+        ":node_modules/@inquirer/prompts",
+        ":node_modules/@listr2/prompt-adapter-inquirer",
+        ":node_modules/@yarnpkg/lockfile",
+        ":node_modules/ini",
+        ":node_modules/jsonc-parser",
+        ":node_modules/npm-package-arg",
+        ":node_modules/npm-pick-manifest",
+        ":node_modules/pacote",
         ":node_modules/resolve",
+        ":node_modules/yargs",
         "//:node_modules/@angular/core",
-        "//:node_modules/@inquirer/prompts",
-        "//:node_modules/@listr2/prompt-adapter-inquirer",
         "//:node_modules/@types/ini",
         "//:node_modules/@types/node",
         "//:node_modules/@types/npm-package-arg",
@@ -60,16 +66,8 @@ ts_project(
         "//:node_modules/@types/semver",
         "//:node_modules/@types/yargs",
         "//:node_modules/@types/yarnpkg__lockfile",
-        "//:node_modules/@yarnpkg/lockfile",
-        "//:node_modules/ini",
-        "//:node_modules/jsonc-parser",
         "//:node_modules/listr2",
-        "//:node_modules/npm-package-arg",
-        "//:node_modules/npm-pick-manifest",
-        "//:node_modules/pacote",
         "//:node_modules/semver",
-        "//:node_modules/symbol-observable",
-        "//:node_modules/yargs",
     ],
 )
 
@@ -108,18 +106,19 @@ ts_project(
         ],
     ),
     deps = [
-        ":angular-cli_rjs",
+        ":angular-cli",
+        ":node_modules/@angular-devkit/core",
+        ":node_modules/@angular-devkit/schematics",
+        ":node_modules/yargs",
         "//:node_modules/@types/semver",
         "//:node_modules/@types/yargs",
-        "//packages/angular_devkit/core:core_rjs",
-        "//packages/angular_devkit/schematics:schematics_rjs",
-        "//packages/angular_devkit/schematics/testing:testing_rjs",
+        "//:node_modules/semver",
     ],
 )
 
 jasmine_test(
     name = "angular-cli_test",
-    data = [":angular-cli_test_lib_rjs"],
+    data = [":angular-cli_test_lib"],
 )
 
 genrule(
@@ -145,7 +144,7 @@ npm_package(
     tags = ["release-package"],
     deps = RUNTIME_ASSETS + [
         ":README.md",
-        ":angular-cli_rjs",
+        ":angular-cli",
         ":license",
     ],
 )

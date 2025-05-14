@@ -33,10 +33,6 @@ test:no-sharding --flaky_test_attempts=1 --test_sharding_strategy=disabled
 # See https://github.com/bazelbuild/bazel/issues/4603
 build --symlink_prefix=dist/
 
-# Disable watchfs as it causes tests to be flaky on Windows
-# https://github.com/angular/angular/issues/29541
-build --nowatchfs
-
 # Turn off legacy external runfiles
 build --nolegacy_external_runfiles
 
@@ -44,7 +40,7 @@ build --nolegacy_external_runfiles
 # in Bazel 0.21.0 but turned off again in 0.22.0. Follow
 # https://github.com/bazelbuild/bazel/issues/7026 for more details.
 # This flag is needed to so that the bazel cache is not invalidated
-# when running bazel via `yarn bazel`.
+# when running bazel via `pnpm bazel`.
 # See https://github.com/angular/angular/issues/27514.
 build --incompatible_strict_action_env
 run --incompatible_strict_action_env
@@ -55,9 +51,6 @@ build --experimental_remote_merkle_tree_cache
 
 # Ensure that tags applied in BUILDs propagate to actions
 common --experimental_allow_tags_propagation
-
-# Don't check if output files have been modified
-build --noexperimental_check_output_files
 
 # Ensure sandboxing is enabled even for exclusive tests
 test --incompatible_exclusive_test_sandboxed
@@ -87,14 +80,14 @@ test:saucelabs --define=KARMA_WEB_TEST_MODE=SL_REQUIRED
 # Releases should always be stamped with version control info
 # This command assumes node on the path and is a workaround for
 # https://github.com/bazelbuild/bazel/issues/4802
-build:release --workspace_status_command="yarn ng-dev release build-env-stamp --mode=release"
+build:release --workspace_status_command="pnpm -s ng-dev release build-env-stamp --mode=release"
 build:release --stamp
 
-build:snapshot --workspace_status_command="yarn ng-dev release build-env-stamp --mode=snapshot"
+build:snapshot --workspace_status_command="pnpm -s ng-dev release build-env-stamp --mode=snapshot"
 build:snapshot --stamp
 build:snapshot --//:enable_snapshot_repo_deps
 
-build:e2e --workspace_status_command="yarn ng-dev release build-env-stamp --mode=release"
+build:e2e --workspace_status_command="pnpm -s ng-dev release build-env-stamp --mode=release"
 build:e2e --stamp
 test:e2e --test_timeout=3600 --experimental_ui_max_stdouterr_bytes=2097152
 
@@ -133,12 +126,13 @@ build:remote --jobs=150
 
 # Setup the toolchain and platform for the remote build execution. The platform
 # is provided by the shared dev-infra package and targets k8 remote containers.
-build:remote --extra_execution_platforms=@npm//@angular/build-tooling/bazel/remote-execution:platform_with_network
-build:remote --host_platform=@npm//@angular/build-tooling/bazel/remote-execution:platform_with_network
-build:remote --platforms=@npm//@angular/build-tooling/bazel/remote-execution:platform_with_network
+build:remote --extra_execution_platforms=@devinfra//bazel/remote-execution:platform_with_network
+build:remote --host_platform=@devinfra//bazel/remote-execution:platform_with_network
+build:remote --platforms=@devinfra//bazel/remote-execution:platform_with_network
 
 # Set remote caching settings
 build:remote --remote_accept_cached=true
+build:remote --remote_upload_local_results=false
 
 # Force remote executions to consider the entire run as linux.
 # This is required for OSX cross-platform RBE.
@@ -151,20 +145,15 @@ build:remote --google_default_credentials
 # Use HTTP remote cache
 build:remote-cache --remote_cache=https://storage.googleapis.com/angular-team-cache
 build:remote-cache --remote_accept_cached=true
-build:remote-cache --remote_upload_local_results=true
+build:remote-cache --remote_upload_local_results=false
 build:remote-cache --google_default_credentials
 
-###############################
-# NodeJS rules settings
-# These settings are required for rules_nodejs
-###############################
+# Additional flags added when running a "trusted build" with additional access
+build:trusted-build --remote_upload_local_results=true
 
-# Fixes use of npm paths with spaces such as some within the puppeteer module
+# Fixes issues with browser archives and files with spaces. Could be
+# removed in Bazel 8 when Bazel runfiles supports spaces.
 build --experimental_inprocess_symlink_creation
-
-# Enable runfiles even on Windows.
-# Architect resolves output files from data files, and this isn't possible without runfile support.
-build --enable_runfiles
 
 ####################################################
 # rules_js specific flags
@@ -173,6 +162,11 @@ build --enable_runfiles
 # TODO(josephperrott): investigate if this can be removed eventually.
 # Prevents the npm package extract from occuring or caching on RBE which overwhelms our quota
 build --modify_execution_info=NpmPackageExtract=+no-remote
+
+# Allow the Bazel server to check directory sources for changes. `rules_js` previously
+# heavily relied on this, but still uses directory "inputs" in some cases.
+# See: https://github.com/aspect-build/rules_js/issues/1408.
+startup --host_jvm_args=-DBAZEL_TRACK_SOURCE_DIRECTORIES=1
 
 ####################################################
 # User bazel configuration

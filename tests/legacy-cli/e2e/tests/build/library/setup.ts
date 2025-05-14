@@ -6,18 +6,18 @@ export async function libraryConsumptionSetup(): Promise<void> {
 
   // Force an external template
   await writeMultipleFiles({
-    'projects/my-lib/src/lib/my-lib.component.html': `<p>my-lib works!</p>`,
-    'projects/my-lib/src/lib/my-lib.component.ts': `import { Component } from '@angular/core';
+    'projects/my-lib/src/lib/my-lib.html': `<p>my-lib works!</p>`,
+    'projects/my-lib/src/lib/my-lib.ts': `import { Component } from '@angular/core';
 
     @Component({
       standalone: true,
       selector: 'lib-my-lib',
-      templateUrl: './my-lib.component.html',
+      templateUrl: './my-lib.html',
     })
     export class MyLibComponent {}`,
-    './src/app/app.component.ts': `
+    './src/app/app.ts': `
     import { Component } from '@angular/core';
-    import { MyLibService, MyLibComponent } from 'my-lib';
+    import { MyLibComponent } from 'my-lib';
 
     @Component({
       standalone: true,
@@ -25,11 +25,10 @@ export async function libraryConsumptionSetup(): Promise<void> {
       template: '<lib-my-lib></lib-my-lib>',
       imports: [MyLibComponent],
     })
-    export class AppComponent {
+    export class App {
       title = 'test-project';
 
-      constructor(myLibService: MyLibService) {
-        console.log(myLibService);
+      constructor() {
       }
     }
   `,

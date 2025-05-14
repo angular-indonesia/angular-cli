@@ -3,8 +3,8 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file at https://angular.dev/license
 
-load("@npm2//:defs.bzl", "npm_link_all_packages")
-load("//tools:defaults2.bzl", "jasmine_test", "npm_package", "ts_project")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("//tools:defaults.bzl", "jasmine_test", "npm_package", "ts_project")
 load("//tools:ts_json_schema.bzl", "ts_json_schema")
 
 licenses(["notice"])
@@ -32,12 +32,11 @@ ts_project(
         "//packages/angular/pwa:pwa/schema.ts",
     ],
     data = RUNTIME_ASSETS,
-    module_name = "@angular/pwa",
     deps = [
         ":node_modules/@angular-devkit/schematics",
         ":node_modules/@schematics/angular",
+        ":node_modules/parse5-html-rewriting-stream",
         "//:node_modules/@types/node",
-        "//:node_modules/parse5-html-rewriting-stream",
     ],
 )
 
@@ -51,15 +50,16 @@ ts_project(
     testonly = True,
     srcs = glob(["pwa/**/*_spec.ts"]),
     deps = [
-        ":pwa_rjs",
+        ":node_modules/@angular-devkit/schematics",
+        ":pwa",
         "//:node_modules/@types/jasmine",
-        "//packages/angular_devkit/schematics/testing:testing_rjs",
+        "//:node_modules/@types/node",
     ],
 )
 
 jasmine_test(
     name = "pwa_test",
-    data = [":pwa_test_lib_rjs"],
+    data = [":pwa_test_lib"],
 )
 
 genrule(
@@ -79,6 +79,6 @@ npm_package(
     deps = RUNTIME_ASSETS + [
         ":README.md",
         ":license",
-        ":pwa_rjs",
+        ":pwa",
     ],
 )

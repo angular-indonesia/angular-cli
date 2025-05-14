@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import { readdir } from 'fs/promises';
+import { readdir } from 'node:fs/promises';
 import { expectFileToExist, expectFileToMatch, replaceInFile, writeFile } from '../../utils/fs';
 import { ng } from '../../utils/process';
 import { getGlobalVariable } from '../../utils/env';
@@ -16,7 +16,7 @@ export default async function () {
   const useWebpackBuilder = !getGlobalVariable('argv')['esbuild'];
 
   const workerPath = 'src/app/app.worker.ts';
-  const snippetPath = 'src/app/app.component.ts';
+  const snippetPath = 'src/app/app.ts';
   const projectTsConfig = 'tsconfig.json';
   const workerTsConfig = 'tsconfig.worker.json';
 
@@ -52,7 +52,7 @@ export default async function () {
 
   // console.warn has to be used because chrome only captures warnings and errors by default
   // https://github.com/angular/protractor/issues/2207
-  await replaceInFile('src/app/app.component.ts', 'console.log', 'console.warn');
+  await replaceInFile('src/app/app.ts', 'console.log', 'console.warn');
 
   await writeFile(
     'e2e/app.e2e-spec.ts',

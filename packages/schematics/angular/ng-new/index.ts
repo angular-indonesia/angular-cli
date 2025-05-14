@@ -57,8 +57,7 @@ export default function (options: NgNewOptions): Rule {
     minimal: options.minimal,
     standalone: options.standalone,
     ssr: options.ssr,
-    serverRouting: options.serverRouting,
-    experimentalZoneless: options.experimentalZoneless,
+    zoneless: options.zoneless,
   };
 
   return chain([

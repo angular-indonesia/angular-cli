@@ -7,12 +7,14 @@
  */
 
 import {
+  FileOperator,
   Rule,
   Tree,
   apply,
   applyTemplates,
   chain,
   filter,
+  forEach,
   mergeWith,
   move,
   noop,
@@ -31,6 +33,7 @@ export interface GenerateFromFilesOptions {
   project: string;
   skipTests?: boolean;
   templateFilesDirectory?: string;
+  type?: string;
 }
 
 export function generateFromFiles(
@@ -41,6 +44,9 @@ export function generateFromFiles(
     options.path ??= await createDefaultPath(host, options.project);
     options.prefix ??= '';
     options.flat ??= true;
+
+    // Schematic templates require a defined type value
+    options.type ??= '';
 
     const parsedPath = parseName(options.path, options.name);
     options.name = parsedPath.name;
@@ -56,6 +62,19 @@ export function generateFromFiles(
         ...options,
         ...extraTemplateValues,
       }),
+      !options.type
+        ? forEach((file) => {
+            let filePath: string = file.path;
+            while (filePath.includes('..')) {
+              filePath = filePath.replaceAll('..', '.');
+            }
+
+            return {
+              content: file.content,
+              path: filePath,
+            } as ReturnType<FileOperator>;
+          })
+        : noop(),
       move(parsedPath.path + (options.flat ? '' : '/' + strings.dasherize(options.name))),
     ]);
 

@@ -26,11 +26,8 @@ export enum PrerenderFallback {
     Server = 0
 }
 
-// @public @deprecated
-export function provideServerRoutesConfig(routes: ServerRoute[], options?: ServerRoutesConfigOptions): EnvironmentProviders;
-
 // @public
-export function provideServerRouting(routes: ServerRoute[], ...features: ServerRoutesFeature<ServerRoutesFeatureKind>[]): EnvironmentProviders;
+export function provideServerRendering(...features: ServerRenderingFeature<ServerRenderingFeatureKind>[]): EnvironmentProviders;
 
 // @public
 export enum RenderMode {
@@ -69,18 +66,16 @@ export interface ServerRoutePrerenderWithParams extends Omit<ServerRoutePrerende
     getPrerenderParams: () => Promise<Record<string, string>[]>;
 }
 
-// @public @deprecated
-export interface ServerRoutesConfigOptions {
-    appShellRoute?: string;
-}
-
 // @public
 export interface ServerRouteServer extends ServerRouteCommon {
     renderMode: RenderMode.Server;
 }
 
 // @public
-export function withAppShell(component: Type<unknown> | (() => Promise<Type<unknown> | DefaultExport<Type<unknown>>>)): ServerRoutesFeature<ServerRoutesFeatureKind.AppShell>;
+export function withAppShell(component: Type<unknown> | (() => Promise<Type<unknown> | DefaultExport<Type<unknown>>>)): ServerRenderingFeature<ServerRenderingFeatureKind.AppShell>;
+
+// @public
+export function withRoutes(routes: ServerRoute[]): ServerRenderingFeature<ServerRenderingFeatureKind.ServerRoutes>;
 
 // (No @packageDocumentation comment for this package)
 

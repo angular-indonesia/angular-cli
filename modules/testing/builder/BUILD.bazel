@@ -1,5 +1,5 @@
-load("@npm2//:defs.bzl", "npm_link_all_packages")
-load("//tools:defaults2.bzl", "jasmine_test", "ts_project")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("//tools:defaults.bzl", "jasmine_test", "ts_project")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -20,11 +20,13 @@ ts_project(
         # Needed at runtime by some builder tests relying on SSR being
         # resolvable in the test project.
         ":node_modules/@angular/ssr",
+        ":node_modules/vitest",
     ] + glob(["projects/**/*"]),
     deps = [
         ":node_modules/@angular-devkit/architect",
         ":node_modules/@angular-devkit/core",
-        "//:node_modules/rxjs",
+        ":node_modules/rxjs",
+        "//:node_modules/@types/node",
     ],
 )
 
@@ -37,12 +39,12 @@ ts_project(
         ],
     ),
     deps = [
-        ":builder_rjs",
+        ":builder",
         ":node_modules/@angular-devkit/architect",
     ],
 )
 
 jasmine_test(
     name = "unit_test",
-    data = [":unit_test_lib_rjs"],
+    data = [":unit_test_lib"],
 )

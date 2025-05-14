@@ -5,7 +5,7 @@ import { installWorkspacePackages } from '../../../utils/packages';
 import { execAndWaitForOutputToMatch, ng } from '../../../utils/process';
 import {
   updateJsonFile,
-  updateServerFileForWebpack,
+  updateServerFileForEsbuild,
   useCIChrome,
   useCIDefaults,
   useSha,
@@ -32,6 +32,7 @@ export default async function () {
         ...build.options,
         main: build.options.browser,
         browser: undefined,
+        index: 'src/index.html',
       };
 
       build.configurations.development = {
@@ -62,18 +63,18 @@ export default async function () {
       build.options.outputMode = undefined;
     });
 
-    await updateServerFileForWebpack('projects/test-project-two/src/server.ts');
+    await updateServerFileForEsbuild('projects/test-project-two/src/server.ts');
   }
 
   await writeMultipleFiles({
-    'projects/test-project-two/src/app/app.component.css': `div { color: #000 }`,
+    'projects/test-project-two/src/app/app.css': `div { color: #000 }`,
     'projects/test-project-two/src/styles.css': `* { color: #000 }`,
     'projects/test-project-two/src/main.ts': `
-      import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
-      import { AppModule } from './app/app.module';
+      import { platformBrowser } from '@angular/platform-browser';
+      import { AppModule } from './app/app-module';
 
       (window as any)['doBootstrap'] = () => {
-        platformBrowserDynamic()
+        platformBrowser()
           .bootstrapModule(AppModule)
           .catch((err) => console.error(err));
       };
@@ -155,6 +156,7 @@ export default async function () {
       ['run', runCommand],
       /Node Express server listening on/,
       {
+        ...process.env,
         'PORT': String(port),
       },
     );

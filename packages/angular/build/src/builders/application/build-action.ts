@@ -9,7 +9,7 @@
 import { BuilderContext } from '@angular-devkit/architect';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { BuildOutputFileType } from '../../tools/esbuild/bundler-context';
+import { BuildOutputFile, BuildOutputFileType } from '../../tools/esbuild/bundler-context';
 import { ExecutionResult, RebuildState } from '../../tools/esbuild/bundler-execution-result';
 import { shutdownSassWorkerPool } from '../../tools/esbuild/stylesheets/sass-language';
 import { logMessages, withNoProgress, withSpinner } from '../../tools/esbuild/utils';
@@ -152,6 +152,10 @@ export async function* runEsBuildBuildAction(
     return;
   }
 
+  // Used to force a full result on next rebuild if there were initial errors.
+  // This ensures at least one full result is emitted.
+  let hasInitialErrors = result.errors.length > 0;
+
   // Wait for changes and rebuild as needed
   const currentWatchFiles = new Set(result.watchFiles);
   try {
@@ -201,10 +205,13 @@ export async function* runEsBuildBuildAction(
         result,
         outputOptions,
         changes,
-        incrementalResults ? rebuildState : undefined,
+        incrementalResults && !hasInitialErrors ? rebuildState : undefined,
       )) {
         yield outputResult;
       }
+
+      // Clear initial build errors flag if no errors are now present
+      hasInitialErrors &&= result.errors.length > 0;
     }
   } finally {
     // Stop the watcher and cleanup incremental rebuild state
@@ -320,8 +327,7 @@ function* emitOutputResults(
     if (needFile) {
       if (file.path.endsWith('.css')) {
         hasCssUpdates = true;
-      } else if (!/(?:\.m?js|\.map)$/.test(file.path)) {
-        // Updates to non-JS files must signal an update with the dev server
+      } else if (!canBackgroundUpdate(file)) {
         incrementalResult.background = false;
       }
 
@@ -414,4 +420,16 @@ function* emitOutputResults(
 
 function isCssFilePath(filePath: string): boolean {
   return /\.css(?:\.map)?$/i.test(filePath);
+}
+
+function canBackgroundUpdate(file: BuildOutputFile): boolean {
+  // Files in the output root are not served and do not affect the
+  // application available with the development server.
+  if (file.type === BuildOutputFileType.Root) {
+    return true;
+  }
+
+  // Updates to non-JS files must signal an update with the dev server
+  // except the service worker configuration which is special cased.
+  return /(?:\.m?js|\.map)$/.test(file.path) || file.path === 'ngsw.json';
 }

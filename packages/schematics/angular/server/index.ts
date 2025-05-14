@@ -14,10 +14,8 @@ import {
   apply,
   applyTemplates,
   chain,
-  filter,
   mergeWith,
   move,
-  noop,
   strings,
   url,
 } from '@angular-devkit/schematics';
@@ -28,7 +26,8 @@ import { JSONFile } from '../utility/json-file';
 import { latestVersions } from '../utility/latest-versions';
 import { isStandaloneApp } from '../utility/ng-ast-utils';
 import { relativePathToWorkspaceRoot } from '../utility/paths';
-import { targetBuildNotFoundError } from '../utility/project-targets';
+import { isUsingApplicationBuilder, targetBuildNotFoundError } from '../utility/project-targets';
+import { resolveBootstrappedComponentData } from '../utility/standalone/app_component';
 import { getMainFilePath } from '../utility/standalone/util';
 import { getWorkspace, updateWorkspace } from '../utility/workspace';
 import { Builders } from '../utility/workspace-models';
@@ -113,19 +112,13 @@ function updateConfigFileApplicationBuilder(options: ServerOptions): Rule {
       serverMainEntryName,
     );
 
-    if (options.serverRouting) {
-      buildTarget.options['outputMode'] = 'static';
-    }
+    buildTarget.options['outputMode'] = 'static';
   });
 }
 
 function updateTsConfigFile(tsConfigPath: string): Rule {
   return (host: Tree) => {
     const json = new JSONFile(host, tsConfigPath);
-    const filesPath = ['files'];
-    const files = new Set((json.get(filesPath) as string[] | undefined) ?? []);
-    files.add('src/' + serverMainEntryName);
-    json.modify(filesPath, [...files]);
 
     const typePath = ['compilerOptions', 'types'];
     const types = new Set((json.get(typePath) as string[] | undefined) ?? []);
@@ -173,13 +166,11 @@ export default function (options: ServerOptions): Rule {
       throw targetBuildNotFoundError();
     }
 
-    const isUsingApplicationBuilder =
-      clientBuildTarget.builder === Builders.Application ||
-      clientBuildTarget.builder === Builders.BuildApplication;
+    const usingApplicationBuilder = isUsingApplicationBuilder(clientProject);
 
     if (
       clientProject.targets.has('server') ||
-      (isUsingApplicationBuilder && clientBuildTarget.options?.server !== undefined)
+      (usingApplicationBuilder && clientBuildTarget.options?.server !== undefined)
     ) {
       // Server has already been added.
       return;
@@ -190,16 +181,27 @@ export default function (options: ServerOptions): Rule {
     const isStandalone = isStandaloneApp(host, browserEntryPoint);
     const sourceRoot = clientProject.sourceRoot ?? join(normalize(clientProject.root), 'src');
 
-    let filesUrl = `./files/${isUsingApplicationBuilder ? 'application-builder/' : 'server-builder/'}`;
+    let filesUrl = `./files/${usingApplicationBuilder ? 'application-builder/' : 'server-builder/'}`;
     filesUrl += isStandalone ? 'standalone-src' : 'ngmodule-src';
 
+    const { componentName, componentImportPathInSameFile, moduleName, moduleImportPathInSameFile } =
+      resolveBootstrappedComponentData(host, browserEntryPoint) || {
+        componentName: 'App',
+        componentImportPathInSameFile: './app/app',
+        moduleName: 'AppModule',
+        moduleImportPathInSameFile: './app/app.module',
+      };
     const templateSource = apply(url(filesUrl), [
-      options.serverRouting
-        ? noop()
-        : filter((path) => !path.endsWith('app.routes.server.ts.template')),
       applyTemplates({
         ...strings,
         ...options,
+        appComponentName: componentName,
+        appComponentPath: componentImportPathInSameFile,
+        appModuleName: moduleName,
+        appModulePath:
+          moduleImportPathInSameFile === null
+            ? null
+            : `./${posix.basename(moduleImportPathInSameFile)}`,
       }),
       move(sourceRoot),
     ]);
@@ -210,7 +212,7 @@ export default function (options: ServerOptions): Rule {
 
     return chain([
       mergeWith(templateSource),
-      ...(isUsingApplicationBuilder
+      ...(usingApplicationBuilder
         ? [
             updateConfigFileApplicationBuilder(options),
             updateTsConfigFile(clientBuildOptions.tsConfig),

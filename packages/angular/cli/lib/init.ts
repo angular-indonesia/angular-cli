@@ -6,11 +6,9 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import 'symbol-observable';
-// symbol polyfill must go first
-import { promises as fs } from 'fs';
-import { createRequire } from 'module';
-import * as path from 'path';
+import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import * as path from 'node:path';
 import { SemVer, major } from 'semver';
 import { colors } from '../src/utilities/color';
 import { isWarningEnabled } from '../src/utilities/config';
@@ -62,7 +60,7 @@ let forceExit = false;
     let localVersion = cli.VERSION?.full;
     if (!localVersion) {
       try {
-        const localPackageJson = await fs.readFile(
+        const localPackageJson = await readFile(
           path.join(path.dirname(projectLocalCli), '../../package.json'),
           'utf-8',
         );

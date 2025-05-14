@@ -3,14 +3,13 @@ import { <% if(changeDetection !== 'Default') { %>ChangeDetectionStrategy, <% }%
 @Component({<% if(!skipSelector) {%>
   selector: '<%= selector %>',<%}%><% if(standalone) {%>
   imports: [],<%} else { %>
-  standalone: false,
-  <% }%><% if(inlineTemplate) { %>
+  standalone: false,<% }%><% if(inlineTemplate) { %>
   template: `
     <p>
       <%= dasherize(name) %> works!
     </p>
   `<% } else { %>
-  templateUrl: './<%= dasherize(name) %><%= type ? '.' + dasherize(type): '' %>.html'<% } if(inlineStyle) { %>,
+  templateUrl: './<%= dasherize(name) %><%= type ? '.' + dasherize(type): '' %><%= ngext %>.html'<% } if(inlineStyle) { %>,
   styles: `<% if(displayBlock){ %>
     :host {
       display: block;

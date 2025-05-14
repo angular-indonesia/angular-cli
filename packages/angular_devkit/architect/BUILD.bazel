@@ -3,9 +3,9 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file at https://angular.dev/license
 
-load("@npm//@angular/build-tooling/bazel/api-golden:index.bzl", "api_golden_test_npm_package")
-load("@npm2//:defs.bzl", "npm_link_all_packages")
-load("//tools:defaults2.bzl", "jasmine_test", "npm_package", "ts_project")
+load("@devinfra//bazel/api-golden:index_rjs.bzl", "api_golden_test_npm_package")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("//tools:defaults.bzl", "jasmine_test", "npm_package", "ts_project")
 load("//tools:ts_json_schema.bzl", "ts_json_schema")
 
 package(default_visibility = ["//visibility:public"])
@@ -66,11 +66,10 @@ ts_project(
     ],
     # Ensure tests can execute the output JS, relying on schemas/JSON files.
     data = JSON_FILES,
-    module_name = "@angular-devkit/architect",
     deps = [
         ":node_modules/@angular-devkit/core",
+        ":node_modules/rxjs",
         "//:node_modules/@types/node",
-        "//:node_modules/rxjs",
     ],
 )
 
@@ -79,17 +78,18 @@ ts_project(
     testonly = True,
     srcs = glob(["src/**/*_spec.ts"]),
     deps = [
-        ":architect_rjs",
+        ":architect",
         ":node_modules/@angular-devkit/core",
+        ":node_modules/rxjs",
         "//:node_modules/@types/jasmine",
-        "//:node_modules/rxjs",
-        "//packages/angular_devkit/architect/testing:testing_rjs",
+        "//:node_modules/@types/node",
+        "//packages/angular_devkit/architect/testing",
     ],
 )
 
 jasmine_test(
     name = "architect_test",
-    data = [":architect_test_lib_rjs"],
+    data = [":architect_test_lib"],
 )
 
 # @external_begin
@@ -108,10 +108,10 @@ npm_package(
     tags = ["release-package"],
     deps = JSON_FILES + [
         "README.md",
-        ":architect_rjs",
+        ":architect",
         ":license",
-        "//packages/angular_devkit/architect/node:node_rjs",
-        "//packages/angular_devkit/architect/testing:testing_rjs",
+        "//packages/angular_devkit/architect/node",
+        "//packages/angular_devkit/architect/testing",
     ],
 )
 
@@ -121,7 +121,7 @@ api_golden_test_npm_package(
         ":npm_package",
         "//goldens:public-api",
     ],
-    golden_dir = "angular_cli/goldens/public-api/angular_devkit/architect",
-    npm_package = "angular_cli/packages/angular_devkit/architect/npm_package",
+    golden_dir = "goldens/public-api/angular_devkit/architect",
+    npm_package = "packages/angular_devkit/architect/npm_package",
 )
 # @external_end

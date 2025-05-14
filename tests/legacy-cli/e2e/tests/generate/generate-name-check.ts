@@ -1,4 +1,4 @@
-import { join } from 'path';
+import { join } from 'node:path';
 import { ng } from '../../utils/process';
 import { expectFileToExist } from '../../utils/fs';
 import { updateJsonFile } from '../../utils/project';
@@ -16,10 +16,10 @@ export default function () {
       )
       .then(() => ng('generate', 'component', 'test-component'))
       .then(() => expectFileToExist(compDir))
-      .then(() => expectFileToExist(join(compDir, 'test-component.component.ts')))
-      .then(() => expectFileToExist(join(compDir, 'test-component.component.spec.ts')))
-      .then(() => expectFileToExist(join(compDir, 'test-component.component.html')))
-      .then(() => expectFileToExist(join(compDir, 'test-component.component.css')))
+      .then(() => expectFileToExist(join(compDir, 'test-component.ts')))
+      .then(() => expectFileToExist(join(compDir, 'test-component.spec.ts')))
+      .then(() => expectFileToExist(join(compDir, 'test-component.html')))
+      .then(() => expectFileToExist(join(compDir, 'test-component.css')))
 
       // Try to run the unit tests.
       .then(() => ng('test', '--watch=false'))

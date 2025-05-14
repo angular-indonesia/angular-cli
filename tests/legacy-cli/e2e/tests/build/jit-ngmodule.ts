@@ -23,6 +23,8 @@ export default async function () {
         main: build.options.browser,
         browser: undefined,
         buildOptimizer: false,
+        outputPath: 'dist/test-project-two',
+        index: 'src/index.html',
       };
 
       build.configurations.development = {
@@ -32,7 +34,16 @@ export default async function () {
       };
     }
 
+    // Remove bundle budgets due to the increased size from JIT
+    build.configurations.production = {
+      ...build.configurations.production,
+      budgets: undefined,
+    };
+
     build.options.aot = false;
+
+    const serve = json['projects']['test-project-two']['architect']['serve'];
+    serve.builder = '@angular-devkit/build-angular:dev-server';
   });
   // Test it works
   await ng('e2e', 'test-project-two', '--configuration=production');

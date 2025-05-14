@@ -7,8 +7,8 @@
  */
 
 import { BaseException, PriorityQueue, logging } from '@angular-devkit/core';
+import { Url } from 'node:url';
 import { Observable, concatMap, from as observableFrom } from 'rxjs';
-import { Url } from 'url';
 import { MergeStrategy } from '../tree/interface';
 import { NullTree } from '../tree/null';
 import { empty } from '../tree/static';
@@ -90,10 +90,10 @@ export class CollectionImpl<CollectionT extends object, SchematicT extends objec
     public readonly baseDescriptions?: Array<CollectionDescription<CollectionT>>,
   ) {}
 
-  get description() {
+  get description(): CollectionDescription<CollectionT> {
     return this._description;
   }
-  get name() {
+  get name(): string {
     return this.description.name || '<unknown>';
   }
 
@@ -183,10 +183,10 @@ export class SchematicEngine<CollectionT extends object, SchematicT extends obje
     protected _workflow?: Workflow,
   ) {}
 
-  get workflow() {
+  get workflow(): Workflow | null {
     return this._workflow || null;
   }
-  get defaultMergeStrategy() {
+  get defaultMergeStrategy(): MergeStrategy {
     return this._host.defaultMergeStrategy || MergeStrategy.Default;
   }
 

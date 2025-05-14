@@ -112,6 +112,21 @@ export async function* serveWithVite(
     browserOptions.ssr ||= true;
   }
 
+  // Disable auto CSP.
+  browserOptions.security = {
+    autoCsp: false,
+  };
+
+  // Disable JSON build stats.
+  // These are not accessible with the dev server and can cause HMR fallbacks.
+  if (browserOptions.statsJson === true) {
+    context.logger.warn(
+      'Build JSON statistics output (`statsJson` option) has been disabled.' +
+        ' The development server does not support this option.',
+    );
+  }
+  browserOptions.statsJson = false;
+
   // Set all packages as external to support Vite's prebundle caching
   browserOptions.externalPackages = serverOptions.prebundle;
 
@@ -151,15 +166,6 @@ export async function* serveWithVite(
   // This will also replace file-based/inline styles as code if external runtime styles are not enabled.
   browserOptions.templateUpdates =
     serverOptions.liveReload && serverOptions.hmr && useComponentTemplateHmr;
-  if (browserOptions.templateUpdates) {
-    context.logger.warn(
-      'Component HMR has been enabled.\n' +
-        'If you encounter application reload issues, you can manually reload the page to bypass HMR and/or disable this feature with the' +
-        ' `--no-hmr` command line option.\n' +
-        'Please consider reporting any issues you encounter here: https://github.com/angular/angular-cli/issues\n',
-    );
-  }
-
   browserOptions.incrementalResults = true;
 
   // Setup the prebundling transformer that will be shared across Vite prebundling requests
@@ -213,6 +219,8 @@ export async function* serveWithVite(
           },
         });
       }
+
+      yield { baseUrl: '', success: false };
       continue;
     }
     // Clear existing error overlay on successful result
@@ -339,8 +347,9 @@ export async function* serveWithVite(
       externalMetadata.implicitServer.length = 0;
       externalMetadata.implicitBrowser.length = 0;
 
-      externalMetadata.explicitBrowser.push(...explicit);
-      externalMetadata.explicitServer.push(...explicit, ...builtinModules);
+      const externalDeps = browserOptions.externalDependencies ?? [];
+      externalMetadata.explicitBrowser.push(...explicit, ...externalDeps);
+      externalMetadata.explicitServer.push(...explicit, ...externalDeps, ...builtinModules);
       externalMetadata.implicitServer.push(...implicitServerFiltered);
       externalMetadata.implicitBrowser.push(...implicitBrowserFiltered);
 
@@ -430,7 +439,10 @@ export async function* serveWithVite(
         componentStyles,
         templateUpdates,
         browserOptions.loader as EsbuildLoaderOption | undefined,
-        browserOptions.define,
+        {
+          ...browserOptions.define,
+          'ngHmrMode': browserOptions.templateUpdates ? 'true' : 'false',
+        },
         extensions?.middleware,
         transformers?.indexHtml,
         thirdPartySourcemaps,
@@ -456,6 +468,41 @@ export async function* serveWithVite(
             break;
         }
       });
+
+      // Setup component HMR invalidation
+      // Invalidation occurs when the runtime cannot update a component
+      server.hot.on(
+        'angular:invalidate',
+        (data: { id: string; message?: string; error?: boolean }) => {
+          if (typeof data?.id !== 'string') {
+            context.logger.warn(
+              'Development server client sent invalid internal invalidate event.',
+            );
+          }
+
+          // Clear invalid template update
+          templateUpdates.delete(data.id);
+
+          // Some cases are expected unsupported update scenarios but some may be errors.
+          // If an error occurred, log the error in addition to the invalidation.
+          if (data.error) {
+            context.logger.error(
+              `Component update failed${data.message ? `: ${data.message}` : '.'}` +
+                '\nPlease consider reporting the error at https://github.com/angular/angular-cli/issues',
+            );
+          } else {
+            context.logger.warn(
+              `Component update unsupported${data.message ? `: ${data.message}` : '.'}`,
+            );
+          }
+
+          server?.ws.send({
+            type: 'full-reload',
+            path: '*',
+          });
+          context.logger.info('Page reload sent to client(s).');
+        },
+      );
 
       const urls = server.resolvedUrls;
       if (urls && (urls.local.length || urls.network.length)) {
@@ -697,6 +744,7 @@ function updateResultRecord(
   }
 }
 
+// eslint-disable-next-line max-lines-per-function
 export async function setupServer(
   serverOptions: NormalizedDevServerOptions,
   outputFiles: Map<string, OutputFileRecord>,
@@ -739,6 +787,15 @@ export async function setupServer(
       break;
   }
 
+  /**
+   * Required when using `externalDependencies` to prevent Vite load errors.
+   *
+   * @note Can be removed if Vite introduces native support for externals.
+   * @note Vite misresolves browser modules in SSR when accessing URLs with multiple segments
+   *       (e.g., 'foo/bar'), as they are not correctly re-based from the base href.
+   */
+  const preTransformRequests =
+    externalMetadata.explicitBrowser.length === 0 && ssrMode === ServerSsrMode.NoSsr;
   const cacheDir = join(serverOptions.cacheOptions.path, serverOptions.buildTarget.project, 'vite');
   const configuration: InlineConfig = {
     configFile: false,
@@ -768,7 +825,11 @@ export async function setupServer(
       mainFields: ['es2020', 'browser', 'module', 'main'],
       preserveSymlinks,
     },
+    dev: {
+      preTransformRequests,
+    },
     server: {
+      preTransformRequests,
       warmup: {
         ssrFiles,
       },
@@ -790,6 +851,9 @@ export async function setupServer(
           ? (proxy ?? {})
           : proxy,
       cors: {
+        // This will add the header `Access-Control-Allow-Origin: http://example.com`,
+        // where `http://example.com` is the requesting origin.
+        origin: true,
         // Allow preflight requests to be proxied.
         preflightContinue: true,
       },
@@ -806,13 +870,6 @@ export async function setupServer(
           ...[...assets.values()].map(({ source }) => source),
         ],
       },
-      // This is needed when `externalDependencies` is used to prevent Vite load errors.
-      // NOTE: If Vite adds direct support for externals, this can be removed.
-      // NOTE: Vite breaks the resolution of browser modules in SSR
-      //       when accessing a url with two or more segments (e.g., 'foo/bar'),
-      //       as they are not re-based from the base href.
-      preTransformRequests:
-        externalMetadata.explicitBrowser.length === 0 && ssrMode === ServerSsrMode.NoSsr,
     },
     ssr: {
       // Note: `true` and `/.*/` have different sematics. When true, the `external` option is ignored.
@@ -846,6 +903,7 @@ export async function setupServer(
         templateUpdates,
         ssrMode,
         resetComponentUpdates: () => templateUpdates.clear(),
+        projectRoot: serverOptions.projectRoot,
       }),
       createRemoveIdPrefixPlugin(externalMetadata.explicitBrowser),
       await createAngularSsrTransformPlugin(serverOptions.workspaceRoot),
@@ -854,7 +912,7 @@ export async function setupServer(
         outputFiles,
         templateUpdates,
         external: externalMetadata.explicitBrowser,
-        skipViteClient: serverOptions.liveReload === false && serverOptions.hmr === false,
+        disableViteTransport: !serverOptions.liveReload,
       }),
     ],
     // Browser only optimizeDeps. (This does not run for SSR dependencies).

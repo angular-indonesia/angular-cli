@@ -1,4 +1,4 @@
-import { join } from 'path';
+import { join } from 'node:path';
 import { ng } from '../../../utils/process';
 import { expectFileToExist } from '../../../utils/fs';
 import { expectToFail } from '../../../utils/utils';
@@ -15,8 +15,8 @@ export default async function () {
 
   await ng('generate', 'module', 'sub-dir/child', '--routing');
   await expectFileToExist(join(testPath, 'sub-dir/child'));
-  await expectFileToExist(join(testPath, 'sub-dir/child', 'child.module.ts'));
-  await expectFileToExist(join(testPath, 'sub-dir/child', 'child-routing.module.ts'));
+  await expectFileToExist(join(testPath, 'sub-dir/child', 'child-module.ts'));
+  await expectFileToExist(join(testPath, 'sub-dir/child', 'child-routing-module.ts'));
   await expectToFail(() => expectFileToExist(join(testPath, 'sub-dir/child', 'child.spec.ts')));
 
   // Try to run the unit tests.

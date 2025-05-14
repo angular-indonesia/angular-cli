@@ -18,6 +18,7 @@ import {
   context,
 } from 'esbuild';
 import assert from 'node:assert';
+import { builtinModules } from 'node:module';
 import { basename, extname, join, relative } from 'node:path';
 import { LoadResultCache, MemoryLoadResultCache } from './load-result-cache';
 import { SERVER_GENERATED_EXTERNALS, convertOutputFile } from './utils';
@@ -260,10 +261,12 @@ export class BundlerContext {
     if (this.incremental) {
       // Add input files except virtual angular files which do not exist on disk
       for (const input of Object.keys(result.metafile.inputs)) {
-        if (!isInternalAngularFile(input)) {
-          // input file paths are always relative to the workspace root
-          this.watchFiles.add(join(this.workspaceRoot, input));
+        if (isInternalAngularFile(input) || isInternalBundlerFile(input)) {
+          continue;
         }
+
+        // Input file paths are always relative to the workspace root
+        this.watchFiles.add(join(this.workspaceRoot, input));
       }
     }
 
@@ -359,17 +362,16 @@ export class BundlerContext {
     // Collect all external package names
     const externalImports = new Set<string>();
     for (const { imports } of Object.values(result.metafile.outputs)) {
-      for (const importData of imports) {
+      for (const { external, kind, path } of imports) {
         if (
-          !importData.external ||
-          SERVER_GENERATED_EXTERNALS.has(importData.path) ||
-          (importData.kind !== 'import-statement' &&
-            importData.kind !== 'dynamic-import' &&
-            importData.kind !== 'require-call')
+          !external ||
+          SERVER_GENERATED_EXTERNALS.has(path) ||
+          (kind !== 'import-statement' && kind !== 'dynamic-import' && kind !== 'require-call')
         ) {
           continue;
         }
-        externalImports.add(importData.path);
+
+        externalImports.add(path);
       }
     }
 
@@ -478,4 +480,21 @@ export class BundlerContext {
 
 function isInternalAngularFile(file: string) {
   return file.startsWith('angular:');
+}
+
+function isInternalBundlerFile(file: string) {
+  // Bundler virtual files such as "<define:???>" or "<runtime>"
+  if (file[0] === '<' && file.at(-1) === '>') {
+    return true;
+  }
+
+  const DISABLED_BUILTIN = '(disabled):';
+
+  // Disabled node builtins such as "/some/path/(disabled):fs"
+  const disabledIndex = file.indexOf(DISABLED_BUILTIN);
+  if (disabledIndex >= 0) {
+    return builtinModules.includes(file.slice(disabledIndex + DISABLED_BUILTIN.length));
+  }
+
+  return false;
 }

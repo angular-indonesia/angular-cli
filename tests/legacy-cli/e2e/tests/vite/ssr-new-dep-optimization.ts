@@ -22,7 +22,7 @@ export default async function () {
 
   // Forcibly remove in case another test doesn't clean itself up.
   await uninstallPackage('@angular/ssr');
-  await ng('add', '@angular/ssr', '--server-routing', '--skip-confirmation', '--skip-install');
+  await ng('add', '@angular/ssr', '--skip-confirmation', '--skip-install');
   await useSha();
   await installWorkspacePackages();
 
@@ -31,7 +31,7 @@ export default async function () {
     'ng',
     ['serve', '--port', port.toString()],
     /Application bundle generation complete/,
-    { CI: '0', NO_COLOR: 'true' },
+    { ...process.env, CI: '0', NO_COLOR: 'true' },
   );
   await validateResponse('/', /Hello,/);
 

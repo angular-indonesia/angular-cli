@@ -1,7 +1,7 @@
-import { join } from 'path';
+import { join } from 'node:path';
 import { getGlobalVariable } from '../../../utils/env';
-import { expectFileToMatch, readFile, rimraf, writeFile } from '../../../utils/fs';
-import { installWorkspacePackages } from '../../../utils/packages';
+import { expectFileToMatch, readFile, writeFile } from '../../../utils/fs';
+import { installWorkspacePackages, uninstallPackage } from '../../../utils/packages';
 import { ng } from '../../../utils/process';
 import { useSha } from '../../../utils/project';
 import { deepStrictEqual } from 'node:assert';
@@ -9,7 +9,7 @@ import { deepStrictEqual } from 'node:assert';
 export default async function () {
   const useWebpackBuilder = !getGlobalVariable('argv')['esbuild'];
   // Forcibly remove in case another test doesn't clean itself up.
-  await rimraf('node_modules/@angular/ssr');
+  await uninstallPackage('@angular/ssr');
   await ng('add', '@angular/ssr', '--skip-confirmation', '--skip-install');
 
   await useSha();
@@ -20,25 +20,25 @@ export default async function () {
     'src/app/app.routes.ts',
     `
   import { Routes } from '@angular/router';
-  import { OneComponent } from './one/one.component';
-  import { TwoChildOneComponent } from './two-child-one/two-child-one.component';
-  import { TwoChildTwoComponent } from './two-child-two/two-child-two.component';
+  import { One } from './one/one';
+  import { TwoChildOne } from './two-child-one/two-child-one';
+  import { TwoChildTwo } from './two-child-two/two-child-two';
 
   export const routes: Routes = [
     {
       path: '',
-      component: OneComponent,
+      component: One,
     },
     {
       path: 'two',
       children: [
         {
           path: 'two-child-one',
-          component: TwoChildOneComponent,
+          component: TwoChildOne,
         },
         {
           path: 'two-child-two',
-          component: TwoChildTwoComponent,
+          component: TwoChildTwo,
         },
       ],
     },
@@ -47,21 +47,17 @@ export default async function () {
       children: [
         {
           path: '',
-          loadComponent: () => import('./lazy-one/lazy-one.component').then(c => c.LazyOneComponent),
+          loadComponent: () => import('./lazy-one/lazy-one').then(c => c.LazyOne),
         },
         {
           path: 'lazy-one-child',
-          loadComponent: () => import('./lazy-one-child/lazy-one-child.component').then(c => c.LazyOneChildComponent),
+          loadComponent: () => import('./lazy-one-child/lazy-one-child').then(c => c.LazyOneChild),
         },
       ],
     },
     {
       path: 'lazy-two',
-      loadComponent: () => import('./lazy-two/lazy-two.component').then(c => c.LazyTwoComponent),
-    },
-    {
-      path: ':param',
-      component: OneComponent,
+      loadComponent: () => import('./lazy-two/lazy-two').then(c => c.LazyTwo),
     },
   ];
   `,

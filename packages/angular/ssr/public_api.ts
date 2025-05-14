@@ -14,10 +14,9 @@ export { createRequestHandler, type RequestHandlerFunction } from './src/handler
 export {
   PrerenderFallback,
   type ServerRoute,
-  type ServerRoutesConfigOptions,
-  provideServerRoutesConfig,
-  provideServerRouting,
+  provideServerRendering,
   withAppShell,
+  withRoutes,
   RenderMode,
   type ServerRouteClient,
   type ServerRoutePrerender,

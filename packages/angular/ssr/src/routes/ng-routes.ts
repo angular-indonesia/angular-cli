@@ -47,6 +47,12 @@ interface Route extends AngularRoute {
 const MODULE_PRELOAD_MAX = 10;
 
 /**
+ * Regular expression to match a catch-all route pattern in a URL path,
+ * specifically one that ends with '/**'.
+ */
+const CATCH_ALL_REGEXP = /\/(\*\*)$/;
+
+/**
  * Regular expression to match segments preceded by a colon in a string.
  */
 const URL_PARAMETER_REGEXP = /(?<!\\):([^/]+)/g;
@@ -154,15 +160,20 @@ async function* handleRoute(options: {
         invokeGetPrerenderParams,
         includePrerenderFallbackRoutes,
       );
-    } else if (typeof redirectTo === 'string') {
+    } else if (redirectTo !== undefined) {
       if (metadata.status && !VALID_REDIRECT_RESPONSE_CODES.has(metadata.status)) {
         yield {
           error:
             `The '${metadata.status}' status code is not a valid redirect response code. ` +
             `Please use one of the following redirect response codes: ${[...VALID_REDIRECT_RESPONSE_CODES.values()].join(', ')}.`,
         };
+      } else if (typeof redirectTo === 'string') {
+        yield {
+          ...metadata,
+          redirectTo: resolveRedirectTo(metadata.route, redirectTo),
+        };
       } else {
-        yield { ...metadata, redirectTo: resolveRedirectTo(metadata.route, redirectTo) };
+        yield metadata;
       }
     } else {
       yield metadata;
@@ -327,21 +338,31 @@ function appendPreloadToMetadata(
   metadata: ServerConfigRouteTreeNodeMetadata,
   includeDynamicImports: boolean,
 ): void {
-  if (!entryPointToBrowserMapping) {
+  const existingPreloads = metadata.preload ?? [];
+  if (!entryPointToBrowserMapping || existingPreloads.length >= MODULE_PRELOAD_MAX) {
     return;
   }
 
   const preload = entryPointToBrowserMapping[entryName];
-
-  if (preload?.length) {
-    // Merge existing preloads with new ones, ensuring uniqueness and limiting the total to the maximum allowed.
-    const preloadPaths =
-      preload
-        .filter(({ dynamicImport }) => includeDynamicImports || !dynamicImport)
-        .map(({ path }) => path) ?? [];
-    const combinedPreloads = [...(metadata.preload ?? []), ...preloadPaths];
-    metadata.preload = Array.from(new Set(combinedPreloads)).slice(0, MODULE_PRELOAD_MAX);
+  if (!preload?.length) {
+    return;
   }
+
+  // Merge existing preloads with new ones, ensuring uniqueness and limiting the total to the maximum allowed.
+  const combinedPreloads: Set<string> = new Set(existingPreloads);
+  for (const { dynamicImport, path } of preload) {
+    if (dynamicImport && !includeDynamicImports) {
+      continue;
+    }
+
+    combinedPreloads.add(path);
+
+    if (combinedPreloads.size === MODULE_PRELOAD_MAX) {
+      break;
+    }
+  }
+
+  metadata.preload = Array.from(combinedPreloads);
 }
 
 /**
@@ -381,7 +402,11 @@ async function* handleSSGRoute(
     meta.redirectTo = resolveRedirectTo(currentRoutePath, redirectTo);
   }
 
-  if (!URL_PARAMETER_REGEXP.test(currentRoutePath)) {
+  const isCatchAllRoute = CATCH_ALL_REGEXP.test(currentRoutePath);
+  if (
+    (isCatchAllRoute && !getPrerenderParams) ||
+    (!isCatchAllRoute && !URL_PARAMETER_REGEXP.test(currentRoutePath))
+  ) {
     // Route has no parameters
     yield {
       ...meta,
@@ -405,7 +430,9 @@ async function* handleSSGRoute(
 
     if (serverConfigRouteTree) {
       // Automatically resolve dynamic parameters for nested routes.
-      const catchAllRoutePath = joinUrlParts(currentRoutePath, '**');
+      const catchAllRoutePath = isCatchAllRoute
+        ? currentRoutePath
+        : joinUrlParts(currentRoutePath, '**');
       const match = serverConfigRouteTree.match(catchAllRoutePath);
       if (match && match.renderMode === RenderMode.Prerender && !('getPrerenderParams' in match)) {
         serverConfigRouteTree.insert(catchAllRoutePath, {
@@ -419,20 +446,10 @@ async function* handleSSGRoute(
     const parameters = await runInInjectionContext(parentInjector, () => getPrerenderParams());
     try {
       for (const params of parameters) {
-        const routeWithResolvedParams = currentRoutePath.replace(URL_PARAMETER_REGEXP, (match) => {
-          const parameterName = match.slice(1);
-          const value = params[parameterName];
-          if (typeof value !== 'string') {
-            throw new Error(
-              `The 'getPrerenderParams' function defined for the '${stripLeadingSlash(currentRoutePath)}' route ` +
-                `returned a non-string value for parameter '${parameterName}'. ` +
-                `Please make sure the 'getPrerenderParams' function returns values for all parameters ` +
-                'specified in this route.',
-            );
-          }
-
-          return value;
-        });
+        const replacer = handlePrerenderParamsReplacement(params, currentRoutePath);
+        const routeWithResolvedParams = currentRoutePath
+          .replace(URL_PARAMETER_REGEXP, replacer)
+          .replace(CATCH_ALL_REGEXP, replacer);
 
         yield {
           ...meta,
@@ -461,6 +478,34 @@ async function* handleSSGRoute(
       renderMode: fallback === PrerenderFallback.Client ? RenderMode.Client : RenderMode.Server,
     };
   }
+}
+
+/**
+ * Creates a replacer function used for substituting parameter placeholders in a route path
+ * with their corresponding values provided in the `params` object.
+ *
+ * @param params - An object mapping parameter names to their string values.
+ * @param currentRoutePath - The current route path, used for constructing error messages.
+ * @returns A function that replaces a matched parameter placeholder (e.g., ':id') with its corresponding value.
+ */
+function handlePrerenderParamsReplacement(
+  params: Record<string, string>,
+  currentRoutePath: string,
+): (substring: string, ...args: unknown[]) => string {
+  return (match) => {
+    const parameterName = match.slice(1);
+    const value = params[parameterName];
+    if (typeof value !== 'string') {
+      throw new Error(
+        `The 'getPrerenderParams' function defined for the '${stripLeadingSlash(currentRoutePath)}' route ` +
+          `returned a non-string value for parameter '${parameterName}'. ` +
+          `Please make sure the 'getPrerenderParams' function returns values for all parameters ` +
+          'specified in this route.',
+      );
+    }
+
+    return parameterName === '**' ? `/${value}` : value;
+  };
 }
 
 /**
@@ -520,9 +565,9 @@ function buildServerConfigRouteTree({ routes, appShellRoute }: ServerRoutesConfi
       continue;
     }
 
-    if (path.includes('*') && 'getPrerenderParams' in metadata) {
+    if ('getPrerenderParams' in metadata && (path.includes('/*/') || path.endsWith('/*'))) {
       errors.push(
-        `Invalid '${path}' route configuration: 'getPrerenderParams' cannot be used with a '*' or '**' route.`,
+        `Invalid '${path}' route configuration: 'getPrerenderParams' cannot be used with a '*' route.`,
       );
       continue;
     }
@@ -603,16 +648,12 @@ export async function getRoutesFromAngularRouterConfig(
     // Wait until the application is stable.
     await applicationRef.whenStable();
 
-    const routesResults: RouteTreeNodeMetadata[] = [];
     const errors: string[] = [];
 
-    let baseHref =
+    const rawBaseHref =
       injector.get(APP_BASE_HREF, null, { optional: true }) ??
       injector.get(PlatformLocation).getBaseHrefFromDOM();
-
-    if (baseHref.startsWith('./')) {
-      baseHref = baseHref.slice(2);
-    }
+    const { pathname: baseHref } = new URL(rawBaseHref, 'http://localhost');
 
     const compiler = injector.get(Compiler);
     const serverRoutesConfig = injector.get(SERVER_ROUTES_CONFIG, null, { optional: true });
@@ -627,11 +668,12 @@ export async function getRoutesFromAngularRouterConfig(
     if (errors.length) {
       return {
         baseHref,
-        routes: routesResults,
+        routes: [],
         errors,
       };
     }
 
+    const routesResults: RouteTreeNodeMetadata[] = [];
     if (router.config.length) {
       // Retrieve all routes from the Angular router configuration.
       const traverseRoutes = traverseRoutesConfig({
@@ -645,11 +687,19 @@ export async function getRoutesFromAngularRouterConfig(
         entryPointToBrowserMapping,
       });
 
-      for await (const result of traverseRoutes) {
-        if ('error' in result) {
-          errors.push(result.error);
-        } else {
-          routesResults.push(result);
+      const seenRoutes: Set<string> = new Set();
+      for await (const routeMetadata of traverseRoutes) {
+        if ('error' in routeMetadata) {
+          errors.push(routeMetadata.error);
+          continue;
+        }
+
+        // If a result already exists for the exact same route, subsequent matches should be ignored.
+        // This aligns with Angular's app router behavior, which prioritizes the first route.
+        const routePath = routeMetadata.route;
+        if (!seenRoutes.has(routePath)) {
+          routesResults.push(routeMetadata);
+          seenRoutes.add(routePath);
         }
       }
 

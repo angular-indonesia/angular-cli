@@ -1,5 +1,5 @@
 import express from 'express';
-import * as path from 'path';
+import * as path from 'node:path';
 import { copyProjectAsset } from '../../utils/assets';
 import { replaceInFile } from '../../utils/fs';
 import { ng } from '../../utils/process';
@@ -11,7 +11,7 @@ export default async function () {
   }
 
   // Workaround for https://github.com/angular/angular/issues/32192
-  await replaceInFile('src/app/app.component.html', /class="material-icons"/g, '');
+  await replaceInFile('src/app/app.html', /class="material-icons"/g, '');
 
   await ng('build');
 

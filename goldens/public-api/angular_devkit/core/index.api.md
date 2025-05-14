@@ -18,6 +18,9 @@ import { ValidateFunction } from 'ajv';
 // @public (undocumented)
 function addUndefinedDefaults(value: JsonValue, _pointer: JsonPointer, schema?: JsonSchema): JsonValue;
 
+// @public (undocumented)
+function addUndefinedObjectDefaults(value: JsonValue, _pointer: JsonPointer, schema?: JsonSchema): JsonValue;
+
 // @public
 class AliasHost<StatsT extends object = {}> extends ResolverHost<StatsT> {
     // (undocumented)
@@ -386,7 +389,7 @@ interface JsonVisitor {
 
 // @public (undocumented)
 class LevelCapLogger extends LevelTransformLogger {
-    constructor(name: string, parent: (Logger | null) | undefined, levelCap: LogLevel);
+    constructor(name: string, parent: Logger | null, levelCap: LogLevel);
     // (undocumented)
     readonly levelCap: LogLevel;
     // (undocumented)
@@ -403,7 +406,7 @@ class LevelCapLogger extends LevelTransformLogger {
 
 // @public (undocumented)
 class LevelTransformLogger extends Logger {
-    constructor(name: string, parent: (Logger | null) | undefined, levelTransform: (level: LogLevel) => LogLevel);
+    constructor(name: string, parent: Logger | null, levelTransform: (level: LogLevel) => LogLevel);
     // (undocumented)
     createChild(name: string): Logger;
     // (undocumented)
@@ -551,11 +554,11 @@ function oneLine(strings: TemplateStringsArray, ...values: any[]): string;
 function parseJsonPointer(pointer: JsonPointer): string[];
 
 // @public (undocumented)
-export class PartiallyOrderedSet<T> implements Set<T> {
+export class PartiallyOrderedSet<T> {
     // (undocumented)
-    [Symbol.iterator](): Generator<T, undefined, unknown>;
+    [Symbol.iterator](): IterableIterator<T, undefined, unknown>;
     // (undocumented)
-    get [Symbol.toStringTag](): 'Set';
+    get [Symbol.toStringTag](): 'PartiallyOrderedSet';
     // (undocumented)
     add(item: T, deps?: Set<T> | T[]): this;
     // (undocumented)
@@ -564,15 +567,15 @@ export class PartiallyOrderedSet<T> implements Set<T> {
     clear(): void;
     // (undocumented)
     delete(item: T): boolean;
-    entries(): SetIterator<[T, T]>;
+    entries(): IterableIterator<[T, T]>;
     // (undocumented)
     forEach(callbackfn: (value: T, value2: T, set: PartiallyOrderedSet<T>) => void, thisArg?: any): void;
     // (undocumented)
     has(item: T): boolean;
-    keys(): SetIterator<T>;
+    keys(): IterableIterator<T>;
     // (undocumented)
     get size(): number;
-    values(): SetIterator<T>;
+    values(): IterableIterator<T>;
 }
 
 // @public
@@ -938,29 +941,9 @@ class SimpleMemoryHost implements Host<{}> {
     // (undocumented)
     protected _list(path: Path): PathFragment[];
     // (undocumented)
-    protected _newDirStats(): {
-        inspect(): string;
-        isFile(): boolean;
-        isDirectory(): boolean;
-        size: number;
-        atime: Date;
-        ctime: Date;
-        mtime: Date;
-        birthtime: Date;
-        content: null;
-    };
+    protected _newDirStats(): Stats<SimpleMemoryHostStats>;
     // (undocumented)
-    protected _newFileStats(content: FileBuffer, oldStats?: Stats<SimpleMemoryHostStats>): {
-        inspect(): string;
-        isFile(): boolean;
-        isDirectory(): boolean;
-        size: number;
-        atime: Date;
-        ctime: Date;
-        mtime: Date;
-        birthtime: Date;
-        content: ArrayBuffer;
-    };
+    protected _newFileStats(content: FileBuffer, oldStats?: Stats<SimpleMemoryHostStats>): Stats<SimpleMemoryHostStats>;
     // (undocumented)
     read(path: Path): Observable<FileBuffer>;
     // (undocumented)
@@ -992,6 +975,8 @@ class SimpleMemoryHost implements Host<{}> {
 interface SimpleMemoryHostStats {
     // (undocumented)
     readonly content: FileBuffer | null;
+    // (undocumented)
+    inspect(): string;
 }
 
 // @public (undocumented)
@@ -1297,6 +1282,7 @@ class TransformLogger extends Logger {
 
 declare namespace transforms {
     export {
+        addUndefinedObjectDefaults,
         addUndefinedDefaults
     }
 }

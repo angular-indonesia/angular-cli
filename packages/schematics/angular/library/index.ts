@@ -43,6 +43,21 @@ function updateTsConfig(packageName: string, ...paths: string[]) {
   };
 }
 
+function addTsProjectReference(...paths: string[]) {
+  return (host: Tree) => {
+    if (!host.exists('tsconfig.json')) {
+      return host;
+    }
+
+    const newReferences = paths.map((path) => ({ path }));
+
+    const file = new JSONFile(host, 'tsconfig.json');
+    const jsonPath = ['references'];
+    const value = file.get(jsonPath);
+    file.modify(jsonPath, Array.isArray(value) ? [...value, ...newReferences] : newReferences);
+  };
+}
+
 function addDependenciesToPackageJson() {
   return (host: Tree) => {
     [
@@ -53,8 +68,8 @@ function addDependenciesToPackageJson() {
       },
       {
         type: NodeDependencyType.Dev,
-        name: '@angular-devkit/build-angular',
-        version: latestVersions.DevkitBuildAngular,
+        name: '@angular/build',
+        version: latestVersions.AngularBuild,
       },
       {
         type: NodeDependencyType.Dev,
@@ -91,11 +106,8 @@ function addLibToWorkspaceFile(
       prefix: options.prefix,
       targets: {
         build: {
-          builder: Builders.NgPackagr,
+          builder: Builders.BuildNgPackagr,
           defaultConfiguration: 'production',
-          options: {
-            project: `${projectRoot}/ng-package.json`,
-          },
           configurations: {
             production: {
               tsConfig: `${projectRoot}/tsconfig.lib.prod.json`,
@@ -106,7 +118,7 @@ function addLibToWorkspaceFile(
           },
         },
         test: {
-          builder: Builders.Karma,
+          builder: Builders.BuildKarma,
           options: {
             tsConfig: `${projectRoot}/tsconfig.spec.json`,
             polyfills: ['zone.js', 'zone.js/testing'],
@@ -165,6 +177,12 @@ export default function (options: LibraryOptions): Rule {
       addLibToWorkspaceFile(options, libDir, packageName),
       options.skipPackageJson ? noop() : addDependenciesToPackageJson(),
       options.skipTsConfig ? noop() : updateTsConfig(packageName, './' + distRoot),
+      options.skipTsConfig
+        ? noop()
+        : addTsProjectReference(
+            './' + join(libDir, 'tsconfig.lib.json'),
+            './' + join(libDir, 'tsconfig.spec.json'),
+          ),
       options.standalone
         ? noop()
         : schematic('module', {
@@ -184,12 +202,10 @@ export default function (options: LibraryOptions): Rule {
         export: true,
         standalone: options.standalone,
         project: packageName,
-      }),
-      schematic('service', {
-        name: options.name,
-        flat: true,
-        path: sourceDir,
-        project: packageName,
+        // Explicitly set an empty `type` since it doesn't necessarily make sense in a library.
+        // This also ensures that the generated files are valid even if the `component` schematic
+        // inherits its `type` from the workspace.
+        type: '',
       }),
       (_tree: Tree, context: SchematicContext) => {
         if (!options.skipPackageJson && !options.skipInstall) {

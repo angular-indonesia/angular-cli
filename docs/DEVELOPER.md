@@ -5,17 +5,20 @@
 To get started locally, follow these instructions:
 
 1. If you haven't done it already, [make a fork of this repo](https://github.com/angular/angular-cli/fork).
-1. Clone to your local computer using `git`.
-1. Make sure that you have Node `v18.19` or higher installed. See instructions [here](https://nodejs.org/en/download/).
-1. Make sure that you have `yarn` installed; see instructions [here](https://yarnpkg.com/lang/en/docs/install/).
-1. Run `yarn` (no arguments) from the root of your clone of this project to install dependencies.
+2. If you are on Windows, see [the extra steps needed for contributing on Windows](#windows)
+3. Clone to your local computer using `git`.
+4. Make sure that you have Node `v20.18.1` or higher installed. See instructions [here](https://nodejs.org/en/download/).
+5. Install `pnpm`.
+   - You can install pnpm by running `npm i -g pnpm@9`.
+   - See detailed instructions [here](https://pnpm.io/installation).
+6. Run `pnpm install` from the root of your clone of this project to install dependencies.
 
 ## Building and Installing the CLI
 
 To make a local build:
 
 ```shell
-yarn build --local
+pnpm build --local
 ```
 
 This generates a number of tarballs in the `dist/` directory. To actually use
@@ -74,9 +77,9 @@ There are two different test suites which can be run locally:
 
 ### Unit tests
 
-- Run all tests: `yarn bazel test //packages/...`
-- Run a subset of the tests, use the full Bazel target example: `yarn bazel test //packages/schematics/angular:angular_test`
-- For a complete list of test targets use the following Bazel query: `yarn bazel query "tests(//packages/...)"`
+- Run all tests: `pnpm bazel test //packages/...`
+- Run a subset of the tests, use the full Bazel target example: `pnpm bazel test //packages/schematics/angular:angular_test`
+- For a complete list of test targets use the following Bazel query: `pnpm bazel query "tests(//packages/...)"`
 
 When debugging a specific test, change `describe()` or `it()` to `fdescribe()`
 and `fit()` to focus execution to just that one test. This will keep the output clean and speed up execution by not running irrelevant tests.
@@ -85,9 +88,9 @@ You can find more info about debugging [tests with Bazel in the docs.](https://g
 
 ### End to end tests
 
-- For a complete list of test targets use the following Bazel query: `yarn bazel query "tests(//tests/...)"`
-- Run a subset of the tests: `yarn bazel test //tests/legacy-cli:e2e_node18 --config=e2e --test_filter="tests/i18n/ivy-localize-*"`
-- Use `bazel run` to debug failing tests debugging: `yarn bazel run //tests/legacy-cli:e2e_node18 --config=e2e --test_arg="--glob=tests/basic/aot.ts"`
+- For a complete list of test targets use the following Bazel query: `pnpm bazel query "tests(//tests/...)"`
+- Run a subset of the tests: `pnpm bazel test //tests/legacy-cli:e2e_node22 --config=e2e --test_filter="tests/i18n/ivy-localize-*"`
+- Use `bazel run` to debug failing tests debugging: `pnpm bazel run //tests/legacy-cli:e2e_node22 --config=e2e --test_arg="--glob=tests/basic/aot.ts"`
 - Provide additional `e2e_runner` options using `--test_arg`: `--test_arg="--package-manager=yarn"`
 
 When running the debug commands, Node will stop and wait for a debugger to attach.
@@ -170,3 +173,17 @@ Adding a package to this repository means running two separate commands:
 
 For private packages, you will need to add a `"private": true` key to your package.json manually.
 This will require re-running the template admin script.
+
+## Windows
+
+To contribute to Angular using a Windows machine, you need to use the [Windows Linux Subsystem](https://learn.microsoft.com/en-us/windows/wsl/about) (also known as WSL).
+Installing WSL on your machine requires a few extra steps, but we believe it's generally useful for developing on Windows:
+
+1.  Run `wsl --install` from Powershell (as administrator).
+2.  Restart your machine.
+3.  Enter the WSL environment by running: `wsl`.
+4.  Continue with the developer guide as if you were on a native Linux system.
+
+For a more detailed guide, refer to the official Microsoft documentation: [Installing WSL](https://learn.microsoft.com/en-us/windows/wsl/install).
+
+**Note:** Angular continues to support native Windows development via the `ng` CLI and rigorously tests on Windows for every code change. This recommendation specifically applies to contributing to the Angular codebase itself.

@@ -8,12 +8,11 @@
 
 import { spawn } from 'node:child_process';
 import { rm } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, resolve } from 'node:path';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const __dirname = import.meta.dirname;
 const baseDir = resolve(`${__dirname}/..`);
-const bazelCmd = process.env.BAZEL ?? `yarn bazel`;
+const bazelCmd = process.env.BAZEL ?? `pnpm -s bazel`;
 const distRoot = join(baseDir, '/dist-schema/');
 
 function _clean() {
@@ -38,7 +37,7 @@ function _exec(cmd: string, captureStdout: boolean): Promise<string> {
     proc.stdout.on('data', (data) => {
       console.info(data.toString().trim());
       if (captureStdout) {
-        output += data.toString().trim();
+        output += data.toString();
       }
     });
     proc.stderr.on('data', (data) => console.info(data.toString().trim()));

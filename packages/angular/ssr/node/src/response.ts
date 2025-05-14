@@ -19,7 +19,6 @@ import type { Http2ServerResponse } from 'node:http2';
  * @param source - The web-standard `Response` object to stream from.
  * @param destination - The Node.js response object (`ServerResponse` or `Http2ServerResponse`) to stream into.
  * @returns A promise that resolves once the streaming operation is complete.
- * @developerPreview
  */
 export async function writeResponseToNodeResponse(
   source: Response,
@@ -42,6 +41,10 @@ export async function writeResponseToNodeResponse(
     } else {
       destination.setHeader(name, value);
     }
+  }
+
+  if ('flushHeaders' in destination) {
+    destination.flushHeaders();
   }
 
   if (!body) {
@@ -72,7 +75,9 @@ export async function writeResponseToNodeResponse(
       }
 
       const canContinue = (destination as ServerResponse).write(value);
-      if (!canContinue) {
+      if (canContinue === false) {
+        // Explicitly check for `false`, as AWS may return `undefined` even though this is not valid.
+        // See: https://github.com/CodeGenieApp/serverless-express/issues/683
         await new Promise<void>((resolve) => destination.once('drain', resolve));
       }
     }

@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import assert from 'node:assert';
-import { expectFileToMatch, writeFile } from '../../../utils/fs';
+import { expectFileToMatch, readFile, replaceInFile, writeFile } from '../../../utils/fs';
 import { execAndWaitForOutputToMatch, ng, noSilentNg, silentNg } from '../../../utils/process';
 import { installWorkspacePackages, uninstallPackage } from '../../../utils/packages';
 import { useSha } from '../../../utils/project';
@@ -16,37 +16,43 @@ export default async function () {
 
   // Forcibly remove in case another test doesn't clean itself up.
   await uninstallPackage('@angular/ssr');
-  await ng('add', '@angular/ssr', '--server-routing', '--skip-confirmation', '--skip-install');
+  await ng('add', '@angular/ssr', '--skip-confirmation', '--skip-install');
   await useSha();
   await installWorkspacePackages();
+
+  // Test scenario to verify that the content length, including \r\n, is accurate
+  await replaceInFile('src/app/app.ts', "title = '", "title = 'Title\\r\\n");
+
+  // Ensure text has been updated.
+  assert.match(await readFile('src/app/app.ts'), /title = 'Title/);
 
   // Add routes
   await writeFile(
     'src/app/app.routes.ts',
     `
   import { Routes } from '@angular/router';
-  import { HomeComponent } from './home/home.component';
-  import { CsrComponent } from './csr/csr.component';
-  import { SsrComponent } from './ssr/ssr.component';
-  import { SsgComponent } from './ssg/ssg.component';
-  import { SsgWithParamsComponent } from './ssg-with-params/ssg-with-params.component';
+  import { Home } from './home/home';
+  import { Csr } from './csr/csr';
+  import { Ssr } from './ssr/ssr';
+  import { Ssg } from './ssg/ssg';
+  import { SsgWithParams } from './ssg-with-params/ssg-with-params';
 
   export const routes: Routes = [
     {
       path: '',
-      component: HomeComponent,
+      component: Home,
     },
     {
       path: 'ssg',
-      component: SsgComponent,
+      component: Ssg,
     },
     {
       path: 'ssr',
-      component: SsrComponent,
+      component: Ssr,
     },
     {
       path: 'csr',
-      component: CsrComponent,
+      component: Csr,
     },
     {
       path: 'redirect',
@@ -54,7 +60,7 @@ export default async function () {
     },
     {
       path: 'ssg/:id',
-      component: SsgWithParamsComponent,
+      component: SsgWithParams,
     },
   ];
   `,
@@ -165,6 +171,7 @@ export default async function () {
 
   const port = await spawnServer();
   for (const [pathname, { content, headers, serverContext }] of Object.entries(responseExpects)) {
+    // NOTE: A global 'UND_ERR_SOCKET' may occur due to an incorrect Content-Length header value.
     const res = await fetch(`http://localhost:${port}${pathname}`);
     const text = await res.text();
 
@@ -197,6 +204,7 @@ async function spawnServer(): Promise<number> {
     ['run', 'serve:ssr:test-project'],
     /Node Express server listening on/,
     {
+      ...process.env,
       'PORT': String(port),
     },
   );

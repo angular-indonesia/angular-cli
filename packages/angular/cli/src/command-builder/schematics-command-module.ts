@@ -13,7 +13,7 @@ import {
   FileSystemSchematicDescription,
   NodeWorkflow,
 } from '@angular-devkit/schematics/tools';
-import { relative, resolve } from 'path';
+import { relative } from 'node:path';
 import { Argv } from 'yargs';
 import { isPackageNameSafeForAnalytics } from '../analytics/analytics';
 import { EventCustomDimension } from '../analytics/analytics-parameters';
@@ -143,27 +143,21 @@ export abstract class SchematicsCommandModule
       workingDir === '' ? undefined : workingDir,
     );
 
-    let shouldReportAnalytics = true;
     workflow.engineHost.registerOptionsTransform(async (schematic, options) => {
-      // Report analytics
-      if (shouldReportAnalytics) {
-        shouldReportAnalytics = false;
+      const {
+        collection: { name: collectionName },
+        name: schematicName,
+      } = schematic;
 
-        const {
-          collection: { name: collectionName },
-          name: schematicName,
-        } = schematic;
+      const analytics = isPackageNameSafeForAnalytics(collectionName)
+        ? await this.getAnalytics()
+        : undefined;
 
-        const analytics = isPackageNameSafeForAnalytics(collectionName)
-          ? await this.getAnalytics()
-          : undefined;
-
-        analytics?.reportSchematicRunEvent({
-          [EventCustomDimension.SchematicCollectionName]: collectionName,
-          [EventCustomDimension.SchematicName]: schematicName,
-          ...this.getAnalyticsParameters(options as unknown as {}),
-        });
-      }
+      analytics?.reportSchematicRunEvent({
+        [EventCustomDimension.SchematicCollectionName]: collectionName,
+        [EventCustomDimension.SchematicName]: schematicName,
+        ...this.getAnalyticsParameters(options as unknown as {}),
+      });
 
       return options;
     });
@@ -277,12 +271,6 @@ export abstract class SchematicsCommandModule
 
   @memoize
   protected async getSchematicCollections(): Promise<Set<string>> {
-    // Resolve relative collections from the location of `angular.json`
-    const resolveRelativeCollection = (collectionName: string) =>
-      collectionName.charAt(0) === '.'
-        ? resolve(this.context.root, collectionName)
-        : collectionName;
-
     const getSchematicCollections = (
       configSection: Record<string, unknown> | undefined,
     ): Set<string> | undefined => {
@@ -292,7 +280,7 @@ export abstract class SchematicsCommandModule
 
       const { schematicCollections } = configSection;
       if (Array.isArray(schematicCollections)) {
-        return new Set(schematicCollections.map((c) => resolveRelativeCollection(c)));
+        return new Set(schematicCollections);
       }
 
       return undefined;
@@ -399,6 +387,10 @@ export abstract class SchematicsCommandModule
 
   private getResolvePaths(collectionName: string): string[] {
     const { workspace, root } = this.context;
+    if (collectionName[0] === '.') {
+      // Resolve relative collections from the location of `angular.json`
+      return [root];
+    }
 
     return workspace
       ? // Workspace

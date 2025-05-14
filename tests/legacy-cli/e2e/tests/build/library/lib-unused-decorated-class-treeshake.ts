@@ -1,4 +1,4 @@
-import assert from 'assert';
+import assert from 'node:assert';
 import { appendToFile, expectFileToExist, expectFileToMatch, readFile } from '../../../utils/fs';
 import { ng } from '../../../utils/process';
 import { libraryConsumptionSetup } from './setup';
@@ -11,7 +11,7 @@ export default async function () {
 
   // Add an unused class as part of the public api.
   await appendToFile(
-    'projects/my-lib/src/lib/my-lib.component.ts',
+    'projects/my-lib/src/lib/my-lib.ts',
     `
     function something() {
       return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {

@@ -55,22 +55,20 @@ describe('Library Schematic', () => {
         '/projects/foo/tsconfig.lib.json',
         '/projects/foo/tsconfig.lib.prod.json',
         '/projects/foo/src/my-index.ts',
-        '/projects/foo/src/lib/foo.component.spec.ts',
-        '/projects/foo/src/lib/foo.component.ts',
-        '/projects/foo/src/lib/foo.service.spec.ts',
-        '/projects/foo/src/lib/foo.service.ts',
+        '/projects/foo/src/lib/foo.spec.ts',
+        '/projects/foo/src/lib/foo.ts',
       ]),
     );
   });
 
   it('should not add reference to module file in entry-file', async () => {
     const tree = await schematicRunner.runSchematic('library', defaultOptions, workspaceTree);
-    expect(tree.readContent('/projects/foo/src/my-index.ts')).not.toContain('foo.module');
+    expect(tree.readContent('/projects/foo/src/my-index.ts')).not.toContain('foo-module');
   });
 
   it('should create a standalone component', async () => {
     const tree = await schematicRunner.runSchematic('library', defaultOptions, workspaceTree);
-    const componentContent = tree.readContent('/projects/foo/src/lib/foo.component.ts');
+    const componentContent = tree.readContent('/projects/foo/src/lib/foo.ts');
     expect(componentContent).not.toContain('standalone');
   });
 
@@ -100,10 +98,8 @@ describe('Library Schematic', () => {
           '/some/other/directory/bar/tsconfig.lib.json',
           '/some/other/directory/bar/tsconfig.lib.prod.json',
           '/some/other/directory/bar/src/my-index.ts',
-          '/some/other/directory/bar/src/lib/foo.component.spec.ts',
-          '/some/other/directory/bar/src/lib/foo.component.ts',
-          '/some/other/directory/bar/src/lib/foo.service.spec.ts',
-          '/some/other/directory/bar/src/lib/foo.service.ts',
+          '/some/other/directory/bar/src/lib/foo.spec.ts',
+          '/some/other/directory/bar/src/lib/foo.ts',
         ]),
       );
     });
@@ -207,10 +203,8 @@ describe('Library Schematic', () => {
     const project = config.projects.pascalCasedName;
     expect(project).toBeDefined();
     expect(project.root).toEqual('projects/pascal-cased-name');
-    const svcContent = tree.readContent(
-      '/projects/pascal-cased-name/src/lib/pascal-cased-name.service.ts',
-    );
-    expect(svcContent).toMatch(/providedIn: 'root'/);
+    const svcContent = tree.readContent('/projects/pascal-cased-name/src/lib/pascal-cased-name.ts');
+    expect(svcContent).toContain('@Component');
   });
 
   describe(`update package.json`, () => {
@@ -299,6 +293,24 @@ describe('Library Schematic', () => {
 
       const tsConfigJson = getJsonFileContent(tree, 'tsconfig.json');
       expect(tsConfigJson.compilerOptions.paths).toBeUndefined();
+      expect(tsConfigJson.references).not.toContain(
+        jasmine.objectContaining({ path: './projects/foo/tsconfig.lib.json' }),
+      );
+      expect(tsConfigJson.references).not.toContain(
+        jasmine.objectContaining({ path: './projects/foo/tsconfig.spec.json' }),
+      );
+    });
+
+    it('should add project references in the root tsconfig.json', async () => {
+      const tree = await schematicRunner.runSchematic('library', defaultOptions, workspaceTree);
+
+      const { references } = getJsonFileContent(tree, '/tsconfig.json');
+      expect(references).toContain(
+        jasmine.objectContaining({ path: './projects/foo/tsconfig.lib.json' }),
+      );
+      expect(references).toContain(
+        jasmine.objectContaining({ path: './projects/foo/tsconfig.spec.json' }),
+      );
     });
   });
 
@@ -310,7 +322,7 @@ describe('Library Schematic', () => {
       project: 'foo',
     };
     tree = await schematicRunner.runSchematic('component', componentOptions, tree);
-    expect(tree.exists('/projects/foo/src/lib/comp/comp.component.ts')).toBe(true);
+    expect(tree.exists('/projects/foo/src/lib/comp/comp.ts')).toBe(true);
   });
 
   it(`should support creating scoped libraries`, async () => {
@@ -320,8 +332,7 @@ describe('Library Schematic', () => {
 
     const pkgJsonPath = '/projects/myscope/mylib/package.json';
     expect(tree.files).toContain(pkgJsonPath);
-    expect(tree.files).toContain('/projects/myscope/mylib/src/lib/mylib.service.ts');
-    expect(tree.files).toContain('/projects/myscope/mylib/src/lib/mylib.component.ts');
+    expect(tree.files).toContain('/projects/myscope/mylib/src/lib/mylib.ts');
 
     const pkgJson = JSON.parse(tree.readContent(pkgJsonPath));
     expect(pkgJson.name).toEqual(scopedName);
@@ -368,7 +379,6 @@ describe('Library Schematic', () => {
     const project = config.projects.foo;
     expect(project.root).toEqual('foo');
     const { options, configurations } = project.architect.build;
-    expect(options.project).toEqual('foo/ng-package.json');
     expect(configurations.production.tsConfig).toEqual('foo/tsconfig.lib.prod.json');
 
     const libTsConfig = getJsonFileContent(tree, '/foo/tsconfig.lib.json');
@@ -388,9 +398,14 @@ describe('Library Schematic', () => {
     const tree = await schematicRunner.runSchematic('library', defaultOptions, workspaceTree);
 
     const workspace = JSON.parse(tree.readContent('/angular.json'));
-    expect(workspace.projects.foo.architect.build.builder).toBe(
-      '@angular-devkit/build-angular:ng-packagr',
-    );
+    expect(workspace.projects.foo.architect.build.builder).toBe('@angular/build:ng-packagr');
+  });
+
+  it(`should add 'karma' test builder`, async () => {
+    const tree = await schematicRunner.runSchematic('library', defaultOptions, workspaceTree);
+
+    const workspace = JSON.parse(tree.readContent('/angular.json'));
+    expect(workspace.projects.foo.architect.test.builder).toBe('@angular/build:karma');
   });
 
   describe('standalone=false', () => {
@@ -403,8 +418,8 @@ describe('Library Schematic', () => {
         workspaceTree,
       );
 
-      const fileContent = getFileContent(tree, '/projects/foo/src/lib/foo.module.ts');
-      expect(fileContent).toMatch(/exports: \[\n(\s*) {2}FooComponent\n\1\]/);
+      const fileContent = getFileContent(tree, '/projects/foo/src/lib/foo-module.ts');
+      expect(fileContent).toMatch(/exports: \[\n(\s*) {2}Foo\n\1\]/);
     });
 
     it('should create files', async () => {
@@ -423,11 +438,9 @@ describe('Library Schematic', () => {
           '/projects/foo/tsconfig.lib.json',
           '/projects/foo/tsconfig.lib.prod.json',
           '/projects/foo/src/my-index.ts',
-          '/projects/foo/src/lib/foo.module.ts',
-          '/projects/foo/src/lib/foo.component.spec.ts',
-          '/projects/foo/src/lib/foo.component.ts',
-          '/projects/foo/src/lib/foo.service.spec.ts',
-          '/projects/foo/src/lib/foo.service.ts',
+          '/projects/foo/src/lib/foo-module.ts',
+          '/projects/foo/src/lib/foo.spec.ts',
+          '/projects/foo/src/lib/foo.ts',
         ]),
       );
     });

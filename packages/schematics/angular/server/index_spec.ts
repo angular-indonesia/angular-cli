@@ -70,6 +70,84 @@ describe('Server Schematic', () => {
       );
     });
 
+    it('should account for renamed app component and module', async () => {
+      appTree.create(
+        '/projects/bar/src/app/my-custom-module.ts',
+        `
+          import { NgModule } from '@angular/core';
+          import { BrowserModule } from '@angular/platform-browser';
+          import { MyCustomApp } from './foo/bar/baz/app.foo';
+
+          @NgModule({
+            declarations: [MyCustomApp],
+            imports: [BrowserModule],
+            bootstrap: [MyCustomApp]
+          })
+          export class MyCustomModule {}
+      `,
+      );
+
+      appTree.overwrite(
+        '/projects/bar/src/main.ts',
+        `
+        import { platformBrowser } from '@angular/platform-browser';
+        import { MyCustomModule } from './app/my-custom-module';
+
+        platformBrowser().bootstrapModule(MyCustomModule)
+          .catch(err => console.error(err));
+      `,
+      );
+
+      const tree = await schematicRunner.runSchematic('server', defaultOptions, appTree);
+      const filePath = '/projects/bar/src/app/app.module.server.ts';
+      expect(tree.exists(filePath)).toBeTrue();
+      const contents = tree.readContent(filePath);
+
+      expect(contents).toContain(`import { MyCustomApp } from './foo/bar/baz/app.foo';`);
+      expect(contents).toContain(`import { MyCustomModule } from './my-custom-module';`);
+      expect(contents).toContain(`imports: [MyCustomModule],`);
+      expect(contents).toContain(`bootstrap: [MyCustomApp],`);
+    });
+
+    it('should account for renamed app component and module that have been aliased', async () => {
+      appTree.create(
+        '/projects/bar/src/app/my-custom-module.ts',
+        `
+          import { NgModule } from '@angular/core';
+          import { BrowserModule } from '@angular/platform-browser';
+          import { MyCustomApp as MyAliasedApp } from './foo/bar/baz/app.foo';
+
+          @NgModule({
+            declarations: [MyAliasedApp],
+            imports: [BrowserModule],
+            bootstrap: [MyAliasedApp]
+          })
+          export class MyCustomModule {}
+      `,
+      );
+
+      appTree.overwrite(
+        '/projects/bar/src/main.ts',
+        `
+        import { platformBrowser } from '@angular/platform-browser';
+        import { MyCustomModule as MyAliasedModule } from './app/my-custom-module';
+
+        platformBrowser().bootstrapModule(MyAliasedModule)
+          .catch(err => console.error(err));
+      `,
+      );
+
+      const tree = await schematicRunner.runSchematic('server', defaultOptions, appTree);
+      const filePath = '/projects/bar/src/app/app.module.server.ts';
+      expect(tree.exists(filePath)).toBeTrue();
+      const contents = tree.readContent(filePath);
+
+      expect(contents).toContain(`import { MyCustomApp } from './foo/bar/baz/app.foo';`);
+      expect(contents).toContain(`import { MyCustomModule } from './my-custom-module';`);
+      expect(contents).toContain(`imports: [MyCustomModule],`);
+      expect(contents).toContain(`bootstrap: [MyCustomApp],`);
+    });
+
     it('should add dependency: @angular/platform-server', async () => {
       const tree = await schematicRunner.runSchematic('server', defaultOptions, appTree);
       const filePath = '/package.json';
@@ -89,12 +167,11 @@ describe('Server Schematic', () => {
       const filePath = '/projects/bar/tsconfig.app.json';
       const contents = parseJson(tree.readContent(filePath).toString());
       expect(contents.compilerOptions.types).toEqual(['node']);
-      expect(contents.files).toEqual(['src/main.ts', 'src/main.server.ts']);
     });
 
     it(`should add 'provideClientHydration' to the providers list`, async () => {
       const tree = await schematicRunner.runSchematic('server', defaultOptions, appTree);
-      const contents = tree.readContent('/projects/bar/src/app/app.module.ts');
+      const contents = tree.readContent('/projects/bar/src/app/app-module.ts');
       expect(contents).toContain(`provideClientHydration(withEventReplay())`);
     });
   });
@@ -124,7 +201,49 @@ describe('Server Schematic', () => {
       const filePath = '/projects/bar/src/main.server.ts';
       expect(tree.exists(filePath)).toBeTrue();
       const contents = tree.readContent(filePath);
-      expect(contents).toContain(`bootstrapApplication(AppComponent, config)`);
+      expect(contents).toContain(`bootstrapApplication(App, config)`);
+    });
+
+    it('should account for renamed app component', async () => {
+      appTree.overwrite(
+        '/projects/bar/src/main.ts',
+        `
+        import { bootstrapApplication } from '@angular/platform-browser';
+        import { appConfig } from './app/app.config';
+        import { MyCustomApp } from './foo/bar/baz/app.foo';
+
+        bootstrapApplication(MyCustomApp, appConfig)
+          .catch((err) => console.error(err));
+      `,
+      );
+
+      const tree = await schematicRunner.runSchematic('server', defaultOptions, appTree);
+      const filePath = '/projects/bar/src/main.server.ts';
+      expect(tree.exists(filePath)).toBeTrue();
+      const contents = tree.readContent(filePath);
+      expect(contents).toContain(`import { MyCustomApp } from './foo/bar/baz/app.foo';`);
+      expect(contents).toContain(`bootstrapApplication(MyCustomApp, config)`);
+    });
+
+    it('should account for renamed app component that is aliased within the main file', async () => {
+      appTree.overwrite(
+        '/projects/bar/src/main.ts',
+        `
+        import { bootstrapApplication } from '@angular/platform-browser';
+        import { appConfig } from './app/app.config';
+        import { MyCustomApp as MyCustomAlias } from './foo/bar/baz/app.foo';
+
+        bootstrapApplication(MyCustomAlias, appConfig)
+          .catch((err) => console.error(err));
+      `,
+      );
+
+      const tree = await schematicRunner.runSchematic('server', defaultOptions, appTree);
+      const filePath = '/projects/bar/src/main.server.ts';
+      expect(tree.exists(filePath)).toBeTrue();
+      const contents = tree.readContent(filePath);
+      expect(contents).toContain(`import { MyCustomApp } from './foo/bar/baz/app.foo';`);
+      expect(contents).toContain(`bootstrapApplication(MyCustomApp, config)`);
     });
 
     it('should create server app config file', async () => {

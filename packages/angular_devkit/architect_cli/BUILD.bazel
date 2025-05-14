@@ -1,5 +1,5 @@
-load("@npm2//:defs.bzl", "npm_link_all_packages")
-load("//tools:defaults2.bzl", "npm_package", "ts_project")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("//tools:defaults.bzl", "npm_package", "ts_project")
 
 # Copyright Google Inc. All Rights Reserved.
 #
@@ -16,14 +16,15 @@ ts_project(
     srcs = [
         "bin/architect.ts",
     ] + glob(["src/**/*.ts"]),
-    module_name = "@angular-devkit/architect-cli",
     deps = [
         ":node_modules/@angular-devkit/architect",
         ":node_modules/@angular-devkit/core",
+        ":node_modules/progress",
         "//:node_modules/@types/node",
         "//:node_modules/@types/progress",
         "//:node_modules/@types/yargs-parser",
         "//:node_modules/ansi-colors",
+        "//:node_modules/yargs-parser",
     ],
 )
 
@@ -43,7 +44,7 @@ npm_package(
     tags = ["release-package"],
     deps = [
         ":README.md",
-        ":architect_cli_rjs",
+        ":architect_cli",
         ":license",
     ],
 )

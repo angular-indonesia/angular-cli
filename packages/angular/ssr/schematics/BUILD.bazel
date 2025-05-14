@@ -3,8 +3,8 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file at https://angular.dev/license
 
-load("@aspect_rules_js//npm:defs.bzl", "npm_package")
-load("//tools:defaults2.bzl", "jasmine_test", "ts_project")
+load("@aspect_rules_js//js:defs.bzl", "js_library")
+load("//tools:defaults.bzl", "jasmine_test", "ts_project")
 load("//tools:ts_json_schema.bzl", "ts_json_schema")
 
 licenses(["notice"])
@@ -57,7 +57,6 @@ ts_project(
         "//packages/angular/ssr/schematics:" + src.replace(".json", ".ts")
         for (src, _) in ALL_SCHEMA_TARGETS
     ],
-    module_name = "@angular/ssr/schematics",
     deps = [
         "//packages/angular/ssr:node_modules/@angular-devkit/schematics",
         "//packages/angular/ssr:node_modules/@schematics/angular",
@@ -77,7 +76,8 @@ ts_project(
         ],
     ),
     deps = [
-        ":schematics_rjs",
+        ":schematics",
+        "//:node_modules/@types/node",
         "//packages/angular/ssr:node_modules/@angular-devkit/schematics",
     ],
 )
@@ -86,17 +86,17 @@ jasmine_test(
     name = "ssr_schematics_test",
     data = [
         ":schematics_assets",
-        ":ssr_schematics_test_lib_rjs",
+        ":ssr_schematics_test_lib",
     ],
 )
 
-# This package is intended to be combined into the main @angular/ssr package as a dep.
-npm_package(
+# This target is used as nested_package in the main @angular/ssr package as a dep.
+js_library(
     name = "pkg",
     srcs = [
         "package.json",
+        ":schematics",
         ":schematics_assets",
-        ":schematics_rjs",
     ],
     visibility = ["//packages/angular/ssr:__pkg__"],
 )

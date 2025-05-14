@@ -6,12 +6,12 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import { isDynamicPattern } from 'fast-glob';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { extname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { makeRe as makeRegExpFromGlob } from 'picomatch';
+import { isDynamicPattern } from 'tinyglobby';
 import { assertIsError } from './error';
 import { loadEsmModule } from './load-esm';
 
@@ -67,7 +67,7 @@ export async function loadProxyConfiguration(
         break;
       } catch (e) {
         assertIsError(e);
-        if (e.code === 'ERR_REQUIRE_ESM') {
+        if (e.code === 'ERR_REQUIRE_ESM' || e.code === 'ERR_REQUIRE_ASYNC_MODULE') {
           // Load the ESM configuration file using the TypeScript dynamic import workaround.
           // Once TypeScript provides support for keeping the dynamic import this workaround can be
           // changed to a direct dynamic import.

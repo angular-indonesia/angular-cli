@@ -1,8 +1,7 @@
-load("@aspect_rules_js//npm:defs.bzl", "npm_package")
-load("@npm//@angular/build-tooling/bazel/api-golden:index.bzl", "api_golden_test_npm_package")
-load("@npm2//:defs.bzl", "npm_link_all_packages")
+load("@devinfra//bazel/api-golden:index_rjs.bzl", "api_golden_test_npm_package")
+load("@npm//:defs.bzl", "npm_link_all_packages")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
-load("//tools:defaults2.bzl", "ng_package", "ts_project")
+load("//tools:defaults.bzl", "ng_package", "ts_project")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -26,7 +25,6 @@ ts_project(
     data = [
         "//packages/angular/ssr/third_party/beasties:beasties_bundled",
     ],
-    module_name = "@angular/ssr",
     source_map = True,
     tsconfig = "//:build-tsconfig-esm",
     deps = [
@@ -40,8 +38,7 @@ ts_project(
 )
 
 ng_package(
-    name = "angular_package",
-    package_name = "@angular/ssr",
+    name = "npm_package",
     srcs = [
         ":package.json",
         "//packages/angular/ssr/third_party/beasties:beasties_bundled",
@@ -53,7 +50,18 @@ ng_package(
     ],
     nested_packages = [
         "//packages/angular/ssr/schematics:pkg",
+        # Included directly as the generated types reference the types file in this location.
+        "//packages/angular/ssr/third_party/beasties:beasties_dts",
     ],
+    package = "@angular/ssr",
+    rollup_runtime_deps = [
+        "//:node_modules/@rollup/plugin-commonjs",
+        "//:node_modules/@rollup/plugin-node-resolve",
+        "//:node_modules/magic-string",
+        "//:node_modules/rollup-plugin-dts",
+        "//:node_modules/rollup-plugin-sourcemaps2",
+    ],
+    tags = ["release-package"],
     deps = [
         ":ssr",
         "//packages/angular/ssr/node",
@@ -69,16 +77,6 @@ pkg_tar(
     tags = ["manual"],
 )
 
-# TODO: Replace when `ng_package` creates a valid `rules_js`-compliant npm package.
-npm_package(
-    name = "npm_package",
-    srcs = [":angular_package"],
-    replace_prefixes = {
-        "angular_package/": "",
-    },
-    tags = ["release-package"],
-)
-
 alias(
     name = "pkg",
     actual = ":npm_package",
@@ -90,6 +88,6 @@ api_golden_test_npm_package(
         ":npm_package",
         "//goldens:public-api",
     ],
-    golden_dir = "angular_cli/goldens/public-api/angular/ssr",
-    npm_package = "angular_cli/packages/angular/ssr/npm_package",
+    golden_dir = "goldens/public-api/angular/ssr",
+    npm_package = "packages/angular/ssr/npm_package",
 )

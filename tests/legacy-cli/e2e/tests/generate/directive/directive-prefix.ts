@@ -1,4 +1,4 @@
-import { join } from 'path';
+import { join } from 'node:path';
 import { ng } from '../../../utils/process';
 import { expectFileToMatch } from '../../../utils/fs';
 import { updateJsonFile, useCIChrome, useCIDefaults } from '../../../utils/project';
@@ -16,9 +16,7 @@ export default function () {
         }),
       )
       .then(() => ng('generate', 'directive', 'test2-directive'))
-      .then(() =>
-        expectFileToMatch(join(directiveDir, 'test2-directive.directive.ts'), /selector: '\[preW/),
-      )
+      .then(() => expectFileToMatch(join(directiveDir, 'test2-directive.ts'), /selector: '\[preW/))
       .then(() => ng('generate', 'application', 'app-two', '--skip-install'))
       .then(() => useCIDefaults('app-two'))
       .then(() => useCIChrome('app-two', './projects/app-two'))
@@ -33,17 +31,12 @@ export default function () {
       .then(() => ng('generate', 'directive', '--skip-import', 'test3-directive'))
       .then(() => process.chdir('../..'))
       .then(() =>
-        expectFileToMatch(
-          join('projects', 'app-two', 'test3-directive.directive.ts'),
-          /selector: '\[preW/,
-        ),
+        expectFileToMatch(join('projects', 'app-two', 'test3-directive.ts'), /selector: '\[preW/),
       )
       .then(() => process.chdir('src/app'))
       .then(() => ng('generate', 'directive', 'test-directive'))
       .then(() => process.chdir('../..'))
-      .then(() =>
-        expectFileToMatch(join(directiveDir, 'test-directive.directive.ts'), /selector: '\[preP/),
-      )
+      .then(() => expectFileToMatch(join(directiveDir, 'test-directive.ts'), /selector: '\[preP/))
 
       // Try to run the unit tests.
       .then(() => ng('test', '--watch=false'))

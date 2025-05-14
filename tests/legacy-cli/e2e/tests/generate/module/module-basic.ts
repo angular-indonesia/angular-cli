@@ -1,4 +1,4 @@
-import { join } from 'path';
+import { join } from 'node:path';
 import { ng } from '../../../utils/process';
 import { expectFileToExist, expectFileToMatch } from '../../../utils/fs';
 import { expectToFail } from '../../../utils/utils';
@@ -13,10 +13,10 @@ export default async function () {
 
   await ng('generate', 'module', 'test', '--project', projectName);
   await expectFileToExist(moduleDir);
-  await expectFileToExist(join(moduleDir, 'test.module.ts'));
-  await expectToFail(() => expectFileToExist(join(moduleDir, 'test-routing.module.ts')));
+  await expectFileToExist(join(moduleDir, 'test-module.ts'));
+  await expectToFail(() => expectFileToExist(join(moduleDir, 'test-routing-module.ts')));
   await expectToFail(() => expectFileToExist(join(moduleDir, 'test.spec.ts')));
-  await expectFileToMatch(join(moduleDir, 'test.module.ts'), 'TestModule');
+  await expectFileToMatch(join(moduleDir, 'test-module.ts'), 'TestModule');
 
   // Try to run the unit tests.
   await ng('test', projectName, '--watch=false');

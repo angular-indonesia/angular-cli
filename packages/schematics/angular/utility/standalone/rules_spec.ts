@@ -8,7 +8,7 @@
 
 import { Rule, SchematicContext, Tree, callRule } from '@angular-devkit/schematics';
 import { SchematicTestRunner } from '@angular-devkit/schematics/testing';
-import { join } from 'path';
+import { join } from 'node:path';
 import { addRootImport, addRootProvider } from './rules';
 
 describe('standalone utilities', () => {
@@ -74,7 +74,7 @@ describe('standalone utilities', () => {
         host,
       );
 
-      const content = readFile('app/app.module.ts');
+      const content = readFile('app/app-module.ts');
 
       assertContains(content, `import { MyModule } from '@my/module';`);
       assertContains(content, `imports: [BrowserModule, MyModule.forRoot([])]`);
@@ -326,7 +326,7 @@ describe('standalone utilities', () => {
         host,
       );
 
-      const content = readFile('app/app.module.ts');
+      const content = readFile('app/app-module.ts');
 
       assertContains(content, `import { BrowserModule as BrowserModule_alias } from '@my/module';`);
       assertContains(content, `imports: [BrowserModule, BrowserModule_alias.forRoot([])]`);
@@ -420,10 +420,13 @@ describe('standalone utilities', () => {
         host,
       );
 
-      const content = readFile('app/app.module.ts');
+      const content = readFile('app/app-module.ts');
 
       assertContains(content, `import { SOME_TOKEN } from '@my/module';`);
-      assertContains(content, `providers: [{ provide: SOME_TOKEN, useValue: 123 }]`);
+      assertContains(
+        content,
+        `providers: [provideBrowserGlobalErrorListeners(),{ provide: SOME_TOKEN, useValue: 123 }]`,
+      );
     });
 
     it('should add a root provider to a standalone app', async () => {
@@ -442,7 +445,11 @@ describe('standalone utilities', () => {
       assertContains(content, `import { provideModule } from '@my/module';`);
       assertContains(
         content,
-        `providers: [provideZoneChangeDetection({ eventCoalescing:true }),provideModule([])]`,
+        `providers: [
+          provideBrowserGlobalErrorListeners(),
+          provideZoneChangeDetection({ eventCoalescing:true }),
+          provideModule([]),
+        ]`,
       );
     });
 
@@ -453,11 +460,12 @@ describe('standalone utilities', () => {
       host.overwrite(
         getPathWithinProject(configPath),
         `
-        import { ApplicationConfig } from '@angular/core';
+        import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
         import { provideRouter } from '@angular/router';
 
         export const appConfig: ApplicationConfig = {
           providers: [
+            provideBrowserGlobalErrorListeners(),
             provideRouter([]),
           ]
         };
@@ -474,7 +482,10 @@ describe('standalone utilities', () => {
 
       const content = readFile('app/app.config.ts');
       assertContains(content, `import { provideModule } from '@my/module';`);
-      assertContains(content, `providers: [provideRouter([]),provideModule([]),]`);
+      assertContains(
+        content,
+        `providers: [provideBrowserGlobalErrorListeners(), provideRouter([]),provideModule([]),]`,
+      );
     });
   });
 });

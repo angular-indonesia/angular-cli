@@ -151,11 +151,13 @@ function* updateBuildTarget(
   // Update server file
   const ssrMainFile = serverTarget?.options?.['main'];
   if (typeof ssrMainFile === 'string') {
-    yield deleteFile(ssrMainFile);
+    // Do not delete the server main file if it's the same as the browser file.
+    if (buildTarget.options?.browser !== ssrMainFile) {
+      yield deleteFile(ssrMainFile);
+    }
 
     yield externalSchematic('@schematics/angular', 'ssr', {
       project: projectName,
-      skipInstall: true,
     });
   }
 }
@@ -215,6 +217,7 @@ function updateProjects(tree: Tree, context: SchematicContext) {
         case Builders.Application:
         case Builders.DevServer:
         case Builders.ExtractI18n:
+        case Builders.Karma:
         case Builders.NgPackagr:
           // Ignore application, dev server, and i18n extraction for devkit usage check.
           // Both will be replaced if no other usage is found.
@@ -239,6 +242,13 @@ function updateProjects(tree: Tree, context: SchematicContext) {
             break;
           case Builders.ExtractI18n:
             target.builder = '@angular/build:extract-i18n';
+            break;
+          case Builders.Karma:
+            target.builder = '@angular/build:karma';
+            // Remove "builderMode" option since the builder will always use "application"
+            for (const [, karmaOptions] of allTargetOptions(target)) {
+              delete karmaOptions['builderMode'];
+            }
             break;
           case Builders.NgPackagr:
             target.builder = '@angular/build:ng-packagr';
@@ -457,8 +467,12 @@ function deleteFile(path: string): Rule {
 }
 
 function updateJsonFile(path: string, updater: (json: JSONFile) => void): Rule {
-  return (tree) => {
-    updater(new JSONFile(tree, path));
+  return (tree, ctx) => {
+    if (tree.exists(path)) {
+      updater(new JSONFile(tree, path));
+    } else {
+      ctx.logger.info(`Skipping updating '${path}' as it does not exist.`);
+    }
   };
 }
 
