@@ -12,7 +12,6 @@ import type {
 } from '@angular/ssr';
 import type { ServerResponse } from 'node:http';
 import type { Connect, ViteDevServer } from 'vite';
-import { loadEsmModule } from '../../../utils/load-esm';
 import {
   isSsrNodeRequestHandler,
   isSsrRequestHandler,
@@ -36,19 +35,15 @@ export function createAngularSsrInternalMiddleware(
     (async () => {
       // Load the compiler because `@angular/ssr/node` depends on `@angular/` packages,
       // which must be processed by the runtime linker, even if they are not used.
-      await loadEsmModule('@angular/compiler');
-      const { writeResponseToNodeResponse, createWebRequestFromNodeRequest } =
-        await loadEsmModule<typeof import('@angular/ssr/node')>('@angular/ssr/node');
+      await import('@angular/compiler');
+      const { writeResponseToNodeResponse, createWebRequestFromNodeRequest } = (await import(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        '@angular/ssr/node' as any
+      )) as typeof import('@angular/ssr/node', { with: { 'resolution-mode': 'import' } });
 
       const { ɵgetOrCreateAngularServerApp } = (await server.ssrLoadModule('/main.server.mjs')) as {
         ɵgetOrCreateAngularServerApp: typeof getOrCreateAngularServerApp;
       };
-
-      // `ɵgetOrCreateAngularServerApp` can be undefined right after an error.
-      // See: https://github.com/angular/angular-cli/issues/29907
-      if (!ɵgetOrCreateAngularServerApp) {
-        return next();
-      }
 
       const angularServerApp = ɵgetOrCreateAngularServerApp({
         allowStaticRouteRender: true,
@@ -90,10 +85,12 @@ export async function createAngularSsrExternalMiddleware(
 
   // Load the compiler because `@angular/ssr/node` depends on `@angular/` packages,
   // which must be processed by the runtime linker, even if they are not used.
-  await loadEsmModule('@angular/compiler');
+  await import('@angular/compiler');
 
-  const { createWebRequestFromNodeRequest, writeResponseToNodeResponse } =
-    await loadEsmModule<typeof import('@angular/ssr/node')>('@angular/ssr/node');
+  const { createWebRequestFromNodeRequest, writeResponseToNodeResponse } = (await import(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    '@angular/ssr/node' as any
+  )) as typeof import('@angular/ssr/node', { with: { 'resolution-mode': 'import' } });
 
   return function angularSsrExternalMiddleware(
     req: Connect.IncomingMessage,

@@ -8,7 +8,6 @@
 
 import assert from 'node:assert';
 import { createServer } from 'node:http';
-import { loadEsmModule } from '../load-esm';
 import { loadEsmModuleFromMemory } from './load-esm-from-memory';
 import { isSsrNodeRequestHandler, isSsrRequestHandler } from './utils';
 
@@ -21,8 +20,10 @@ export const DEFAULT_URL = new URL('http://ng-localhost/');
  */
 export async function launchServer(): Promise<URL> {
   const { reqHandler } = await loadEsmModuleFromMemory('./server.mjs');
-  const { createWebRequestFromNodeRequest, writeResponseToNodeResponse } =
-    await loadEsmModule<typeof import('@angular/ssr/node')>('@angular/ssr/node');
+  const { createWebRequestFromNodeRequest, writeResponseToNodeResponse } = (await import(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    '@angular/ssr/node' as any
+  )) as typeof import('@angular/ssr/node', { with: { 'resolution-mode': 'import' } });
 
   if (!isSsrNodeRequestHandler(reqHandler) && !isSsrRequestHandler(reqHandler)) {
     return DEFAULT_URL;

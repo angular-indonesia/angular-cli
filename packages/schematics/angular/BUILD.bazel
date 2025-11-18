@@ -4,10 +4,8 @@
 # found in the LICENSE file at https://angular.dev/license
 
 load("@npm//:defs.bzl", "npm_link_all_packages")
-load("//:constants.bzl", "BASELINE_DATE")
 load("//tools:defaults.bzl", "copy_to_bin", "jasmine_test", "npm_package", "ts_project")
 load("//tools:ts_json_schema.bzl", "ts_json_schema")
-load("//tools/baseline_browserslist:baseline_browserslist.bzl", "baseline_browserslist")
 
 licenses(["notice"])
 
@@ -22,7 +20,10 @@ ALL_SCHEMA_TARGETS = [
         x.replace("/", "_").replace("-", "_").replace(".json", ""),
     )
     for x in glob(
-        include = ["*/schema.json"],
+        include = [
+            "*/schema.json",
+            "refactor/*/schema.json",
+        ],
         exclude = [
             # NB: we need to exclude the nested node_modules that is laid out by yarn workspaces
             "node_modules/**",
@@ -44,27 +45,20 @@ copy_to_bin(
     srcs = glob(["**/schema.json"]),
 )
 
-baseline_browserslist(
-    name = "angular_browserslist",
-    out = "config/.browserslistrc",
-    baseline = BASELINE_DATE,
-)
-
 RUNTIME_ASSETS = [
     "collection.json",
     "migrations/migration-collection.json",
     "package.json",
     "utility/latest-versions/package.json",
-    ":angular_browserslist",
 ] + glob(
     include = [
         "*/schema.json",
         "*/files/**/*",
-        "*/other-files/**/*",
         "*/implements-files/**/*",
         "*/type-files/**/*",
         "*/functional-files/**/*",
         "*/class-files/**/*",
+        "refactor/*/schema.json",
     ],
     exclude = [
         # NB: we need to exclude the nested node_modules that is laid out by yarn workspaces
@@ -78,6 +72,7 @@ ts_project(
         include = ["**/*.ts"],
         exclude = [
             "**/*_spec.ts",
+            "refactor/jasmine-vitest/test-helpers.ts",
             # Also exclude templated files.
             "*/files/**/*.ts",
             "*/other-files/**/*.ts",
@@ -120,6 +115,7 @@ ts_project(
         include = [
             "**/*_spec.ts",
             "utility/test/**/*.ts",
+            "refactor/jasmine-vitest/test-helpers.ts",
         ],
         exclude = [
             # NB: we need to exclude the nested node_modules that is laid out by yarn workspaces
@@ -133,12 +129,13 @@ ts_project(
         ":node_modules/jsonc-parser",
         "//:node_modules/@types/jasmine",
         "//:node_modules/@types/node",
+        "//:node_modules/prettier",
         "//packages/schematics/angular/third_party/github.com/Microsoft/TypeScript",
     ],
 )
 
 jasmine_test(
-    name = "angular_test",
+    name = "test",
     data = [":angular_test_lib"],
 )
 
@@ -156,6 +153,7 @@ npm_package(
         "//packages/angular_devkit/core:package.json",
     ],
     stamp_files = [
+        "config/index.js",
         "utility/latest-versions.js",
     ],
     tags = ["release-package"],

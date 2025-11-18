@@ -11,8 +11,13 @@
 import '@angular/compiler';
 /* eslint-enable import/no-unassigned-import */
 
-import { Component } from '@angular/core';
-import { Routes, provideRouter, withEnabledBlockingInitialNavigation } from '@angular/router';
+import { Component, InjectionToken, Injector, inject } from '@angular/core';
+import {
+  Route,
+  Routes,
+  provideRouter,
+  withEnabledBlockingInitialNavigation,
+} from '@angular/router';
 import { extractRoutesAndCreateRouteTree } from '../../src/routes/ng-routes';
 import { PrerenderFallback, RenderMode } from '../../src/routes/route-config';
 import { setAngularAppTestingManifest } from '../testing-utils';
@@ -21,7 +26,6 @@ describe('extractRoutesAndCreateRouteTree', () => {
   const url = new URL('http://localhost');
 
   @Component({
-    standalone: true,
     selector: 'app-dummy-comp',
     template: `dummy works`,
   })
@@ -424,6 +428,45 @@ describe('extractRoutesAndCreateRouteTree', () => {
     ]);
   });
 
+  it('should extract routes with a route level matcher captured by "**"', async () => {
+    setAngularAppTestingManifest(
+      [
+        {
+          path: '',
+          component: DummyComponent,
+        },
+        {
+          path: 'list',
+          component: DummyComponent,
+        },
+        {
+          path: 'product',
+          component: DummyComponent,
+          children: [
+            {
+              matcher: () => null,
+              component: DummyComponent,
+            },
+          ],
+        },
+      ],
+      [
+        { path: 'list', renderMode: RenderMode.Client },
+        { path: '', renderMode: RenderMode.Client },
+        { path: '**', renderMode: RenderMode.Server },
+      ],
+    );
+
+    const { routeTree, errors } = await extractRoutesAndCreateRouteTree({ url });
+    expect(errors).toHaveSize(0);
+    expect(routeTree.toObject()).toEqual([
+      { route: '/', renderMode: RenderMode.Client },
+      { route: '/list', renderMode: RenderMode.Client },
+      { route: '/product', renderMode: RenderMode.Server },
+      { route: '/**', renderMode: RenderMode.Server },
+    ]);
+  });
+
   it('should extract nested redirects that are not explicitly defined.', async () => {
     setAngularAppTestingManifest(
       [
@@ -625,7 +668,6 @@ describe('extractRoutesAndCreateRouteTree', () => {
 
   it('should not bootstrap the root component', async () => {
     @Component({
-      standalone: true,
       selector: 'app-root',
       template: '',
     })
@@ -654,7 +696,6 @@ describe('extractRoutesAndCreateRouteTree', () => {
 
   it('should not bootstrap the root component when using `withEnabledBlockingInitialNavigation`', async () => {
     @Component({
-      standalone: true,
       selector: 'app-root',
       template: '',
     })
@@ -715,6 +756,38 @@ describe('extractRoutesAndCreateRouteTree', () => {
       { route: '/', renderMode: RenderMode.Server },
       { route: '/home', renderMode: RenderMode.Server },
       { route: '/**', renderMode: RenderMode.Server },
+    ]);
+  });
+
+  it(`should create and run route level injector when 'loadChildren' is used`, async () => {
+    const ChildRoutes = new InjectionToken<Route[]>('Child Routes');
+    setAngularAppTestingManifest(
+      [
+        {
+          path: '',
+          component: DummyComponent,
+          providers: [
+            {
+              provide: ChildRoutes,
+              useValue: [
+                {
+                  path: 'home',
+                  component: DummyComponent,
+                },
+              ],
+            },
+          ],
+          loadChildren: () => inject(ChildRoutes),
+        },
+      ],
+      [{ path: '**', renderMode: RenderMode.Server }],
+    );
+
+    const { routeTree, errors } = await extractRoutesAndCreateRouteTree({ url });
+    expect(errors).toHaveSize(0);
+    expect(routeTree.toObject()).toEqual([
+      { route: '/', renderMode: RenderMode.Server },
+      { route: '/home', renderMode: RenderMode.Server },
     ]);
   });
 });

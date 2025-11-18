@@ -22,14 +22,13 @@ export default async function () {
     'public/media.json': JSON.stringify({ dataFromAssets: true }),
     // Update component to do an HTTP call to asset and API.
     'src/app/app.ts': `
-    import { Component, inject } from '@angular/core';
+    import { ChangeDetectorRef, Component, inject } from '@angular/core';
     import { JsonPipe } from '@angular/common';
     import { RouterOutlet } from '@angular/router';
     import { HttpClient } from '@angular/common/http';
 
     @Component({
       selector: 'app-root',
-      standalone: true,
       imports: [JsonPipe, RouterOutlet],
       template: \`
         <p>{{ assetsData | json }}</p>
@@ -40,16 +39,19 @@ export default async function () {
     export class App {
       assetsData: any;
       apiData: any;
+      private readonly cdr: ChangeDetectorRef = inject(ChangeDetectorRef);
 
       constructor() {
         const http = inject(HttpClient);
 
         http.get('/media.json').toPromise().then((d) => {
           this.assetsData = d;
+          this.cdr.markForCheck();
         });
 
         http.get('/api').toPromise().then((d) => {
           this.apiData = d;
+          this.cdr.markForCheck();
         });
       }
     }

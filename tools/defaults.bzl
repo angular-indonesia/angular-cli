@@ -12,8 +12,8 @@ def ts_project(
         deps = [],
         tsconfig = None,
         testonly = False,
+        source_map = True,
         visibility = None,
-        ignore_strict_deps = False,
         **kwargs):
     if tsconfig == None:
         tsconfig = "//:test-tsconfig" if testonly else "//:build-tsconfig"
@@ -22,18 +22,19 @@ def ts_project(
         name = name,
         testonly = testonly,
         declaration = True,
+        source_map = source_map,
         tsconfig = tsconfig,
         visibility = visibility,
         deps = deps,
         **kwargs
     )
 
-    if not ignore_strict_deps:
-        strict_deps_test(
-            name = "%s_strict_deps_test" % name,
-            srcs = kwargs.get("srcs", []),
-            deps = deps,
-        )
+    strict_deps_test(
+        name = "%s_strict_deps_test" % name,
+        srcs = kwargs.get("srcs", []),
+        tsconfig = tsconfig,
+        deps = deps,
+    )
 
 def npm_package(**kwargs):
     _npm_package(**kwargs)
@@ -44,13 +45,16 @@ def copy_to_bin(**kwargs):
 def js_binary(**kwargs):
     _js_binary(**kwargs)
 
-def ng_package(deps = [], **kwargs):
+def ng_package(deps = [], extra_substitutions = {}, **kwargs):
+    nostamp_subs = dict(substitutions["nostamp"], **extra_substitutions)
+    stamp_subs = dict(substitutions["stamp"], **extra_substitutions)
+
     _ng_package(
         deps = deps,
         license = "//:LICENSE",
         substitutions = select({
-            "//:stamp": substitutions["stamp"],
-            "//conditions:default": substitutions["nostamp"],
+            "//:stamp": stamp_subs,
+            "//conditions:default": nostamp_subs,
         }),
         **kwargs
     )
@@ -65,9 +69,10 @@ def jasmine_test(data = [], args = [], **kwargs):
         chdir = native.package_name(),
         args = [
             "--require=%s/node_modules/source-map-support/register.js" % relative_to_root,
-            "**/*spec.js",
-            "**/*spec.mjs",
-            "**/*spec.cjs",
+            # Escape so that the `js_binary` launcher triggers Bash expansion.
+            "'**/*+(.|_)spec.js'",
+            "'**/*+(.|_)spec.mjs'",
+            "'**/*+(.|_)spec.cjs'",
         ] + args,
         data = data + ["//:node_modules/source-map-support"],
         **kwargs

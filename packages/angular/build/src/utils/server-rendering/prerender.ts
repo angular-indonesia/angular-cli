@@ -13,6 +13,7 @@ import { OutputMode } from '../../builders/application/schema';
 import { BuildOutputFile, BuildOutputFileType } from '../../tools/esbuild/bundler-context';
 import { BuildOutputAsset } from '../../tools/esbuild/bundler-execution-result';
 import { assertIsError } from '../error';
+import { toPosixPath } from '../path';
 import { urlJoin } from '../url';
 import { WorkerPool } from '../worker-pool';
 import { IMPORT_EXEC_ARGV } from './esm-in-memory-loader/utils';
@@ -25,6 +26,7 @@ import {
   WritableSerializableRouteTreeNode,
 } from './models';
 import type { RenderWorkerData } from './render-worker';
+import { generateRedirectStaticPage } from './utils';
 
 type PrerenderOptions = NormalizedApplicationBuildOptions['prerenderOptions'];
 type AppShellOptions = NormalizedApplicationBuildOptions['appShellOptions'];
@@ -94,7 +96,7 @@ export async function prerenderPages(
 
   const assetsReversed: Record</** Destination */ string, /** Source */ string> = {};
   for (const { source, destination } of assets) {
-    assetsReversed[addLeadingSlash(destination.replace(/\\/g, posix.sep))] = source;
+    assetsReversed[addLeadingSlash(toPosixPath(destination))] = source;
   }
 
   // Get routes to prerender
@@ -378,29 +380,4 @@ function addTrailingSlash(url: string): string {
 
 function removeLeadingSlash(value: string): string {
   return value[0] === '/' ? value.slice(1) : value;
-}
-
-/**
- * Generates a static HTML page with a meta refresh tag to redirect the user to a specified URL.
- *
- * This function creates a simple HTML page that performs a redirect using a meta tag.
- * It includes a fallback link in case the meta-refresh doesn't work.
- *
- * @param url - The URL to which the page should redirect.
- * @returns The HTML content of the static redirect page.
- */
-function generateRedirectStaticPage(url: string): string {
-  return `
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <title>Redirecting</title>
-    <meta http-equiv="refresh" content="0; url=${url}">
-  </head>
-  <body>
-    <pre>Redirecting to <a href="${url}">${url}</a></pre>
-  </body>
-</html>
-`.trim();
 }

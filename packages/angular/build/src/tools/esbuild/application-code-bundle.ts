@@ -13,6 +13,7 @@ import { extname, relative } from 'node:path';
 import type { NormalizedApplicationBuildOptions } from '../../builders/application/options';
 import { ExperimentalPlatform } from '../../builders/application/schema';
 import { allowMangle } from '../../utils/environment-options';
+import { toPosixPath } from '../../utils/path';
 import {
   SERVER_APP_ENGINE_MANIFEST_FILENAME,
   SERVER_APP_MANIFEST_FILENAME,
@@ -653,7 +654,7 @@ function getEsBuildCommonPolyfillsOptions(
   tryToResolvePolyfillsAsRelative: boolean,
   loadResultCache: LoadResultCache | undefined,
 ): BuildOptions | undefined {
-  const { jit, workspaceRoot, i18nOptions } = options;
+  const { jit, workspaceRoot, i18nOptions, externalPackages } = options;
 
   const buildOptions = getEsBuildCommonOptions(options);
   buildOptions.splitting = false;
@@ -670,8 +671,10 @@ function getEsBuildCommonPolyfillsOptions(
   // Locale data should go first so that project provided polyfill code can augment if needed.
   let needLocaleDataPlugin = false;
   if (i18nOptions.shouldInline) {
-    // Remove localize polyfill as this is not needed for build time i18n.
-    polyfills = polyfills.filter((path) => !path.startsWith('@angular/localize'));
+    if (!externalPackages) {
+      // Remove localize polyfill when i18n inline transformation have been applied to all the packages.
+      polyfills = polyfills.filter((path) => !path.startsWith('@angular/localize'));
+    }
 
     // Add locale data for all active locales
     // TODO: Inject each individually within the inlining process itself
@@ -685,7 +688,7 @@ function getEsBuildCommonPolyfillsOptions(
     needLocaleDataPlugin = true;
   }
   if (needLocaleDataPlugin) {
-    buildOptions.plugins.push(createAngularLocaleDataPlugin());
+    buildOptions.plugins.unshift(createAngularLocaleDataPlugin());
   }
 
   if (polyfills.length === 0) {
@@ -719,9 +722,7 @@ function getEsBuildCommonPolyfillsOptions(
         }
 
         // Generate module contents with an import statement per defined polyfill
-        let contents = polyfillPaths
-          .map((file) => `import '${file.replace(/\\/g, '/')}';`)
-          .join('\n');
+        let contents = polyfillPaths.map((file) => `import '${toPosixPath(file)}';`).join('\n');
 
         // The below should be done after loading `$localize` as otherwise the locale will be overridden.
         if (i18nOptions.shouldInline) {
@@ -746,10 +747,5 @@ function getEsBuildCommonPolyfillsOptions(
 }
 
 function entryFileToWorkspaceRelative(workspaceRoot: string, entryFile: string): string {
-  return (
-    './' +
-    relative(workspaceRoot, entryFile)
-      .replace(/.[mc]?ts$/, '')
-      .replace(/\\/g, '/')
-  );
+  return './' + toPosixPath(relative(workspaceRoot, entryFile).replace(/.[mc]?ts$/, ''));
 }

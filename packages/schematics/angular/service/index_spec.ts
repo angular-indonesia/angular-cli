@@ -55,7 +55,7 @@ describe('Service Schematic', () => {
 
     const tree = await schematicRunner.runSchematic('service', options, appTree);
     const content = tree.readContent('/projects/bar/src/app/foo/foo.ts');
-    expect(content).toMatch(/providedIn: 'root'/);
+    expect(content).toMatch(/providedIn: 'root',/);
   });
 
   it('should respect the skipTests flag', async () => {
@@ -91,5 +91,34 @@ describe('Service Schematic', () => {
     const testContent = tree.readContent('/projects/bar/src/app/foo/foo.spec.ts');
     expect(content).toContain('export class Foo');
     expect(testContent).toContain("describe('Foo'");
+  });
+
+  it('should not add type to class name when addTypeToClassName is false', async () => {
+    const options = { ...defaultOptions, type: 'Service', addTypeToClassName: false };
+    const tree = await schematicRunner.runSchematic('service', options, appTree);
+    const content = tree.readContent('/projects/bar/src/app/foo/foo.service.ts');
+    const testContent = tree.readContent('/projects/bar/src/app/foo/foo.service.spec.ts');
+    expect(content).toContain('export class Foo {');
+    expect(content).not.toContain('export class FooService {');
+    expect(testContent).toContain("describe('Foo', () => {");
+    expect(testContent).not.toContain("describe('FooService', () => {");
+  });
+
+  it('should add type to class name when addTypeToClassName is true', async () => {
+    const options = { ...defaultOptions, type: 'Service', addTypeToClassName: true };
+    const tree = await schematicRunner.runSchematic('service', options, appTree);
+    const content = tree.readContent('/projects/bar/src/app/foo/foo.service.ts');
+    const testContent = tree.readContent('/projects/bar/src/app/foo/foo.service.spec.ts');
+    expect(content).toContain('export class FooService {');
+    expect(testContent).toContain("describe('FooService', () => {");
+  });
+
+  it('should add type to class name by default', async () => {
+    const options = { ...defaultOptions, type: 'Service', addTypeToClassName: undefined };
+    const tree = await schematicRunner.runSchematic('service', options, appTree);
+    const content = tree.readContent('/projects/bar/src/app/foo/foo.service.ts');
+    const testContent = tree.readContent('/projects/bar/src/app/foo/foo.service.spec.ts');
+    expect(content).toContain('export class FooService {');
+    expect(testContent).toContain("describe('FooService', () => {");
   });
 });

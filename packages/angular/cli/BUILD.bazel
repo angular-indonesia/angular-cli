@@ -5,6 +5,7 @@
 
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("//tools:defaults.bzl", "jasmine_test", "npm_package", "ts_project")
+load("//tools:example_db_generator.bzl", "cli_example_db")
 load("//tools:ng_cli_schema_generator.bzl", "cli_json_schema")
 load("//tools:ts_json_schema.bzl", "ts_json_schema")
 
@@ -25,6 +26,7 @@ RUNTIME_ASSETS = glob(
     ],
 ) + [
     "//packages/angular/cli:lib/config/schema.json",
+    "//packages/angular/cli:lib/code-examples.db",
 ]
 
 ts_project(
@@ -36,6 +38,7 @@ ts_project(
         ],
         exclude = [
             "**/*_spec.ts",
+            "**/testing/**",
         ],
     ) + [
         # These files are generated from the JSON schema
@@ -49,14 +52,17 @@ ts_project(
         ":node_modules/@angular-devkit/schematics",
         ":node_modules/@inquirer/prompts",
         ":node_modules/@listr2/prompt-adapter-inquirer",
+        ":node_modules/@modelcontextprotocol/sdk",
         ":node_modules/@yarnpkg/lockfile",
+        ":node_modules/algoliasearch",
         ":node_modules/ini",
         ":node_modules/jsonc-parser",
         ":node_modules/npm-package-arg",
-        ":node_modules/npm-pick-manifest",
         ":node_modules/pacote",
+        ":node_modules/parse5-html-rewriting-stream",
         ":node_modules/resolve",
         ":node_modules/yargs",
+        ":node_modules/zod",
         "//:node_modules/@angular/core",
         "//:node_modules/@types/ini",
         "//:node_modules/@types/node",
@@ -68,7 +74,19 @@ ts_project(
         "//:node_modules/@types/yarnpkg__lockfile",
         "//:node_modules/listr2",
         "//:node_modules/semver",
+        "//:node_modules/typescript",
     ],
+)
+
+cli_example_db(
+    name = "cli_example_database",
+    srcs = glob(
+        include = [
+            "lib/examples/**/*.md",
+        ],
+    ),
+    out = "lib/code-examples.db",
+    path = "packages/angular/cli/lib/examples",
 )
 
 CLI_SCHEMA_DATA = [
@@ -99,7 +117,10 @@ ts_project(
     name = "angular-cli_test_lib",
     testonly = True,
     srcs = glob(
-        include = ["**/*_spec.ts"],
+        include = [
+            "**/*_spec.ts",
+            "**/testing/**",
+        ],
         exclude = [
             # NB: we need to exclude the nested node_modules that is laid out by yarn workspaces
             "node_modules/**",
@@ -109,15 +130,17 @@ ts_project(
         ":angular-cli",
         ":node_modules/@angular-devkit/core",
         ":node_modules/@angular-devkit/schematics",
+        ":node_modules/@modelcontextprotocol/sdk",
         ":node_modules/yargs",
         "//:node_modules/@types/semver",
         "//:node_modules/@types/yargs",
         "//:node_modules/semver",
+        "//:node_modules/typescript",
     ],
 )
 
 jasmine_test(
-    name = "angular-cli_test",
+    name = "test",
     data = [":angular-cli_test_lib"],
 )
 

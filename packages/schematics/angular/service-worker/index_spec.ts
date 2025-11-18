@@ -6,7 +6,6 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import { tags } from '@angular-devkit/core';
 import { SchematicTestRunner, UnitTestTree } from '@angular-devkit/schematics/testing';
 import { Schema as ApplicationOptions } from '../application/schema';
 import { Builders } from '../utility/workspace-models';
@@ -127,19 +126,16 @@ describe('Service Worker Schematic', () => {
   it(`should add the 'provideServiceWorker' to providers`, async () => {
     const tree = await schematicRunner.runSchematic('service-worker', defaultOptions, appTree);
     const content = tree.readContent('/projects/bar/src/app/app.config.ts');
-    expect(tags.oneLine`${content}`).toContain(tags.oneLine`
-        provideServiceWorker('ngsw-worker.js', {
-          enabled: !isDevMode(),
-          registrationStrategy: 'registerWhenStable:30000'
-        })
-    `);
+    expect(content.replace(/\s/g, '')).toContain(
+      `provideServiceWorker('ngsw-worker.js',{enabled:!isDevMode(),registrationStrategy:'registerWhenStable:30000'})`,
+    );
   });
 
   it(`should import 'isDevMode' from '@angular/core'`, async () => {
     const tree = await schematicRunner.runSchematic('service-worker', defaultOptions, appTree);
     const content = tree.readContent('/projects/bar/src/app/app.config.ts');
     expect(content).toContain(
-      `import { ApplicationConfig, provideBrowserGlobalErrorListeners, provideZoneChangeDetection, isDevMode } from '@angular/core';`,
+      `import { ApplicationConfig, provideBrowserGlobalErrorListeners, isDevMode } from '@angular/core';`,
     );
   });
 
@@ -203,7 +199,7 @@ describe('Service Worker Schematic', () => {
       build.builder = Builders.Browser;
       build.options = {
         ...build.options,
-        main: build.options.browser,
+        main: 'projects/bar/src/main.ts',
         browser: undefined,
       };
 

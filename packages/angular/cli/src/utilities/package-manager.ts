@@ -6,14 +6,24 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import { isJsonObject, json } from '@angular-devkit/core';
+import { JsonValue, isJsonObject } from '@angular-devkit/core';
 import { execSync, spawn } from 'node:child_process';
-import { existsSync, promises as fs, realpathSync, rmSync } from 'node:fs';
+import { promises as fs, readFileSync, readdirSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PackageManager } from '../../lib/config/workspace-schema';
 import { AngularWorkspace, getProjectByCwd } from './config';
 import { memoize } from './memoize';
+
+/**
+ * A map of package managers to their corresponding lockfile names.
+ */
+const LOCKFILE_NAMES: Readonly<Record<PackageManager, string | readonly string[]>> = {
+  [PackageManager.Yarn]: 'yarn.lock',
+  [PackageManager.Pnpm]: 'pnpm-lock.yaml',
+  [PackageManager.Bun]: ['bun.lockb', 'bun.lock'],
+  [PackageManager.Npm]: 'package-lock.json',
+};
 
 interface PackageManagerOptions {
   saveDev: string;
@@ -29,7 +39,13 @@ export interface PackageManagerUtilsContext {
   root: string;
 }
 
+/**
+ * Utilities for interacting with various package managers.
+ */
 export class PackageManagerUtils {
+  /**
+   * @param context The context for the package manager utilities, including workspace and global configuration.
+   */
   constructor(private readonly context: PackageManagerUtilsContext) {}
 
   /** Get the package manager name. */
@@ -168,7 +184,7 @@ export class PackageManagerUtils {
     return new Promise((resolve) => {
       const bufferedOutput: { stream: NodeJS.WriteStream; data: Buffer }[] = [];
 
-      const childProcess = spawn(this.name, args, {
+      const childProcess = spawn(`${this.name} ${args.join(' ')}`, {
         // Always pipe stderr to allow for failures to be reported
         stdio: silent ? ['ignore', 'ignore', 'pipe'] : 'pipe',
         shell: true,
@@ -216,10 +232,11 @@ export class PackageManagerUtils {
       return packageManager;
     }
 
-    const hasNpmLock = this.hasLockfile(PackageManager.Npm);
-    const hasYarnLock = this.hasLockfile(PackageManager.Yarn);
-    const hasPnpmLock = this.hasLockfile(PackageManager.Pnpm);
-    const hasBunLock = this.hasLockfile(PackageManager.Bun);
+    const filesInRoot = readdirSync(this.context.root);
+    const hasNpmLock = this.hasLockfile(PackageManager.Npm, filesInRoot);
+    const hasYarnLock = this.hasLockfile(PackageManager.Yarn, filesInRoot);
+    const hasPnpmLock = this.hasLockfile(PackageManager.Pnpm, filesInRoot);
+    const hasBunLock = this.hasLockfile(PackageManager.Bun, filesInRoot);
 
     // PERF NOTE: `this.getVersion` spawns the package a the child_process which can take around ~300ms at times.
     // Therefore, we should only call this method when needed. IE: don't call `this.getVersion(PackageManager.Pnpm)` unless truly needed.
@@ -265,41 +282,34 @@ export class PackageManagerUtils {
     return PackageManager.Npm;
   }
 
-  private hasLockfile(packageManager: PackageManager): boolean {
-    let lockfileName: string;
-    switch (packageManager) {
-      case PackageManager.Yarn:
-        lockfileName = 'yarn.lock';
-        break;
-      case PackageManager.Pnpm:
-        lockfileName = 'pnpm-lock.yaml';
-        break;
-      case PackageManager.Bun:
-        lockfileName = 'bun.lockb';
-        break;
-      case PackageManager.Npm:
-      default:
-        lockfileName = 'package-lock.json';
-        break;
-    }
+  /**
+   * Checks if a lockfile for a specific package manager exists in the root directory.
+   * @param packageManager The package manager to check for.
+   * @param filesInRoot An array of file names in the root directory.
+   * @returns True if the lockfile exists, false otherwise.
+   */
+  private hasLockfile(packageManager: PackageManager, filesInRoot: string[]): boolean {
+    const lockfiles = LOCKFILE_NAMES[packageManager];
 
-    return existsSync(join(this.context.root, lockfileName));
+    return typeof lockfiles === 'string'
+      ? filesInRoot.includes(lockfiles)
+      : lockfiles.some((lockfile) => filesInRoot.includes(lockfile));
   }
 
   private getConfiguredPackageManager(): PackageManager | undefined {
-    const getPackageManager = (source: json.JsonValue | undefined): PackageManager | undefined => {
-      if (source && isJsonObject(source)) {
-        const value = source['packageManager'];
-        if (typeof value === 'string') {
-          return value as PackageManager;
-        }
-      }
-
-      return undefined;
-    };
-
-    let result: PackageManager | undefined;
     const { workspace: localWorkspace, globalConfiguration: globalWorkspace } = this.context;
+    let result: PackageManager | undefined;
+
+    try {
+      const packageJsonPath = join(this.context.root, 'package.json');
+      const pkgJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as JsonValue;
+      result = getPackageManager(pkgJson);
+    } catch {}
+
+    if (result) {
+      return result;
+    }
+
     if (localWorkspace) {
       const project = getProjectByCwd(localWorkspace);
       if (project) {
@@ -309,10 +319,19 @@ export class PackageManagerUtils {
       result ??= getPackageManager(localWorkspace.extensions['cli']);
     }
 
-    if (!result) {
-      result = getPackageManager(globalWorkspace.extensions['cli']);
-    }
+    result ??= getPackageManager(globalWorkspace.extensions['cli']);
 
     return result;
   }
+}
+
+function getPackageManager(source: JsonValue | undefined): PackageManager | undefined {
+  if (source && isJsonObject(source)) {
+    const value = source['packageManager'];
+    if (typeof value === 'string') {
+      return value.split('@', 1)[0] as PackageManager;
+    }
+  }
+
+  return undefined;
 }

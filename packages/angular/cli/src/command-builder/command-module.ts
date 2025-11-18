@@ -9,12 +9,13 @@
 import { logging, schema } from '@angular-devkit/core';
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
-import yargs, {
+import type {
   ArgumentsCamelCase,
   Argv,
   CamelCaseKey,
   CommandModule as YargsCommandModule,
-} from 'yargs';
+  // Resolution mode is required due to CamelCaseKey missing from esm types
+} from 'yargs' with { 'resolution-mode': 'require' };
 import { Parser as yargsParser } from 'yargs/helpers';
 import { getAnalyticsUserId } from '../analytics/analytics';
 import { AnalyticsCollector } from '../analytics/analytics-collector';
@@ -45,6 +46,7 @@ export interface CommandContext {
   globalConfiguration: AngularWorkspace;
   logger: logging.Logger;
   packageManager: PackageManagerUtils;
+  yargsInstance: Argv<{}>;
 
   /** Arguments parsed in free-from without parser configuration. */
   args: {
@@ -87,7 +89,10 @@ export abstract class CommandModule<T extends {} = {}> implements CommandModuleI
   protected readonly shouldReportAnalytics: boolean = true;
   readonly scope: CommandScope = CommandScope.Both;
 
-  private readonly optionsWithAnalytics = new Map<string, string>();
+  private readonly optionsWithAnalytics = new Map<
+    string,
+    EventCustomDimension | EventCustomMetric
+  >();
 
   constructor(protected readonly context: CommandContext) {}
 
@@ -234,12 +239,16 @@ export abstract class CommandModule<T extends {} = {}> implements CommandModuleI
     ]);
 
     for (const [name, ua] of this.optionsWithAnalytics) {
+      if (!validEventCustomDimensionAndMetrics.has(ua)) {
+        continue;
+      }
+
       const value = options[name];
-      if (
-        (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') &&
-        validEventCustomDimensionAndMetrics.has(ua as EventCustomDimension | EventCustomMetric)
-      ) {
-        parameters[ua as EventCustomDimension | EventCustomMetric] = value;
+      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        parameters[ua] = value;
+      } else if (Array.isArray(value)) {
+        // GA doesn't allow array as values.
+        parameters[ua] = value.sort().join(', ');
       }
     }
 
@@ -248,7 +257,7 @@ export abstract class CommandModule<T extends {} = {}> implements CommandModuleI
 
   private reportCommandRunAnalytics(analytics: AnalyticsCollector): void {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const internalMethods = (yargs as any).getInternalMethods();
+    const internalMethods = (this.context.yargsInstance as any).getInternalMethods();
     // $0 generate component [name] -> generate_component
     // $0 add <collection> -> add
     const fullCommand = (internalMethods.getUsageInstance().getUsage()[0][0] as string)

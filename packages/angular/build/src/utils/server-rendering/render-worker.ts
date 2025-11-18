@@ -12,6 +12,7 @@ import type { ESMInMemoryFileLoaderWorkerData } from './esm-in-memory-loader/loa
 import { patchFetchToLoadInMemoryAssets } from './fetch-patch';
 import { DEFAULT_URL, launchServer } from './launch-server';
 import { loadEsmModuleFromMemory } from './load-esm-from-memory';
+import { generateRedirectStaticPage } from './utils';
 
 export interface RenderWorkerData extends ESMInMemoryFileLoaderWorkerData {
   assetFiles: Record</** Destination */ string, /** Source */ string>;
@@ -48,10 +49,20 @@ async function renderPage({ url }: RenderOptions): Promise<string | null> {
     new Request(new URL(url, serverURL), { signal: AbortSignal.timeout(30_000) }),
   );
 
-  return response ? response.text() : null;
+  if (!response) {
+    return null;
+  }
+
+  const location = response.headers.get('Location');
+
+  return location ? generateRedirectStaticPage(location) : response.text();
 }
 
 async function initialize() {
+  // Load the compiler because `@angular/ssr/node` depends on `@angular/` packages,
+  // which must be processed by the runtime linker, even if they are not used.
+  await import('@angular/compiler');
+
   if (outputMode !== undefined && hasSsrEntry) {
     serverURL = await launchServer();
   }

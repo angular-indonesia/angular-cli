@@ -8,7 +8,6 @@
 
 import {
   Rule,
-  SchematicContext,
   Tree,
   apply,
   applyTemplates,
@@ -20,15 +19,27 @@ import {
   strings,
   url,
 } from '@angular-devkit/schematics';
-import { NodePackageInstallTask } from '@angular-devkit/schematics/tasks';
 import { join } from 'node:path/posix';
-import { NodeDependencyType, addPackageJsonDependency } from '../utility/dependencies';
+import {
+  DependencyType,
+  ExistingBehavior,
+  InstallBehavior,
+  addDependency,
+  getDependency,
+} from '../utility/dependency';
 import { JSONFile } from '../utility/json-file';
 import { latestVersions } from '../utility/latest-versions';
 import { relativePathToWorkspaceRoot } from '../utility/paths';
 import { getWorkspace, updateWorkspace } from '../utility/workspace';
 import { Builders, ProjectType } from '../utility/workspace-models';
 import { Schema as LibraryOptions } from './schema';
+
+const LIBRARY_DEV_DEPENDENCIES = [
+  { name: '@angular/compiler-cli', version: latestVersions.Angular },
+  { name: '@angular/build', version: latestVersions.AngularBuild },
+  { name: 'ng-packagr', version: latestVersions.NgPackagr },
+  { name: 'typescript', version: latestVersions['typescript'] },
+];
 
 function updateTsConfig(packageName: string, ...paths: string[]) {
   return (host: Tree) => {
@@ -58,44 +69,29 @@ function addTsProjectReference(...paths: string[]) {
   };
 }
 
-function addDependenciesToPackageJson() {
-  return (host: Tree) => {
-    [
-      {
-        type: NodeDependencyType.Dev,
-        name: '@angular/compiler-cli',
-        version: latestVersions.Angular,
-      },
-      {
-        type: NodeDependencyType.Dev,
-        name: '@angular/build',
-        version: latestVersions.AngularBuild,
-      },
-      {
-        type: NodeDependencyType.Dev,
-        name: 'ng-packagr',
-        version: latestVersions.NgPackagr,
-      },
-      {
-        type: NodeDependencyType.Default,
-        name: 'tslib',
-        version: latestVersions['tslib'],
-      },
-      {
-        type: NodeDependencyType.Dev,
-        name: 'typescript',
-        version: latestVersions['typescript'],
-      },
-    ].forEach((dependency) => addPackageJsonDependency(host, dependency));
-
-    return host;
-  };
+function addDependenciesToPackageJson(skipInstall: boolean): Rule {
+  return chain([
+    ...LIBRARY_DEV_DEPENDENCIES.map((dependency) =>
+      addDependency(dependency.name, dependency.version, {
+        type: DependencyType.Dev,
+        existing: ExistingBehavior.Skip,
+        install: skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
+      }),
+    ),
+    addDependency('tslib', latestVersions['tslib'], {
+      type: DependencyType.Default,
+      existing: ExistingBehavior.Skip,
+      install: skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
+    }),
+  ]);
 }
 
 function addLibToWorkspaceFile(
   options: LibraryOptions,
   projectRoot: string,
   projectName: string,
+  hasZoneDependency: boolean,
+  hasVitest: boolean,
 ): Rule {
   return updateWorkspace((workspace) => {
     workspace.projects.add({
@@ -117,13 +113,20 @@ function addLibToWorkspaceFile(
             },
           },
         },
-        test: {
-          builder: Builders.BuildKarma,
-          options: {
-            tsConfig: `${projectRoot}/tsconfig.spec.json`,
-            polyfills: ['zone.js', 'zone.js/testing'],
-          },
-        },
+        test: hasVitest
+          ? {
+              builder: Builders.BuildUnitTest,
+              options: {
+                tsConfig: `${projectRoot}/tsconfig.spec.json`,
+              },
+            }
+          : {
+              builder: Builders.BuildKarma,
+              options: {
+                tsConfig: `${projectRoot}/tsconfig.spec.json`,
+                polyfills: hasZoneDependency ? ['zone.js', 'zone.js/testing'] : undefined,
+              },
+            },
       },
     });
   });
@@ -155,6 +158,7 @@ export default function (options: LibraryOptions): Rule {
 
     const distRoot = `dist/${folderName}`;
     const sourceDir = `${libDir}/src/lib`;
+    const hasVitest = getDependency(host, 'vitest') !== null;
 
     const templateSource = apply(url('./files'), [
       applyTemplates({
@@ -168,14 +172,17 @@ export default function (options: LibraryOptions): Rule {
         angularLatestVersion: latestVersions.Angular.replace(/~|\^/, ''),
         tsLibLatestVersion: latestVersions['tslib'].replace(/~|\^/, ''),
         folderName,
+        testTypesPackage: hasVitest ? 'vitest/globals' : 'jasmine',
       }),
       move(libDir),
     ]);
 
+    const hasZoneDependency = getDependency(host, 'zone.js') !== null;
+
     return chain([
       mergeWith(templateSource),
-      addLibToWorkspaceFile(options, libDir, packageName),
-      options.skipPackageJson ? noop() : addDependenciesToPackageJson(),
+      addLibToWorkspaceFile(options, libDir, packageName, hasZoneDependency, hasVitest),
+      options.skipPackageJson ? noop() : addDependenciesToPackageJson(!!options.skipInstall),
       options.skipTsConfig ? noop() : updateTsConfig(packageName, './' + distRoot),
       options.skipTsConfig
         ? noop()
@@ -191,6 +198,9 @@ export default function (options: LibraryOptions): Rule {
             flat: true,
             path: sourceDir,
             project: packageName,
+            // Explicitly set the `typeSeparator` this also ensures that the generated files are valid even if the `module` schematic
+            // inherits its `typeSeparator` from the workspace.
+            typeSeparator: '-',
           }),
       schematic('component', {
         name: options.name,
@@ -207,11 +217,6 @@ export default function (options: LibraryOptions): Rule {
         // inherits its `type` from the workspace.
         type: '',
       }),
-      (_tree: Tree, context: SchematicContext) => {
-        if (!options.skipPackageJson && !options.skipInstall) {
-          context.addTask(new NodePackageInstallTask());
-        }
-      },
     ]);
   };
 }

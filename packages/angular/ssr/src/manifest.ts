@@ -6,6 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
+import type { BootstrapContext } from '@angular/platform-browser';
 import type { SerializableRouteTreeNode } from './routes/route-tree';
 import { AngularBootstrap } from './utils/ng';
 
@@ -72,7 +73,7 @@ export interface AngularAppEngineManifest {
    * - `key`: The locale identifier (e.g., 'en', 'fr').
    * - `value`: The url segment associated with that locale.
    */
-  readonly supportedLocales: Readonly<Record<string, string | undefined>>;
+  readonly supportedLocales: Readonly<Record<string, string>>;
 }
 
 /**
@@ -123,21 +124,16 @@ export interface AngularAppManifest {
    * Maps entry-point names to their corresponding browser bundles and loading strategies.
    *
    * - **Key**: The entry-point name, typically the value of `ɵentryName`.
-   * - **Value**: An array of objects, each representing a browser bundle with:
-   *   - `path`: The filename or URL of the associated JavaScript bundle to preload.
-   *   - `dynamicImport`: A boolean indicating whether the bundle is loaded via a dynamic `import()`.
-   *     If `true`, the bundle is lazily loaded, impacting its preloading behavior.
+   * - **Value**: A readonly array of JavaScript bundle paths or `undefined` if no bundles are associated.
    *
    * ### Example
    * ```ts
    * {
-   *   'src/app/lazy/lazy.ts': [{ path: 'src/app/lazy/lazy.js', dynamicImport: true }]
+   *   'src/app/lazy/lazy.ts': ['src/app/lazy/lazy.js']
    * }
    * ```
    */
-  readonly entryPointToBrowserMapping?: Readonly<
-    Record<string, ReadonlyArray<{ path: string; dynamicImport: boolean }> | undefined>
-  >;
+  readonly entryPointToBrowserMapping?: Readonly<Record<string, readonly string[] | undefined>>;
 }
 
 /**

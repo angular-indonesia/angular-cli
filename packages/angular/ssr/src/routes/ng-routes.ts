@@ -10,7 +10,9 @@ import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
 import {
   ApplicationRef,
   Compiler,
+  EnvironmentInjector,
   Injector,
+  createEnvironmentInjector,
   runInInjectionContext,
   ɵConsole,
   ɵENABLE_ROOT_COMPONENT_BOOTSTRAP,
@@ -148,7 +150,7 @@ async function* handleRoute(options: {
 
     const { redirectTo, loadChildren, loadComponent, children, ɵentryName } = route;
     if (ɵentryName && loadComponent) {
-      appendPreloadToMetadata(ɵentryName, entryPointToBrowserMapping, metadata, true);
+      appendPreloadToMetadata(ɵentryName, entryPointToBrowserMapping, metadata);
     }
 
     if (metadata.renderMode === RenderMode.Prerender) {
@@ -192,21 +194,20 @@ async function* handleRoute(options: {
     // Load and process lazy-loaded child routes
     if (loadChildren) {
       if (ɵentryName) {
-        // When using `loadChildren`, the entire feature area (including multiple routes) is loaded.
-        // As a result, we do not want all dynamic-import dependencies to be preload, because it involves multiple dependencies
-        // across different child routes. In contrast, `loadComponent` only loads a single component, which allows
-        // for precise control over preloading, ensuring that the files preloaded are exactly those required for that specific route.
-        appendPreloadToMetadata(ɵentryName, entryPointToBrowserMapping, metadata, false);
+        appendPreloadToMetadata(ɵentryName, entryPointToBrowserMapping, metadata);
       }
 
-      const loadedChildRoutes = await loadChildrenHelper(
-        route,
-        compiler,
-        parentInjector,
-      ).toPromise();
+      const routeInjector = route.providers
+        ? createEnvironmentInjector(
+            route.providers,
+            parentInjector.get(EnvironmentInjector),
+            `Route: ${route.path}`,
+          )
+        : parentInjector;
 
+      const loadedChildRoutes = await loadChildrenHelper(route, compiler, routeInjector);
       if (loadedChildRoutes) {
-        const { routes: childRoutes, injector = parentInjector } = loadedChildRoutes;
+        const { routes: childRoutes, injector = routeInjector } = loadedChildRoutes;
         yield* traverseRoutesConfig({
           ...options,
           routes: childRoutes,
@@ -250,15 +251,22 @@ async function* traverseRoutesConfig(options: {
     const currentRoutePath = joinUrlParts(parentRoute, path);
 
     if (matcher && serverConfigRouteTree) {
-      let foundMatch = false;
+      const matches: (RouteTreeNodeMetadata & ServerConfigRouteTreeAdditionalMetadata)[] = [];
       for (const matchedMetaData of serverConfigRouteTree.traverse()) {
-        if (!matchedMetaData.route.startsWith(currentRoutePath)) {
-          continue;
+        if (matchedMetaData.route.startsWith(currentRoutePath)) {
+          matches.push(matchedMetaData);
         }
+      }
 
-        foundMatch = true;
+      if (!matches.length) {
+        const matchedMetaData = serverConfigRouteTree.match(currentRoutePath);
+        if (matchedMetaData) {
+          matches.push(matchedMetaData);
+        }
+      }
+
+      for (const matchedMetaData of matches) {
         matchedMetaData.presentInClientRouter = true;
-
         if (matchedMetaData.renderMode === RenderMode.Prerender) {
           yield {
             error:
@@ -281,7 +289,7 @@ async function* traverseRoutesConfig(options: {
         });
       }
 
-      if (!foundMatch) {
+      if (!matches.length) {
         yield {
           error:
             `The route '${stripLeadingSlash(currentRoutePath)}' has a defined matcher but does not ` +
@@ -336,7 +344,6 @@ function appendPreloadToMetadata(
   entryName: string,
   entryPointToBrowserMapping: EntryPointToBrowserMapping,
   metadata: ServerConfigRouteTreeNodeMetadata,
-  includeDynamicImports: boolean,
 ): void {
   const existingPreloads = metadata.preload ?? [];
   if (!entryPointToBrowserMapping || existingPreloads.length >= MODULE_PRELOAD_MAX) {
@@ -350,13 +357,8 @@ function appendPreloadToMetadata(
 
   // Merge existing preloads with new ones, ensuring uniqueness and limiting the total to the maximum allowed.
   const combinedPreloads: Set<string> = new Set(existingPreloads);
-  for (const { dynamicImport, path } of preload) {
-    if (dynamicImport && !includeDynamicImports) {
-      continue;
-    }
-
-    combinedPreloads.add(path);
-
+  for (const href of preload) {
+    combinedPreloads.add(href);
     if (combinedPreloads.size === MODULE_PRELOAD_MAX) {
       break;
     }
@@ -634,7 +636,7 @@ export async function getRoutesFromAngularRouterConfig(
       const moduleRef = await platformRef.bootstrapModule(bootstrap);
       applicationRef = moduleRef.injector.get(ApplicationRef);
     } else {
-      applicationRef = await bootstrap();
+      applicationRef = await bootstrap({ platformRef });
     }
 
     const injector = applicationRef.injector;

@@ -1,4 +1,4 @@
-load("@devinfra//bazel/api-golden:index_rjs.bzl", "api_golden_test_npm_package")
+load("@devinfra//bazel/api-golden:index.bzl", "api_golden_test_npm_package")
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("//tools:defaults.bzl", "ng_package", "ts_project")
@@ -30,6 +30,7 @@ ts_project(
     deps = [
         "//:node_modules/@angular/common",
         "//:node_modules/@angular/core",
+        "//:node_modules/@angular/platform-browser",
         "//:node_modules/@angular/platform-server",
         "//:node_modules/@angular/router",
         "//:node_modules/tslib",
@@ -48,6 +49,12 @@ ng_package(
         "@angular/ssr/node",
         "../../third_party/beasties",
     ],
+    extra_substitutions = {
+        # Needed for ssr.d.ts file
+        "\\./third_party/beasties": "../third_party/beasties",
+        # Needed for the FESM file.
+        "\\./(.+)/packages/angular/ssr/third_party/beasties": "../third_party/beasties/index.js",
+    },
     nested_packages = [
         "//packages/angular/ssr/schematics:pkg",
         # Included directly as the generated types reference the types file in this location.
@@ -55,6 +62,7 @@ ng_package(
     ],
     package = "@angular/ssr",
     rollup_runtime_deps = [
+        "//:node_modules/@babel/core",
         "//:node_modules/@rollup/plugin-commonjs",
         "//:node_modules/@rollup/plugin-node-resolve",
         "//:node_modules/magic-string",

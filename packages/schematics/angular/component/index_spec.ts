@@ -163,7 +163,7 @@ describe('Component Schematic', () => {
 
     await expectAsync(
       schematicRunner.runSchematic('component', options, appTree),
-    ).toBeRejectedWithError('Class name "404" is invalid.');
+    ).toBeRejectedWithError('Class name "404Component" is invalid.');
   });
 
   it('should allow dash in selector before a number', async () => {
@@ -553,5 +553,39 @@ describe('Component Schematic', () => {
 
     const specContent = tree.readContent('/projects/bar/src/app/foo/foo.component.spec.ts');
     expect(specContent).toContain("import { FooComponent } from './foo.component';");
+  });
+
+  it('should add fixture.whenStable() in spec file when zoneless and standalone apps', async () => {
+    const tree = await schematicRunner.runSchematic('component', { ...defaultOptions }, appTree);
+    const tsContent = tree.readContent('/projects/bar/src/app/foo/foo.component.spec.ts');
+
+    expect(tsContent).toContain('fixture.whenStable()');
+    expect(tsContent).not.toContain('fixture.detectChanges()');
+  });
+
+  describe('with zone.js application', () => {
+    const zoneAppOptions: ApplicationOptions = {
+      ...appOptions,
+      name: 'baz',
+      zoneless: false,
+    };
+
+    it('should add not fixture.whenStable() in spec file for standalone', async () => {
+      appTree = await schematicRunner.runSchematic(
+        'application',
+        { ...zoneAppOptions, standalone: true },
+        appTree,
+      );
+      const tree = await schematicRunner.runSchematic(
+        'component',
+        { ...defaultOptions, standalone: true, project: 'baz' },
+        appTree,
+      );
+
+      const tsContent = tree.readContent('/projects/baz/src/app/foo/foo.component.spec.ts');
+
+      expect(tsContent).not.toContain('fixture.whenStable()');
+      expect(tsContent).toContain('fixture.detectChanges()');
+    });
   });
 });

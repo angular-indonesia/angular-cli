@@ -1,4 +1,4 @@
-load("@devinfra//bazel/api-golden:index_rjs.bzl", "api_golden_test_npm_package")
+load("@devinfra//bazel/api-golden:index.bzl", "api_golden_test_npm_package")
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("//tools:defaults.bzl", "jasmine_test", "npm_package", "ts_project")
 
@@ -59,7 +59,7 @@ ts_project(
 )
 
 jasmine_test(
-    name = "core_test",
+    name = "test",
     data = [":core_test_lib"],
 )
 

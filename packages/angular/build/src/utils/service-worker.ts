@@ -6,14 +6,17 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import type { Config, Filesystem } from '@angular/service-worker/config';
+import type {
+  Config,
+  Filesystem,
+} from '@angular/service-worker/config' with { 'resolution-mode': 'import' };
 import * as crypto from 'node:crypto';
-import { existsSync, constants as fsConstants, promises as fsPromises } from 'node:fs';
+import { existsSync, promises as fsPromises } from 'node:fs';
 import * as path from 'node:path';
 import { BuildOutputFile, BuildOutputFileType } from '../tools/esbuild/bundler-context';
 import { BuildOutputAsset } from '../tools/esbuild/bundler-execution-result';
 import { assertIsError } from './error';
-import { loadEsmModule } from './load-esm';
+import { toPosixPath } from './path';
 
 class CliFilesystem implements Filesystem {
   constructor(
@@ -52,7 +55,7 @@ class CliFilesystem implements Filesystem {
 
       if (stats.isFile()) {
         // Uses posix paths since the service worker expects URLs
-        items.push('/' + path.relative(this.base, entryPath).replace(/\\/g, '/'));
+        items.push('/' + toPosixPath(path.relative(this.base, entryPath)));
       } else if (stats.isDirectory()) {
         subdirectories.push(entryPath);
       }
@@ -75,11 +78,11 @@ class ResultFilesystem implements Filesystem {
   ) {
     for (const file of outputFiles) {
       if (file.type === BuildOutputFileType.Media || file.type === BuildOutputFileType.Browser) {
-        this.fileReaders.set('/' + file.path.replace(/\\/g, '/'), async () => file.contents);
+        this.fileReaders.set('/' + toPosixPath(file.path), async () => file.contents);
       }
     }
     for (const file of assetFiles) {
-      this.fileReaders.set('/' + file.destination.replace(/\\/g, '/'), () =>
+      this.fileReaders.set('/' + toPosixPath(file.destination), () =>
         fsPromises.readFile(file.source),
       );
     }
@@ -215,17 +218,14 @@ export async function augmentAppWithServiceWorkerCore(
   serviceWorkerFilesystem: Filesystem,
   baseHref: string,
 ): Promise<{ manifest: string; assetFiles: { source: string; destination: string }[] }> {
-  // Load ESM `@angular/service-worker/config` using the TypeScript dynamic import workaround.
-  // Once TypeScript provides support for keeping the dynamic import this workaround can be
-  // changed to a direct dynamic import.
-  const GeneratorConstructor = (
-    await loadEsmModule<typeof import('@angular/service-worker/config')>(
-      '@angular/service-worker/config',
-    )
-  ).Generator;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { Generator } = (await import('@angular/service-worker/config' as any)) as typeof import(
+    '@angular/service-worker/config',
+    { with: { 'resolution-mode': 'import' } }
+  );
 
   // Generate the manifest
-  const generator = new GeneratorConstructor(serviceWorkerFilesystem, baseHref);
+  const generator = new Generator(serviceWorkerFilesystem, baseHref);
   const output = await generator.process(config);
 
   // Write the manifest

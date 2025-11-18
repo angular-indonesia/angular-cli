@@ -20,7 +20,6 @@ import { ServerAsset, setAngularAppManifest } from '../src/manifest';
 import { ServerRoute, provideServerRendering, withRoutes } from '../src/routes/route-config';
 
 @Component({
-  standalone: true,
   selector: 'app-root',
   template: '<router-outlet />',
   imports: [RouterOutlet],
@@ -90,15 +89,19 @@ export function setAngularAppTestingManifest(
       `,
       },
     },
-    bootstrap: async () => () => {
-      return bootstrapApplication(rootComponent, {
-        providers: [
-          provideZonelessChangeDetection(),
-          provideRouter(routes),
-          provideServerRendering(withRoutes(serverRoutes)),
-          ...extraProviders,
-        ],
-      });
+    bootstrap: async () => (context) => {
+      return bootstrapApplication(
+        rootComponent,
+        {
+          providers: [
+            provideZonelessChangeDetection(),
+            provideRouter(routes),
+            provideServerRendering(withRoutes(serverRoutes)),
+            ...extraProviders,
+          ],
+        },
+        context,
+      );
     },
   });
 }

@@ -115,6 +115,10 @@ export class BuilderHarness<T> {
     return join(getSystemPath(this.host.root()), path);
   }
 
+  resetProjectMetadata(): void {
+    this.projectMetadata = DEFAULT_PROJECT_METADATA;
+  }
+
   useProject(name: string, metadata: Record<string, unknown> = {}): this {
     if (!name) {
       throw new Error('Project name cannot be an empty string.');
@@ -154,6 +158,24 @@ export class BuilderHarness<T> {
       options: options || {},
       info: { builderName: handler.name, description: '', optionSchema: true, ...info },
     });
+
+    return this;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  modifyTarget<O extends object = any>(
+    targetName: string,
+    modifier: (options: O) => O | void,
+  ): this {
+    const target = this.builderTargets.get(targetName);
+    if (!target) {
+      throw new Error(`Target "${targetName}" not found.`);
+    }
+
+    const newOptions = modifier(target.options as O);
+    if (newOptions) {
+      target.options = newOptions as json.JsonObject;
+    }
 
     return this;
   }
@@ -259,7 +281,7 @@ export class BuilderHarness<T> {
     }
 
     const logs: logging.LogEntry[] = [];
-    context.logger.subscribe((e) => logs.push(e));
+    const logger$ = context.logger.subscribe((e) => logs.push(e));
 
     return observableFrom(this.schemaRegistry.compile(this.builderInfo.optionSchema)).pipe(
       mergeMap((validator) => validator(targetOptions)),
@@ -298,6 +320,7 @@ export class BuilderHarness<T> {
       }),
       finalize(() => {
         this.watcherNotifier = undefined;
+        logger$.unsubscribe();
 
         for (const teardown of context.teardowns) {
           // eslint-disable-next-line @typescript-eslint/no-floating-promises

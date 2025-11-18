@@ -29,13 +29,14 @@
   },
   "devDependencies": {
     "@angular-devkit/schematics": "workspace:*",
-    "@angular/common": "20.0.0-rc.0",
-    "@angular/compiler": "20.0.0-rc.0",
-    "@angular/core": "20.0.0-rc.0",
-    "@angular/platform-browser": "20.0.0-rc.0",
-    "@angular/platform-server": "20.0.0-rc.0",
-    "@angular/router": "20.0.0-rc.0",
-    "@schematics/angular": "workspace:*"
+    "@angular/common": "21.0.0-rc.2",
+    "@angular/compiler": "21.0.0-rc.2",
+    "@angular/core": "21.0.0-rc.2",
+    "@angular/platform-browser": "21.0.0-rc.2",
+    "@angular/platform-server": "21.0.0-rc.2",
+    "@angular/router": "21.0.0-rc.2",
+    "@schematics/angular": "workspace:*",
+    "beasties": "0.3.5"
   },
   "sideEffects": false,
   "schematics": "./schematics/collection.json",

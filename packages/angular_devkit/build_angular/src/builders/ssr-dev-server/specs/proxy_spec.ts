@@ -15,7 +15,16 @@ import { SSRDevServerBuilderOutput } from '../index';
 
 describe('Serve SSR Builder', () => {
   const target = { project: 'app', target: 'serve-ssr' };
+  const originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
   let architect: Architect;
+
+  beforeAll(() => {
+    jasmine.DEFAULT_TIMEOUT_INTERVAL = 100_000;
+  });
+
+  afterAll(() => {
+    jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
+  });
 
   beforeEach(async () => {
     await host.initialize().toPromise();
@@ -23,8 +32,6 @@ describe('Serve SSR Builder', () => {
 
     host.writeMultipleFiles({
       'src/main.server.ts': `
-        import 'zone.js/node';
-
         import { CommonEngine } from '@angular/ssr/node';
         import * as express from 'express';
         import { resolve, join } from 'node:path';

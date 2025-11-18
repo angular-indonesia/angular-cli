@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import yargs from 'yargs';
+import { Argv } from 'yargs';
 import { FullDescribe } from '../command-module';
 
 interface JsonHelpOption {
@@ -42,9 +42,9 @@ export interface JsonHelp extends JsonHelpDescription {
 
 const yargsDefaultCommandRegExp = /^\$0|\*/;
 
-export function jsonHelpUsage(): string {
+export function jsonHelpUsage(localYargs: Argv): string {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const localYargs = yargs as any;
+  const localYargsInstance = localYargs as any;
   const {
     deprecatedOptions,
     alias: aliases,
@@ -56,31 +56,33 @@ export function jsonHelpUsage(): string {
     demandedOptions,
     default: defaultVal,
     hiddenOptions = [],
-  } = localYargs.getOptions();
+  } = localYargsInstance.getOptions();
 
-  const internalMethods = localYargs.getInternalMethods();
+  const internalMethods = localYargsInstance.getInternalMethods();
   const usageInstance = internalMethods.getUsageInstance();
   const context = internalMethods.getContext();
   const descriptions = usageInstance.getDescriptions();
-  const groups = localYargs.getGroups();
+  const groups = localYargsInstance.getGroups();
   const positional = groups[usageInstance.getPositionalGroupName()] as string[] | undefined;
-
+  const seen = new Set<string>();
   const hidden = new Set(hiddenOptions);
   const normalizeOptions: JsonHelpOption[] = [];
   const allAliases = new Set([...Object.values<string[]>(aliases).flat()]);
 
+  // Reverted order of https://github.com/yargs/yargs/blob/971e351705f0fbc5566c6ed1dfd707fa65e11c0d/lib/usage.ts#L419-L424
   for (const [names, type] of [
+    [number, 'number'],
     [array, 'array'],
     [string, 'string'],
     [boolean, 'boolean'],
-    [number, 'number'],
   ]) {
     for (const name of names) {
-      if (allAliases.has(name) || hidden.has(name)) {
+      if (allAliases.has(name) || hidden.has(name) || seen.has(name)) {
         // Ignore hidden, aliases and already visited option.
         continue;
       }
 
+      seen.add(name);
       const positionalIndex = positional?.indexOf(name) ?? -1;
       const alias = aliases[name];
 
@@ -124,7 +126,7 @@ export function jsonHelpUsage(): string {
 
   const output: JsonHelp = {
     name: [...context.commands].pop(),
-    command: `${command?.replace(yargsDefaultCommandRegExp, localYargs['$0'])}${defaultSubCommand}`,
+    command: `${command?.replace(yargsDefaultCommandRegExp, localYargsInstance['$0'])}${defaultSubCommand}`,
     ...parseDescription(rawDescription),
     options: normalizeOptions.sort((a, b) => a.name.localeCompare(b.name)),
     subcommands: otherSubcommands.length ? otherSubcommands : undefined,

@@ -37,11 +37,13 @@ ESBUILD_TESTS = [
     "tests/commands/serve/ssr-http-requests-assets.js",
     "tests/i18n/**",
     "tests/vite/**",
+    "tests/vitest/**",
     "tests/test/**",
 ]
 
 WEBPACK_IGNORE_TESTS = [
     "tests/vite/**",
+    "tests/vitest/**",
     "tests/build/app-shell/**",
     "tests/i18n/ivy-localize-app-shell.js",
     "tests/i18n/ivy-localize-app-shell-service-worker.js",
@@ -53,6 +55,8 @@ WEBPACK_IGNORE_TESTS = [
     "tests/build/wasm-esm.js",
     "tests/build/auto-csp*",
     "tests/build/incremental-watch.js",
+    "tests/build/chunk-optimizer.js",
+    "tests/build/chunk-optimizer-lazy.js",
 ]
 
 def _to_glob(patterns):
@@ -110,12 +114,12 @@ def _e2e_tests(name, runner, toolchain, **kwargs):
 
     # Chromium browser toolchain
     env.update({
-        "CHROME_BIN": "$(CHROMIUM)",
-        "CHROME_PATH": "$(CHROMIUM)",
+        "CHROME_BIN": "$(CHROME-HEADLESS-SHELL)",
+        "CHROME_PATH": "$(CHROME-HEADLESS-SHELL)",
         "CHROMEDRIVER_BIN": "$(CHROMEDRIVER)",
     })
-    toolchains = toolchains + ["@devinfra//bazel/browsers/chromium:toolchain_alias"]
-    data = data + ["@devinfra//bazel/browsers/chromium"]
+    toolchains = toolchains + ["@rules_browsers//browsers/chromium:toolchain_alias"]
+    data = data + ["@rules_browsers//browsers/chromium"]
 
     js_test(
         name = name,
@@ -127,8 +131,7 @@ def _e2e_tests(name, runner, toolchain, **kwargs):
         toolchains = toolchains,
         node_toolchain = toolchain,
         include_npm = select({
-            # For Windows testing mode, we use the real global NPM as otherwise this
-            # will be a lot of files that need to be brought from WSL to the host FS.
+            # TODO(alanagius): check why on windows this fails.
             "@platforms//os:windows": False,
             "//conditions:default": True,
         }),

@@ -1,5 +1,175 @@
-# TODO(devversion): Investigate bzlmod and use it where possible.
+"""Rules/toolchains for angular_cli with Bazel."""
 
 module(
     name = "angular_cli",
+)
+
+bazel_dep(name = "yq.bzl", version = "0.3.1")
+bazel_dep(name = "rules_nodejs", version = "6.6.1")
+bazel_dep(name = "aspect_rules_js", version = "2.8.1")
+bazel_dep(name = "aspect_rules_ts", version = "3.7.1")
+bazel_dep(name = "rules_pkg", version = "0.8.1")
+
+# Alow for usage of rules_pkg@0.8.1 even though other deps want a later verison.
+multiple_version_override(
+    module_name = "rules_pkg",
+    versions = [
+        "0.8.1",
+        "1.1.0",
+    ],
+)
+
+bazel_dep(name = "aspect_bazel_lib", version = "2.21.2")
+bazel_dep(name = "bazel_skylib", version = "1.8.2")
+bazel_dep(name = "aspect_rules_esbuild", version = "0.24.0")
+bazel_dep(name = "aspect_rules_jasmine", version = "2.0.0")
+bazel_dep(name = "rules_angular")
+git_override(
+    module_name = "rules_angular",
+    commit = "74d8baec22a5ffd3a1a36bac252399fa125a6c4b",
+    remote = "https://github.com/devversion/rules_angular.git",
+)
+
+bazel_dep(name = "devinfra")
+git_override(
+    module_name = "devinfra",
+    commit = "c855fffb4b01bc06e743eb3bdfd54c866af09ad8",
+    remote = "https://github.com/angular/dev-infra.git",
+)
+
+bazel_dep(name = "rules_sass")
+git_override(
+    module_name = "rules_sass",
+    commit = "1184a80751a21af8348f308abc5b38a41f26850e",
+    remote = "https://github.com/devversion/rules_sass.git",
+)
+
+bazel_dep(name = "rules_browsers")
+git_override(
+    module_name = "rules_browsers",
+    commit = "6a699bf3e896690e2923cf3ade29fbd4e492e366",
+    remote = "https://github.com/devversion/rules_browsers.git",
+)
+
+node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node")
+node.toolchain(node_version = "24.0.0")
+use_repo(
+    node,
+    "nodejs_darwin_amd64",
+    "nodejs_darwin_arm64",
+    "nodejs_linux_amd64",
+    "nodejs_linux_arm64",
+    "nodejs_toolchains",
+    "nodejs_windows_amd64",
+)
+
+node_dev = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node", dev_dependency = True)
+
+# Node.js 20
+node_dev.toolchain(
+    name = "node20",
+    node_version = "20.19.0",
+)
+
+# Node.js 22
+node_dev.toolchain(
+    name = "node22",
+    node_version = "22.12.0",
+)
+
+# Node.js 24
+node_dev.toolchain(
+    name = "node24",
+    node_version = "24.0.0",
+)
+use_repo(
+    node_dev,
+    "node20_darwin_amd64",
+    "node20_darwin_arm64",
+    "node20_linux_amd64",
+    "node20_linux_arm64",
+    "node20_toolchains",
+    "node20_windows_amd64",
+    "node22_darwin_amd64",
+    "node22_darwin_arm64",
+    "node22_linux_amd64",
+    "node22_linux_arm64",
+    "node22_toolchains",
+    "node22_windows_amd64",
+    "node24_darwin_amd64",
+    "node24_darwin_arm64",
+    "node24_linux_amd64",
+    "node24_linux_arm64",
+    "node24_toolchains",
+    "node24_windows_amd64",
+)
+
+# This is needed following https://github.com/bazel-contrib/rules_nodejs/pull/3859
+register_toolchains("//:node22_windows_no_exec_config_toolchain")
+
+npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm")
+npm.npm_translate_lock(
+    name = "npm",
+    custom_postinstalls = {
+        # TODO: Standardize browser management for `rules_js`
+        "webdriver-manager": "node ./bin/webdriver-manager update --standalone false --gecko false --versions.chrome 106.0.5249.21",
+    },
+    data = [
+        "//:package.json",
+        "//:pnpm-workspace.yaml",
+        "//modules/testing/builder:package.json",
+        "//packages/angular/build:package.json",
+        "//packages/angular/cli:package.json",
+        "//packages/angular/create/package.json",
+        "//packages/angular/pwa:package.json",
+        "//packages/angular/ssr:package.json",
+        "//packages/angular_devkit/architect:package.json",
+        "//packages/angular_devkit/architect_cli:package.json",
+        "//packages/angular_devkit/build_angular:package.json",
+        "//packages/angular_devkit/build_webpack:package.json",
+        "//packages/angular_devkit/core:package.json",
+        "//packages/angular_devkit/schematics:package.json",
+        "//packages/angular_devkit/schematics_cli:package.json",
+        "//packages/ngtools/webpack:package.json",
+        "//packages/schematics/angular:package.json",
+        "//tests:package.json",
+    ],
+    lifecycle_hooks_envs = {
+        # TODO: Standardize browser management for `rules_js`
+        "puppeteer": ["PUPPETEER_DOWNLOAD_PATH=./downloads"],
+    },
+    lifecycle_hooks_execution_requirements = {
+        # Needed for downloading chromedriver.
+        # Also `update-config` of webdriver manager would store an absolute path;
+        # which would then break execution.
+        "webdriver-manager": ["local"],
+    },
+    npmrc = "//:.npmrc",
+    pnpm_lock = "//:pnpm-lock.yaml",
+    verify_node_modules_ignored = "//:.bazelignore",
+)
+use_repo(npm, "npm")
+
+rules_ts_ext = use_extension("@aspect_rules_ts//ts:extensions.bzl", "ext")
+rules_ts_ext.deps(
+    name = "angular_cli_npm_typescript",
+    # Obtained by: npm info typescript@5.9.3 dist.integrity
+    ts_integrity = "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==",
+    ts_version = "5.9.3",
+)
+use_repo(rules_ts_ext, **{"npm_typescript": "angular_cli_npm_typescript"})
+
+rules_angular = use_extension("@rules_angular//setup:extensions.bzl", "rules_angular")
+rules_angular.setup(
+    name = "components_rules_angular_configurable_deps",
+    angular_compiler_cli = "//:node_modules/@angular/compiler-cli",
+    typescript = "//:node_modules/typescript",
+)
+use_repo(rules_angular, **{"rules_angular_configurable_deps": "components_rules_angular_configurable_deps"})
+
+register_toolchains(
+    "@devinfra//bazel/git-toolchain:git_linux_toolchain",
+    "@devinfra//bazel/git-toolchain:git_macos_x86_toolchain",
+    "@devinfra//bazel/git-toolchain:git_macos_arm64_toolchain",
+    "@devinfra//bazel/git-toolchain:git_windows_toolchain",
 )

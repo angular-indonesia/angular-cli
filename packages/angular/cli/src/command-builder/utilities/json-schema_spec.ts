@@ -6,88 +6,125 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import { json, schema } from '@angular-devkit/core';
-import yargs, { positional } from 'yargs';
+import { JsonObject, schema } from '@angular-devkit/core';
+import yargs from 'yargs';
 
 import { addSchemaOptionsToCommand, parseJsonSchemaToOptions } from './json-schema';
 
-const YError = (() => {
-  try {
-    const y = yargs().strict().fail(false).exitProcess(false).parse(['--forced-failure']);
-  } catch (e) {
-    if (!(e instanceof Error)) {
-      throw new Error('Unexpected non-Error thrown');
-    }
-
-    return e.constructor as typeof Error;
-  }
-  throw new Error('Expected parse to fail');
-})();
-
-interface ParseFunction {
-  (argv: string[]): unknown;
-}
-
-function withParseForSchema(
-  jsonSchema: json.JsonObject,
-  {
-    interactive = true,
-    includeDefaultValues = true,
-  }: { interactive?: boolean; includeDefaultValues?: boolean } = {},
-): ParseFunction {
-  let actualParse: ParseFunction = () => {
-    throw new Error('Called before init');
-  };
-  const parse: ParseFunction = (args) => {
-    return actualParse(args);
-  };
-
-  beforeEach(async () => {
-    const registry = new schema.CoreSchemaRegistry();
-    const options = await parseJsonSchemaToOptions(registry, jsonSchema, interactive);
-
-    actualParse = async (args: string[]) => {
-      // Create a fresh yargs for each call. The yargs object is stateful and
-      // calling .parse multiple times on the same instance isn't safe.
-      const localYargs = yargs().exitProcess(false).strict().fail(false);
-      addSchemaOptionsToCommand(localYargs, options, includeDefaultValues);
-
+describe('parseJsonSchemaToOptions', () => {
+  describe('without required fields in schema', () => {
+    const parse = async (args: string[]) => {
       // Yargs only exposes the parse errors as proper errors when using the
       // callback syntax. This unwraps that ugly workaround so tests can just
       // use simple .toThrow/.toEqual assertions.
       return localYargs.parseAsync(args);
     };
-  });
 
-  return parse;
-}
-
-describe('parseJsonSchemaToOptions', () => {
-  describe('without required fields in schema', () => {
-    const parse = withParseForSchema({
-      'type': 'object',
-      'properties': {
-        'maxSize': {
-          'type': 'number',
-        },
-        'ssr': {
-          'type': 'string',
-          'enum': ['always', 'surprise-me', 'never'],
-        },
-        'extendable': {
-          'type': 'object',
-          'properties': {},
-          'additionalProperties': {
+    let localYargs: yargs.Argv<unknown>;
+    beforeEach(async () => {
+      // Create a fresh yargs for each call. The yargs object is stateful and
+      // calling .parse multiple times on the same instance isn't safe.
+      localYargs = yargs().exitProcess(false).strict().fail(false).wrap(1_000);
+      const jsonSchema = {
+        'type': 'object',
+        'properties': {
+          'maxSize': {
+            'type': 'number',
+          },
+          'ssr': {
             'type': 'string',
+            'enum': ['always', 'surprise-me', 'never'],
+          },
+          'arrayWithChoices': {
+            'type': 'array',
+            'default': ['default-array'],
+            'items': {
+              'type': 'string',
+              'enum': ['always', 'never', 'default-array'],
+            },
+          },
+          'extendable': {
+            'type': 'object',
+            'properties': {},
+            'additionalProperties': {
+              'type': 'string',
+            },
+          },
+          'someDefine': {
+            'type': 'object',
+            'additionalProperties': {
+              'type': 'string',
+            },
+          },
+          'arrayWithChoicesInOneOf': {
+            'type': 'array',
+            'items': {
+              'oneOf': [
+                {
+                  'enum': ['default', 'verbose'],
+                },
+                {
+                  'type': 'array',
+                  'minItems': 1,
+                  'maxItems': 2,
+                  'items': [
+                    {
+                      'enum': ['default', 'verbose'],
+                    },
+                    {
+                      'type': 'object',
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+          'arrayWithComplexAnyOf': {
+            'type': 'array',
+            'items': {
+              'oneOf': [
+                {
+                  'anyOf': [
+                    {
+                      'type': 'string',
+                    },
+                    {
+                      'enum': ['default', 'verbose'],
+                    },
+                  ],
+                },
+                {
+                  'type': 'array',
+                  'minItems': 1,
+                  'maxItems': 2,
+                  'items': [
+                    {
+                      'anyOf': [
+                        {
+                          'type': 'string',
+                        },
+                        {
+                          'enum': ['default', 'verbose'],
+                        },
+                      ],
+                    },
+                    {
+                      'type': 'object',
+                    },
+                  ],
+                },
+              ],
+            },
           },
         },
-        'someDefine': {
-          'type': 'object',
-          'additionalProperties': {
-            'type': 'string',
-          },
-        },
-      },
+      };
+      const registry = new schema.CoreSchemaRegistry();
+      const options = await parseJsonSchemaToOptions(
+        registry,
+        jsonSchema as unknown as JsonObject,
+        false,
+      );
+      addSchemaOptionsToCommand(localYargs, options, true);
     });
 
     describe('type=number', () => {
@@ -95,6 +132,68 @@ describe('parseJsonSchemaToOptions', () => {
         expect(await parse(['--max-size', '42'])).toEqual(
           jasmine.objectContaining({
             'maxSize': 42,
+          }),
+        );
+      });
+    });
+
+    describe('type=array, enum', () => {
+      it('parses valid option value', async () => {
+        expect(
+          await parse(['--arrayWithChoices', 'always', '--arrayWithChoices', 'never']),
+        ).toEqual(
+          jasmine.objectContaining({
+            'arrayWithChoices': ['always', 'never'],
+          }),
+        );
+      });
+
+      it('rejects non-enum values', async () => {
+        await expectAsync(parse(['--arrayWithChoices', 'yes'])).toBeRejectedWithError(
+          /Argument: array-with-choices, Given: "yes", Choices:/,
+        );
+      });
+
+      it('should add default value to help', async () => {
+        expect(await localYargs.getHelp()).toContain('[default: ["default-array"]]');
+      });
+    });
+
+    describe('type=array, enum in oneOf', () => {
+      it('parses valid option value', async () => {
+        expect(
+          await parse([
+            '--arrayWithChoicesInOneOf',
+            'default',
+            '--arrayWithChoicesInOneOf',
+            'verbose',
+          ]),
+        ).toEqual(
+          jasmine.objectContaining({
+            'arrayWithChoicesInOneOf': ['default', 'verbose'],
+          }),
+        );
+      });
+
+      it('rejects non-enum values', async () => {
+        await expectAsync(parse(['--arrayWithChoicesInOneOf', 'yes'])).toBeRejectedWithError(
+          /Argument: array-with-choices-in-one-of, Given: "yes", Choices:/,
+        );
+      });
+    });
+
+    describe('type=array, anyOf', () => {
+      it('parses valid option value', async () => {
+        expect(
+          await parse([
+            '--arrayWithComplexAnyOf',
+            'default',
+            '--arrayWithComplexAnyOf',
+            'something-else',
+          ]),
+        ).toEqual(
+          jasmine.objectContaining({
+            'arrayWithComplexAnyOf': ['default', 'something-else'],
           }),
         );
       });
@@ -125,11 +224,9 @@ describe('parseJsonSchemaToOptions', () => {
 
       it('rejects invalid values for string maps', async () => {
         await expectAsync(parse(['--some-define', 'foo'])).toBeRejectedWithError(
-          YError,
           /Invalid value for argument: some-define, Given: 'foo', Expected key=value pair/,
         );
         await expectAsync(parse(['--some-define', '42'])).toBeRejectedWithError(
-          YError,
           /Invalid value for argument: some-define, Given: '42', Expected key=value pair/,
         );
       });
@@ -162,43 +259,42 @@ describe('parseJsonSchemaToOptions', () => {
 
   describe('with required positional argument', () => {
     it('marks the required argument as required', async () => {
-      const jsonSchema = JSON.parse(`
-      {
-        "$id": "FakeSchema",
-        "title": "Fake Schema",
-        "type": "object",
-        "required": ["a"],
-        "properties": {
-          "b": {
-            "type": "string",
-            "description": "b.",
-            "$default": {
-              "$source": "argv",
-              "index": 1
-            }
+      const jsonSchema = {
+        '$id': 'FakeSchema',
+        'title': 'Fake Schema',
+        'type': 'object',
+        'required': ['a'],
+        'properties': {
+          'b': {
+            'type': 'string',
+            'description': 'b.',
+            '$default': {
+              '$source': 'argv',
+              'index': 1,
+            },
           },
-          "a": {
-            "type": "string",
-            "description": "a.",
-            "$default": {
-              "$source": "argv",
-              "index": 0
-            }
+          'a': {
+            'type': 'string',
+            'description': 'a.',
+            '$default': {
+              '$source': 'argv',
+              'index': 0,
+            },
           },
-          "optC": {
-            "type": "string",
-            "description": "optC"
+          'optC': {
+            'type': 'string',
+            'description': 'optC',
           },
-          "optA": {
-            "type": "string",
-            "description": "optA"
+          'optA': {
+            'type': 'string',
+            'description': 'optA',
           },
-          "optB": {
-            "type": "string",
-            "description": "optB"
-          }
-        }
-      }`) as json.JsonObject;
+          'optB': {
+            'type': 'string',
+            'description': 'optB',
+          },
+        },
+      };
       const registry = new schema.CoreSchemaRegistry();
       const options = await parseJsonSchemaToOptions(registry, jsonSchema, /* interactive= */ true);
 

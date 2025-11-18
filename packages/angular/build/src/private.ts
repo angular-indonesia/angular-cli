@@ -25,8 +25,7 @@ import { BundleStylesheetOptions } from './tools/esbuild/stylesheets/bundle-opti
 export { buildApplicationInternal } from './builders/application';
 export type { ApplicationBuilderInternalOptions } from './builders/application/options';
 export { type Result, type ResultFile, ResultKind } from './builders/application/results';
-export { serveWithVite } from './builders/dev-server/vite-server';
-export { execute as executeKarmaInternal } from './builders/karma/application_builder';
+export { serveWithVite } from './builders/dev-server/vite';
 
 // Tools
 export * from './tools/babel/plugins';
@@ -36,6 +35,8 @@ export { transformSupportedBrowsersToTargets } from './tools/esbuild/utils';
 export { SassWorkerImplementation } from './tools/sass/sass-service';
 
 export { SourceFileCache } from './tools/esbuild/angular/source-file-cache';
+export { Cache } from './tools/esbuild/cache';
+export { LmdbCacheStore } from './tools/esbuild/lmdb-cache-store';
 export { createJitResourceTransformer } from './tools/angular/transformers/jit-resource-transformer';
 export { JavaScriptTransformer } from './tools/esbuild/javascript-transformer';
 
@@ -58,6 +59,10 @@ export function createCompilerPlugin(
     ),
   );
 }
+
+export type { AngularCompilation } from './tools/angular/compilation';
+export { createAngularCompilation };
+export { ComponentStylesheetBundler } from './tools/esbuild/angular/component-stylesheets';
 
 // Utilities
 export * from './utils/bundle-calculator';
@@ -84,3 +89,8 @@ export { type BundleStats, generateBuildStatsTable } from './utils/stats-table';
 export { getSupportedBrowsers } from './utils/supported-browsers';
 export { assertCompatibleAngularVersion } from './utils/version';
 export { findTests, getTestEntrypoints } from './builders/karma/find-tests';
+export {
+  findTailwindConfiguration,
+  generateSearchDirectories,
+  loadPostcssConfiguration,
+} from './utils/postcss-configuration';

@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
+import { PlatformLocation } from '@angular/common';
 import {
   ApplicationRef,
   type PlatformRef,
@@ -14,15 +14,16 @@ import {
   type Type,
   ɵConsole,
 } from '@angular/core';
+import { BootstrapContext } from '@angular/platform-browser';
 import {
   INITIAL_CONFIG,
   ɵSERVER_CONTEXT as SERVER_CONTEXT,
   platformServer,
   ɵrenderInternal as renderInternal,
 } from '@angular/platform-server';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Console } from '../console';
-import { joinUrlParts, stripIndexHtmlFromURL } from './url';
+import { stripIndexHtmlFromURL, stripTrailingSlash } from './url';
 
 /**
  * Represents the bootstrap mechanism for an Angular application.
@@ -31,7 +32,9 @@ import { joinUrlParts, stripIndexHtmlFromURL } from './url';
  * - A reference to an Angular component or module (`Type<unknown>`) that serves as the root of the application.
  * - A function that returns a `Promise<ApplicationRef>`, which resolves with the root application reference.
  */
-export type AngularBootstrap = Type<unknown> | (() => Promise<ApplicationRef>);
+export type AngularBootstrap =
+  | Type<unknown>
+  | ((context: BootstrapContext) => Promise<ApplicationRef>);
 
 /**
  * Renders an Angular application or module to an HTML string.
@@ -57,12 +60,12 @@ export async function renderAngular(
   serverContext: string,
 ): Promise<{ hasNavigationError: boolean; redirectTo?: string; content: () => Promise<string> }> {
   // A request to `http://www.example.com/page/index.html` will render the Angular route corresponding to `http://www.example.com/page`.
-  const urlToRender = stripIndexHtmlFromURL(url).toString();
+  const urlToRender = stripIndexHtmlFromURL(url);
   const platformRef = platformServer([
     {
       provide: INITIAL_CONFIG,
       useValue: {
-        url: urlToRender,
+        url: urlToRender.href,
         document: html,
       },
     },
@@ -90,7 +93,7 @@ export async function renderAngular(
       const moduleRef = await platformRef.bootstrapModule(bootstrap);
       applicationRef = moduleRef.injector.get(ApplicationRef);
     } else {
-      applicationRef = await bootstrap();
+      applicationRef = await bootstrap({ platformRef });
     }
 
     // Block until application is stable.
@@ -98,21 +101,19 @@ export async function renderAngular(
 
     // TODO(alanagius): Find a way to avoid rendering here especially for redirects as any output will be discarded.
     const envInjector = applicationRef.injector;
+    const routerIsProvided = !!envInjector.get(ActivatedRoute, null);
     const router = envInjector.get(Router);
-    const lastSuccessfulNavigation = router.lastSuccessfulNavigation;
+    const lastSuccessfulNavigation = router.lastSuccessfulNavigation();
 
-    if (lastSuccessfulNavigation?.finalUrl) {
+    if (!routerIsProvided) {
       hasNavigationError = false;
+    } else if (lastSuccessfulNavigation) {
+      hasNavigationError = false;
+      const { pathname, search, hash } = envInjector.get(PlatformLocation);
+      const finalUrl = [stripTrailingSlash(pathname), search, hash].join('');
 
-      const { finalUrl, initialUrl } = lastSuccessfulNavigation;
-      const finalUrlStringified = finalUrl.toString();
-
-      if (initialUrl.toString() !== finalUrlStringified) {
-        const baseHref =
-          envInjector.get(APP_BASE_HREF, null, { optional: true }) ??
-          envInjector.get(PlatformLocation).getBaseHrefFromDOM();
-
-        redirectTo = joinUrlParts(baseHref, finalUrlStringified);
+      if (urlToRender.href !== new URL(finalUrl, urlToRender.origin).href) {
+        redirectTo = finalUrl;
       }
     }
 

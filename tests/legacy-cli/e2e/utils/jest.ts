@@ -4,11 +4,11 @@ import { updateJsonFile } from './project';
 /** Updates the `test` builder in the current workspace to use Jest with the given options. */
 export async function applyJestBuilder(
   options: {} = {
+    polyfills: [],
     tsConfig: 'tsconfig.spec.json',
-    polyfills: ['zone.js', 'zone.js/testing'],
   },
 ): Promise<void> {
-  await silentNpm('install', 'jest@29.5.0', 'jest-environment-jsdom@29.5.0', '--save-dev');
+  await silentNpm('install', 'jest@30.2.0', 'jest-environment-jsdom@30.2.0', '--save-dev');
 
   await updateJsonFile('angular.json', (json) => {
     const projects = Object.values(json['projects']);

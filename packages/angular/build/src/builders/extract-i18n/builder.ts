@@ -10,7 +10,6 @@ import type { Diagnostics } from '@angular/localize/tools';
 import type { BuilderContext, BuilderOutput } from '@angular-devkit/architect';
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadEsmModule } from '../../utils/load-esm';
 import { assertCompatibleAngularVersion } from '../../utils/version';
 import type { ApplicationBuilderExtensions } from '../application/options';
 import { normalizeOptions } from './options';
@@ -51,8 +50,7 @@ export async function execute(
   // The package is a peer dependency and might not be present
   let localizeToolsModule;
   try {
-    localizeToolsModule =
-      await loadEsmModule<typeof import('@angular/localize/tools')>('@angular/localize/tools');
+    localizeToolsModule = await import('@angular/localize/tools');
   } catch {
     return {
       success: false,
@@ -90,16 +88,23 @@ export async function execute(
       return path.relative(from, to);
     },
   };
+  const duplicateTranslationBehavior = normalizedOptions.i18nOptions.duplicateTranslationBehavior;
   const diagnostics = checkDuplicateMessages(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     checkFileSystem as any,
     extractionResult.messages,
-    normalizedOptions.i18nOptions.i18nDuplicateTranslation || 'warning',
+    duplicateTranslationBehavior,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     extractionResult.basePath as any,
   );
-  if (diagnostics.messages.length > 0) {
-    context.logger.warn(diagnostics.formatDiagnostics(''));
+  if (diagnostics.messages.length > 0 && duplicateTranslationBehavior !== 'ignore') {
+    if (duplicateTranslationBehavior === 'error') {
+      context.logger.error(`Extraction Failed: ${diagnostics.formatDiagnostics('')}`);
+
+      return { success: false };
+    } else {
+      context.logger.warn(diagnostics.formatDiagnostics(''));
+    }
   }
 
   // Serialize all extracted messages

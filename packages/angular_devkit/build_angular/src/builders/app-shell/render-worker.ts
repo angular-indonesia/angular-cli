@@ -7,6 +7,7 @@
  */
 
 import type { ApplicationRef, StaticProvider, Type } from '@angular/core';
+import type { BootstrapContext } from '@angular/platform-browser';
 import type { renderApplication, renderModule, ɵSERVER_CONTEXT } from '@angular/platform-server';
 import assert from 'node:assert';
 import { workerData } from 'node:worker_threads';
@@ -16,7 +17,7 @@ import { workerData } from 'node:worker_threads';
  * This is passed as workerData when setting up the worker via the `piscina` package.
  */
 const { zonePackage } = workerData as {
-  zonePackage: string;
+  zonePackage: string | undefined;
 };
 
 interface ServerBundleExports {
@@ -33,7 +34,7 @@ interface ServerBundleExports {
   renderApplication?: typeof renderApplication;
 
   /** Standalone application bootstrapping function. */
-  default?: () => Promise<ApplicationRef>;
+  default?: (context: BootstrapContext) => Promise<ApplicationRef>;
 }
 
 /**
@@ -121,7 +122,9 @@ async function render({ serverBundlePath, document, url }: RenderRequest): Promi
   return Promise.race([renderAppPromise, renderingTimeout]).finally(() => clearTimeout(timer));
 }
 
-function isBootstrapFn(value: unknown): value is () => Promise<ApplicationRef> {
+function isBootstrapFn(
+  value: unknown,
+): value is (context: BootstrapContext) => Promise<ApplicationRef> {
   // We can differentiate between a module and a bootstrap function by reading compiler-generated `ɵmod` static property:
   return typeof value === 'function' && !('ɵmod' in value);
 }
@@ -133,8 +136,9 @@ function isBootstrapFn(value: unknown): value is () => Promise<ApplicationRef> {
  * @returns A promise resolving to the render function of the worker.
  */
 async function initialize() {
-  // Setup Zone.js
-  await import(zonePackage);
+  if (zonePackage) {
+    await import(zonePackage);
+  }
 
   // Return the render function for use
   return render;

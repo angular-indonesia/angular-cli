@@ -26,7 +26,7 @@ const execFile = promisify(execFileCb);
 export default createBuilder(
   async (schema: JestBuilderSchema, context: BuilderContext): Promise<BuilderOutput> => {
     context.logger.warn(
-      'NOTE: The Jest builder is currently EXPERIMENTAL and not ready for production use.',
+      'NOTE: The Jest builder is currently EXPERIMENTAL and will be removed in version 22.',
     );
 
     const options = normalizeOptions(schema);
@@ -116,7 +116,7 @@ export default createBuilder(
       '--experimental-vm-modules',
       jest,
 
-      `--rootDir="${testOut}"`,
+      `--rootDir=${testOut}`,
       `--config=${path.join(__dirname, 'jest.config.mjs')}`,
       '--testEnvironment=jsdom',
 
@@ -133,7 +133,7 @@ export default createBuilder(
       // the environment for fake async to work correctly.
       // Third, we initialize `TestBed`. This is dependent on fake async being set up correctly beforehand.
       `--setupFilesAfterEnv="<rootDir>/jest-global.mjs"`,
-      ...(options.polyfills ? [`--setupFilesAfterEnv="<rootDir>/polyfills.mjs"`] : []),
+      ...(options.polyfills?.length ? [`--setupFilesAfterEnv="<rootDir>/polyfills.mjs"`] : []),
       `--setupFilesAfterEnv="<rootDir>/init-test-bed.mjs"`,
 
       // Don't run any infrastructure files as tests, they are manually loaded where needed.

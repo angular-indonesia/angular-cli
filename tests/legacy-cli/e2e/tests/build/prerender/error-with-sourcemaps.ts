@@ -20,19 +20,18 @@ export default async function () {
 
   await writeMultipleFiles({
     'src/app/app.ts': `
-      import { Component } from '@angular/core';
+      import { Component, signal } from '@angular/core';
       import { CommonModule } from '@angular/common';
       import { RouterOutlet } from '@angular/router';
 
       @Component({
         selector: 'app-root',
-        standalone: true,
         imports: [CommonModule, RouterOutlet],
         templateUrl: './app.html',
         styleUrls: ['./app.css']
       })
       export class App {
-      title = 'test-ssr';
+      protected readonly title = signal('test-ssr');
 
       constructor() {
         console.log(window)

@@ -10,7 +10,6 @@ import { JsonObject, join, normalize } from '@angular-devkit/core';
 import {
   MergeStrategy,
   Rule,
-  SchematicContext,
   Tree,
   apply,
   applyTemplates,
@@ -23,15 +22,25 @@ import {
   strings,
   url,
 } from '@angular-devkit/schematics';
-import { NodePackageInstallTask } from '@angular-devkit/schematics/tasks';
-import { Schema as ComponentOptions } from '../component/schema';
-import { NodeDependencyType, addPackageJsonDependency } from '../utility/dependencies';
+import { Schema as ComponentOptions, Style as ComponentStyle } from '../component/schema';
+import {
+  DependencyType,
+  ExistingBehavior,
+  InstallBehavior,
+  addDependency,
+} from '../utility/dependency';
 import { JSONFile } from '../utility/json-file';
 import { latestVersions } from '../utility/latest-versions';
 import { relativePathToWorkspaceRoot } from '../utility/paths';
 import { getWorkspace, updateWorkspace } from '../utility/workspace';
 import { Builders, ProjectType } from '../utility/workspace-models';
 import { Schema as ApplicationOptions, Style } from './schema';
+
+const APPLICATION_DEV_DEPENDENCIES = [
+  { name: '@angular/compiler-cli', version: latestVersions.Angular },
+  { name: '@angular/build', version: latestVersions.AngularBuild },
+  { name: 'typescript', version: latestVersions['typescript'] },
+];
 
 function addTsProjectReference(...paths: string[]) {
   return (host: Tree) => {
@@ -49,12 +58,20 @@ function addTsProjectReference(...paths: string[]) {
 }
 
 export default function (options: ApplicationOptions): Rule {
-  return async (host: Tree, context: SchematicContext) => {
+  return async (host: Tree) => {
+    const isTailwind = options.style === Style.Tailwind;
+    if (isTailwind) {
+      options.style = Style.Css;
+    }
+
     const { appDir, appRootSelector, componentOptions, folderName, sourceDir } =
       await getAppOptions(host, options);
 
+    const suffix = options.fileNameStyleGuide === '2016' ? '.component' : '';
+    const typeSeparator = options.fileNameStyleGuide === '2016' ? '.' : '-';
+
     return chain([
-      addAppToWorkspaceFile(options, appDir, folderName),
+      addAppToWorkspaceFile(options, appDir),
       addTsProjectReference('./' + join(normalize(appDir), 'tsconfig.app.json')),
       options.skipTests || options.minimal
         ? noop()
@@ -69,6 +86,7 @@ export default function (options: ApplicationOptions): Rule {
             routingScope: 'Root',
             path: sourceDir,
             project: options.name,
+            typeSeparator,
           }),
       schematic('component', {
         name: 'app',
@@ -93,6 +111,8 @@ export default function (options: ApplicationOptions): Rule {
             relativePathToWorkspaceRoot: relativePathToWorkspaceRoot(appDir),
             appName: options.name,
             folderName,
+            suffix,
+            typeSeparator,
           }),
           move(appDir),
         ]),
@@ -104,7 +124,7 @@ export default function (options: ApplicationOptions): Rule {
             ? filter((path) => !path.endsWith('tsconfig.spec.json.template'))
             : noop(),
           componentOptions.inlineTemplate
-            ? filter((path) => !path.endsWith('app.html.template'))
+            ? filter((path) => !path.endsWith('app__suffix__.html.template'))
             : noop(),
           applyTemplates({
             utils: strings,
@@ -113,6 +133,8 @@ export default function (options: ApplicationOptions): Rule {
             relativePathToWorkspaceRoot: relativePathToWorkspaceRoot(appDir),
             appName: options.name,
             folderName,
+            suffix,
+            testRunner: options.testRunner,
           }),
           move(appDir),
         ]),
@@ -125,43 +147,108 @@ export default function (options: ApplicationOptions): Rule {
           })
         : noop(),
       options.skipPackageJson ? noop() : addDependenciesToPackageJson(options),
+      isTailwind
+        ? schematic('tailwind', {
+            project: options.name,
+            skipInstall: options.skipInstall,
+          })
+        : noop(),
     ]);
   };
 }
 
-function addDependenciesToPackageJson(options: ApplicationOptions) {
-  return (host: Tree, context: SchematicContext) => {
-    [
-      {
-        type: NodeDependencyType.Dev,
-        name: '@angular/compiler-cli',
-        version: latestVersions.Angular,
-      },
-      {
-        type: NodeDependencyType.Dev,
-        name: '@angular/build',
-        version: latestVersions.AngularBuild,
-      },
-      {
-        type: NodeDependencyType.Dev,
-        name: 'typescript',
-        version: latestVersions['typescript'],
-      },
-    ].forEach((dependency) => addPackageJsonDependency(host, dependency));
+function addDependenciesToPackageJson(options: ApplicationOptions): Rule {
+  const rules: Rule[] = APPLICATION_DEV_DEPENDENCIES.map((dependency) =>
+    addDependency(dependency.name, dependency.version, {
+      type: DependencyType.Dev,
+      existing: ExistingBehavior.Skip,
+      install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
+    }),
+  );
 
-    if (!options.skipInstall) {
-      context.addTask(new NodePackageInstallTask());
+  if (!options.zoneless) {
+    rules.push(
+      addDependency('zone.js', latestVersions['zone.js'], {
+        type: DependencyType.Default,
+        existing: ExistingBehavior.Skip,
+        install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
+      }),
+    );
+  }
+
+  if (options.style === Style.Less) {
+    rules.push(
+      addDependency('less', latestVersions['less'], {
+        type: DependencyType.Dev,
+        existing: ExistingBehavior.Skip,
+        install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
+      }),
+    );
+  }
+
+  if (!options.skipTests) {
+    if (options.testRunner === 'vitest') {
+      rules.push(
+        addDependency('vitest', latestVersions['vitest'], {
+          type: DependencyType.Dev,
+          existing: ExistingBehavior.Skip,
+          install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
+        }),
+        addDependency('jsdom', latestVersions['jsdom'], {
+          type: DependencyType.Dev,
+          existing: ExistingBehavior.Skip,
+          install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
+        }),
+      );
+    } else {
+      rules.push(
+        addDependency('karma', latestVersions['karma'], {
+          type: DependencyType.Dev,
+          existing: ExistingBehavior.Skip,
+          install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
+        }),
+        addDependency('karma-chrome-launcher', latestVersions['karma-chrome-launcher'], {
+          type: DependencyType.Dev,
+          existing: ExistingBehavior.Skip,
+          install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
+        }),
+        addDependency('karma-coverage', latestVersions['karma-coverage'], {
+          type: DependencyType.Dev,
+          existing: ExistingBehavior.Skip,
+          install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
+        }),
+        addDependency('karma-jasmine', latestVersions['karma-jasmine'], {
+          type: DependencyType.Dev,
+          existing: ExistingBehavior.Skip,
+          install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
+        }),
+        addDependency(
+          'karma-jasmine-html-reporter',
+          latestVersions['karma-jasmine-html-reporter'],
+          {
+            type: DependencyType.Dev,
+            existing: ExistingBehavior.Skip,
+            install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
+          },
+        ),
+        addDependency('jasmine-core', latestVersions['jasmine-core'], {
+          type: DependencyType.Dev,
+          existing: ExistingBehavior.Skip,
+          install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
+        }),
+        addDependency('@types/jasmine', latestVersions['@types/jasmine'], {
+          type: DependencyType.Dev,
+          existing: ExistingBehavior.Skip,
+          install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
+        }),
+      );
     }
+  }
 
-    return host;
-  };
+  return chain(rules);
 }
 
-function addAppToWorkspaceFile(
-  options: ApplicationOptions,
-  appDir: string,
-  folderName: string,
-): Rule {
+function addAppToWorkspaceFile(options: ApplicationOptions, appDir: string): Rule {
   let projectRoot = appDir;
   if (projectRoot) {
     projectRoot += '/';
@@ -210,6 +297,20 @@ function addAppToWorkspaceFile(
     const schematicsWithStandalone = ['component', 'directive', 'pipe'];
     schematicsWithStandalone.forEach((type) => {
       ((schematics[`@schematics/angular:${type}`] ??= {}) as JsonObject).standalone = false;
+    });
+  }
+
+  if (options.fileNameStyleGuide === '2016') {
+    const schematicsWithTypeSymbols = ['component', 'directive', 'service'];
+    schematicsWithTypeSymbols.forEach((type) => {
+      const schematicDefaults = (schematics[`@schematics/angular:${type}`] ??= {}) as JsonObject;
+      schematicDefaults.type = type;
+      schematicDefaults.addTypeToClassName = false;
+    });
+
+    const schematicsWithTypeSeparator = ['guard', 'interceptor', 'module', 'pipe', 'resolver'];
+    schematicsWithTypeSeparator.forEach((type) => {
+      ((schematics[`@schematics/angular:${type}`] ??= {}) as JsonObject).typeSeparator = '.';
     });
   }
 
@@ -288,21 +389,20 @@ function addAppToWorkspaceFile(
           },
         },
       },
-      'extract-i18n': {
-        builder: Builders.BuildExtractI18n,
-      },
-      test: options.minimal
-        ? undefined
-        : {
-            builder: Builders.BuildKarma,
-            options: {
-              polyfills: options.zoneless ? undefined : ['zone.js', 'zone.js/testing'],
-              tsConfig: `${projectRoot}tsconfig.spec.json`,
-              inlineStyleLanguage,
-              assets: [{ 'glob': '**/*', 'input': `${projectRoot}public` }],
-              styles: [`${sourceRoot}/styles.${options.style}`],
-            },
-          },
+      test:
+        options.skipTests || options.minimal
+          ? undefined
+          : options.testRunner === 'vitest'
+            ? {
+                builder: Builders.BuildUnitTest,
+                options: {},
+              }
+            : {
+                builder: Builders.BuildUnitTest,
+                options: {
+                  runner: 'karma',
+                },
+              },
     },
   };
 
@@ -358,16 +458,21 @@ function getComponentOptions(options: ApplicationOptions): Partial<ComponentOpti
         inlineStyle: options.inlineStyle,
         inlineTemplate: options.inlineTemplate,
         skipTests: options.skipTests,
-        style: options.style,
+        style: options.style as unknown as ComponentStyle,
         viewEncapsulation: options.viewEncapsulation,
       }
     : {
         inlineStyle: options.inlineStyle ?? true,
         inlineTemplate: options.inlineTemplate ?? true,
         skipTests: true,
-        style: options.style,
+        style: options.style as unknown as ComponentStyle,
         viewEncapsulation: options.viewEncapsulation,
       };
+
+  if (options.fileNameStyleGuide === '2016') {
+    componentOptions.type = 'component';
+    componentOptions.addTypeToClassName = false;
+  }
 
   return componentOptions;
 }

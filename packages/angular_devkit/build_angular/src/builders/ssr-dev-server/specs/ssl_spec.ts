@@ -9,13 +9,22 @@
 import { Architect } from '@angular-devkit/architect';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import * as browserSync from 'browser-sync';
-import { Agent, getGlobalDispatcher, setGlobalDispatcher } from 'undici';
+import { Agent } from 'undici';
 import { createArchitect, host } from '../../../testing/test-utils';
 import { SSRDevServerBuilderOutput } from '../index';
 
 describe('Serve SSR Builder', () => {
   const target = { project: 'app', target: 'serve-ssr' };
+  const originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
   let architect: Architect;
+
+  beforeAll(() => {
+    jasmine.DEFAULT_TIMEOUT_INTERVAL = 100_000;
+  });
+
+  afterAll(() => {
+    jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
+  });
 
   beforeEach(async () => {
     await host.initialize().toPromise();
@@ -23,8 +32,6 @@ describe('Serve SSR Builder', () => {
 
     host.writeMultipleFiles({
       'src/main.server.ts': `
-        import 'zone.js/node';
-
         import { CommonEngine } from '@angular/ssr/node';
         import * as express from 'express';
         import { resolve, join } from 'node:path';
@@ -78,20 +85,13 @@ describe('Serve SSR Builder', () => {
     expect(output.success).toBe(true);
     expect(output.baseUrl).toBe(`https://localhost:${output.port}`);
 
-    // The self-signed certificate used by the dev server will cause fetch to fail
-    // unless reject unauthorized is disabled.
-    const originalDispatcher = getGlobalDispatcher();
-    setGlobalDispatcher(
-      new Agent({
+    const response = await fetch(`https://localhost:${output.port}/index.html`, {
+      dispatcher: new Agent({
         connect: { rejectUnauthorized: false },
       }),
-    );
-    try {
-      const response = await fetch(`https://localhost:${output.port}/index.html`);
-      expect(await response.text()).toContain('<title>HelloWorldApp</title>');
-    } finally {
-      setGlobalDispatcher(originalDispatcher);
-    }
+    });
+
+    expect(await response.text()).toContain('<title>HelloWorldApp</title>');
 
     await run.stop();
   });

@@ -6,11 +6,9 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import { tags } from '@angular-devkit/core';
 import { HostTree } from '@angular-devkit/schematics';
 import * as ts from '../third_party/github.com/Microsoft/TypeScript/lib/typescript';
 import { Change, InsertChange } from '../utility/change';
-import { getFileContent } from '../utility/test';
 import {
   addDeclarationToModule,
   addExportToModule,
@@ -38,7 +36,7 @@ function applyChanges(path: string, content: string, changes: Change[]): string 
   }
   tree.commitUpdate(exportRecorder);
 
-  return getFileContent(tree, path);
+  return tree.readText(path);
 }
 
 describe('ast utils', () => {
@@ -74,7 +72,7 @@ describe('ast utils', () => {
   });
 
   it('should add export to module if not indented', () => {
-    moduleContent = tags.stripIndents`${moduleContent}`;
+    moduleContent = moduleContent.replace(/^(\s+)/gm, '');
     const source = getTsSource(modulePath, moduleContent);
     const changes = addExportToModule(source, modulePath, 'FooComponent', './foo.component');
     const output = applyChanges(modulePath, moduleContent, changes);
@@ -83,7 +81,7 @@ describe('ast utils', () => {
   });
 
   it('should add declarations to module if not indented', () => {
-    moduleContent = tags.stripIndents`${moduleContent}`;
+    moduleContent = moduleContent.replace(/^(\s+)/gm, '');
     const source = getTsSource(modulePath, moduleContent);
     const changes = addDeclarationToModule(source, modulePath, 'FooComponent', './foo.component');
     const output = applyChanges(modulePath, moduleContent, changes);
@@ -92,7 +90,7 @@ describe('ast utils', () => {
   });
 
   it('should add declarations to module when PropertyAssignment is StringLiteral', () => {
-    moduleContent = tags.stripIndents`
+    moduleContent = `
     import { BrowserModule } from '@angular/platform-browser';
     import { NgModule } from '@angular/core';
     import { AppComponent } from './app.component';
@@ -111,7 +109,7 @@ describe('ast utils', () => {
     const changes = addDeclarationToModule(source, modulePath, 'FooComponent', './foo.component');
     const output = applyChanges(modulePath, moduleContent, changes);
     expect(output).toMatch(/import { FooComponent } from '.\/foo.component';/);
-    expect(output).toMatch(/"declarations": \[\nAppComponent,\nFooComponent\n\]/);
+    expect(output).toMatch(/"declarations": \[\s*AppComponent,\s*FooComponent\s*\]/);
   });
 
   it('should add metadata', () => {

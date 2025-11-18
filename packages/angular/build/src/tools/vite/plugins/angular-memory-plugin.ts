@@ -11,7 +11,6 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
-import { loadEsmModule } from '../../../utils/load-esm';
 import { AngularMemoryOutputFiles } from '../utils';
 
 interface AngularMemoryPluginOptions {
@@ -30,7 +29,7 @@ export async function createAngularMemoryPlugin(
   options: AngularMemoryPluginOptions,
 ): Promise<Plugin> {
   const { virtualProjectRoot, outputFiles, external } = options;
-  const { normalizePath } = await loadEsmModule<typeof import('vite')>('vite');
+  const { normalizePath } = await import('vite');
 
   return {
     name: 'vite:angular-memory',
@@ -121,13 +120,13 @@ export async function createAngularMemoryPlugin(
 async function loadViteClientCode(file: string, disableViteTransport = false): Promise<string> {
   const originalContents = await readFile(file, 'utf-8');
   let updatedContents = originalContents.replace(
-    `"You can also disable this overlay by setting ",
-      h("code", { part: "config-option-name" }, "server.hmr.overlay"),
-      " to ",
-      h("code", { part: "config-option-value" }, "false"),
-      " in ",
-      h("code", { part: "config-file-name" }, hmrConfigName),
-      "."`,
+    '"You can also disable this overlay by setting ", ' +
+      'h("code", { part: "config-option-name" }, "server.hmr.overlay"), ' +
+      '" to ", ' +
+      'h("code", { part: "config-option-value" }, "false"), ' +
+      '" in ", ' +
+      'h("code", { part: "config-file-name" }, hmrConfigName), ' +
+      '"."',
     '',
   );
 

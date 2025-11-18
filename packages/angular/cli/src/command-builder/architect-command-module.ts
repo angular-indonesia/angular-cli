@@ -41,7 +41,8 @@ export abstract class ArchitectCommandModule
     // Add default builder if target is not in project and a command default is provided
     if (this.findDefaultBuilderName && this.context.workspace) {
       for (const [project, projectDefinition] of this.context.workspace.projects) {
-        if (projectDefinition.targets.has(target)) {
+        const targetDefinition = projectDefinition.targets.get(target);
+        if (targetDefinition?.builder) {
           continue;
         }
 
@@ -49,7 +50,13 @@ export abstract class ArchitectCommandModule
           project,
           target,
         });
-        if (defaultBuilder) {
+        if (!defaultBuilder) {
+          continue;
+        }
+
+        if (targetDefinition) {
+          targetDefinition.builder = defaultBuilder;
+        } else {
           projectDefinition.targets.set(target, {
             builder: defaultBuilder,
           });
@@ -97,11 +104,17 @@ export abstract class ArchitectCommandModule
   }
 
   async run(options: Options<ArchitectCommandArgs> & OtherOptions): Promise<number | void> {
-    const target = this.getArchitectTarget();
+    const originalProcessTitle = process.title;
+    try {
+      const target = this.getArchitectTarget();
+      const { configuration = '', project, ...architectOptions } = options;
 
-    const { configuration = '', project, ...architectOptions } = options;
+      if (project) {
+        process.title = `${originalProcessTitle} (${project})`;
 
-    if (!project) {
+        return await this.runSingleTarget({ configuration, target, project }, architectOptions);
+      }
+
       // This runs each target sequentially.
       // Running them in parallel would jumble the log messages.
       let result = 0;
@@ -111,12 +124,13 @@ export abstract class ArchitectCommandModule
       }
 
       for (const project of projectNames) {
+        process.title = `${originalProcessTitle} (${project})`;
         result |= await this.runSingleTarget({ configuration, target, project }, architectOptions);
       }
 
       return result;
-    } else {
-      return await this.runSingleTarget({ configuration, target, project }, architectOptions);
+    } finally {
+      process.title = originalProcessTitle;
     }
   }
 

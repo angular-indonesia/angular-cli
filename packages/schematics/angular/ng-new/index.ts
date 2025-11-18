@@ -23,6 +23,7 @@ import {
   RepositoryInitializerTask,
 } from '@angular-devkit/schematics/tasks';
 import { Schema as ApplicationOptions } from '../application/schema';
+import { JSONFile } from '../utility/json-file';
 import { Schema as WorkspaceOptions } from '../workspace/schema';
 import { Schema as NgNewOptions } from './schema';
 
@@ -50,6 +51,7 @@ export default function (options: NgNewOptions): Rule {
     routing: options.routing,
     style: options.style,
     skipTests: options.skipTests,
+    testRunner: options.testRunner,
     skipPackageJson: false,
     // always 'skipInstall' here, so that we do it after the move
     skipInstall: true,
@@ -58,6 +60,7 @@ export default function (options: NgNewOptions): Rule {
     standalone: options.standalone,
     ssr: options.ssr,
     zoneless: options.zoneless,
+    fileNameStyleGuide: options.fileNameStyleGuide,
   };
 
   return chain([
@@ -65,6 +68,15 @@ export default function (options: NgNewOptions): Rule {
       apply(empty(), [
         schematic('workspace', workspaceOptions),
         options.createApplication ? schematic('application', applicationOptions) : noop,
+        schematic('ai-config', {
+          tool: options.aiConfig?.length ? options.aiConfig : undefined,
+        }),
+        (tree: Tree) => {
+          if (options.testRunner === 'karma') {
+            const file = new JSONFile(tree, 'angular.json');
+            file.modify(['schematics', '@schematics/angular:application', 'testRunner'], 'karma');
+          }
+        },
         move(options.directory),
       ]),
     ),

@@ -1,9 +1,7 @@
-load("@devinfra//bazel/api-golden:index_rjs.bzl", "api_golden_test_npm_package")
+load("@devinfra//bazel/api-golden:index.bzl", "api_golden_test_npm_package")
 load("@npm//:defs.bzl", "npm_link_all_packages")
-load("//:constants.bzl", "BASELINE_DATE")
 load("//tools:defaults.bzl", "copy_to_bin", "jasmine_test", "npm_package", "ts_project")
 load("//tools:ts_json_schema.bzl", "ts_json_schema")
-load("//tools/baseline_browserslist:baseline_browserslist.bzl", "baseline_browserslist")
 
 licenses(["notice"])
 
@@ -46,23 +44,14 @@ copy_to_bin(
     srcs = glob(["**/schema.json"]),
 )
 
-baseline_browserslist(
-    name = "angular_browserslist",
-    out = ".browserslistrc",
-    baseline = BASELINE_DATE,
-)
-
 RUNTIME_ASSETS = glob(
     include = [
         "src/**/schema.json",
         "src/**/*.js",
-        "src/**/*.mjs",
-        "src/**/*.html",
     ],
 ) + [
     "builders.json",
     "package.json",
-    ":angular_browserslist",
 ]
 
 ts_project(
@@ -97,6 +86,7 @@ ts_project(
         ":node_modules/@babel/helper-split-export-declaration",
         ":node_modules/@inquirer/confirm",
         ":node_modules/@vitejs/plugin-basic-ssl",
+        ":node_modules/beasties",
         ":node_modules/browserslist",
         ":node_modules/https-proxy-agent",
         ":node_modules/istanbul-lib-instrument",
@@ -111,9 +101,11 @@ ts_project(
         ":node_modules/picomatch",
         ":node_modules/piscina",
         ":node_modules/postcss",
+        ":node_modules/rolldown",
         ":node_modules/sass",
         ":node_modules/source-map-support",
         ":node_modules/tinyglobby",
+        ":node_modules/undici",
         ":node_modules/vite",
         ":node_modules/vitest",
         ":node_modules/watchpack",
@@ -122,6 +114,7 @@ ts_project(
         "//:node_modules/@angular/compiler-cli",
         "//:node_modules/@angular/core",
         "//:node_modules/@angular/localize",
+        "//:node_modules/@angular/platform-browser",
         "//:node_modules/@angular/platform-server",
         "//:node_modules/@angular/service-worker",
         "//:node_modules/@types/babel__core",
@@ -131,11 +124,9 @@ ts_project(
         "//:node_modules/@types/picomatch",
         "//:node_modules/@types/semver",
         "//:node_modules/@types/watchpack",
-        "//:node_modules/beasties",
         "//:node_modules/esbuild",
         "//:node_modules/esbuild-wasm",
         "//:node_modules/karma",
-        "//:node_modules/rollup",
         "//:node_modules/semver",
         "//:node_modules/tslib",
         "//:node_modules/typescript",
@@ -162,7 +153,7 @@ ts_project(
 )
 
 jasmine_test(
-    name = "unit_tests",
+    name = "test",
     data = [":unit_test_lib"],
 )
 
@@ -291,15 +282,15 @@ ts_project(
 
 jasmine_test(
     name = "application_integration_tests",
-    size = "large",
+    size = "medium",
     data = [":application_integration_test_lib"],
     flaky = True,
-    shard_count = 10,
+    shard_count = 25,
 )
 
 jasmine_test(
     name = "dev-server_integration_tests",
-    size = "large",
+    size = "medium",
     data = [":dev-server_integration_test_lib"],
     flaky = True,
     shard_count = 10,
@@ -307,7 +298,7 @@ jasmine_test(
 
 jasmine_test(
     name = "karma_integration_tests",
-    size = "large",
+    size = "medium",
     data = [":karma_integration_test_lib"],
     env = {
         # TODO: Replace Puppeteer downloaded browsers with Bazel-managed browsers,
@@ -320,9 +311,10 @@ jasmine_test(
 
 jasmine_test(
     name = "unit-test_integration_tests",
-    size = "large",
+    size = "medium",
     data = [":unit-test_integration_test_lib"],
-    shard_count = 10,
+    flaky = True,
+    shard_count = 5,
 )
 
 genrule(
@@ -341,6 +333,7 @@ npm_package(
         "src/utils/version.js",
         "src/tools/esbuild/utils.js",
         "src/utils/normalize-cache.js",
+        "src/utils/supported-browsers.js",
     ],
     tags = ["release-package"],
     deps = RUNTIME_ASSETS + [

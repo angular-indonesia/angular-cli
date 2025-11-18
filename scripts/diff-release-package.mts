@@ -18,10 +18,9 @@
 
 import { GitClient } from '@angular/ng-dev';
 import childProcess from 'node:child_process';
-import fs from 'node:fs';
+import fs, { chmodSync, lstatSync, readdirSync } from 'node:fs';
 import os from 'node:os';
-import path from 'node:path';
-import sh from 'shelljs';
+import path, { join } from 'node:path';
 
 // Do not remove `.git` as we use Git for comparisons later.
 // Also preserve `uniqueId` as it's irrelevant for the diff and not included via Bazel.
@@ -64,7 +63,7 @@ async function main(packageName: string) {
   console.log(`--> Cloned snapshot repo.`);
 
   const bazelBinDir = childProcess
-    .spawnSync(bazel, ['info', 'bazel-bin'], {
+    .spawnSync(`${bazel} info bazel-bin`, {
       shell: true,
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'inherit'],
@@ -79,15 +78,11 @@ async function main(packageName: string) {
   // Delete old directory to avoid surprises, or stamping being outdated.
   await deleteDir(outputPath);
 
-  childProcess.spawnSync(
-    bazel,
-    ['build', `//packages/${targetDir}:npm_package`, '--config=snapshot'],
-    {
-      shell: true,
-      stdio: 'inherit',
-      encoding: 'utf8',
-    },
-  );
+  childProcess.spawnSync(`${bazel} build //packages/${targetDir}:npm_package --config=snapshot`, {
+    shell: true,
+    stdio: 'inherit',
+    encoding: 'utf8',
+  });
 
   console.log('--> Built npm package with --config=snapshot');
   console.error(`--> Output: ${outputPath}`);
@@ -134,6 +129,28 @@ async function deleteDir(dirPath: string) {
   }
 
   // Needed as Bazel artifacts are readonly and cannot be deleted otherwise.
-  sh.chmod('-R', 'u+w', dirPath);
+  chmodRecursiveSync(dirPath, '0755');
   await fs.promises.rm(dirPath, { recursive: true, force: true, maxRetries: 3 });
+}
+
+/**
+ * Recursively changes the permissions (mode) of a directory and all its contents (files and subdirectories).
+ * @param startPath The starting directory path.
+ * @param mode The new permissions mode (e.g., 0755).
+ */
+function chmodRecursiveSync(startPath: string, mode: string): void {
+  chmodSync(startPath, mode);
+
+  const files = readdirSync(startPath);
+
+  for (const file of files) {
+    const filePath = join(startPath, file);
+    const stat = lstatSync(filePath);
+
+    if (stat.isDirectory()) {
+      chmodRecursiveSync(filePath, mode);
+    } else {
+      chmodSync(filePath, mode);
+    }
+  }
 }

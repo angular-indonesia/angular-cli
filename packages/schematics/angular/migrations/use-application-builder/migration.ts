@@ -7,7 +7,6 @@
  */
 
 import {
-  DirEntry,
   Rule,
   SchematicContext,
   SchematicsException,
@@ -15,25 +14,27 @@ import {
   chain,
   externalSchematic,
 } from '@angular-devkit/schematics';
-import { basename, dirname, extname, join } from 'node:path/posix';
-import { removePackageJsonDependency } from '../../utility/dependencies';
+import { dirname, join } from 'node:path/posix';
 import {
   DependencyType,
   ExistingBehavior,
-  InstallBehavior,
   addDependency,
+  removeDependency,
 } from '../../utility/dependency';
 import { JSONFile } from '../../utility/json-file';
 import { latestVersions } from '../../utility/latest-versions';
 import {
   TargetDefinition,
-  WorkspaceDefinition,
   allTargetOptions,
   allWorkspaceTargets,
   updateWorkspace,
 } from '../../utility/workspace';
 import { Builders, ProjectType } from '../../utility/workspace-models';
-import { findImports } from './css-import-lexer';
+import {
+  hasLessStylesheets,
+  hasPostcssConfiguration,
+  updateStyleImports,
+} from './stylesheet-updates';
 
 function* updateBuildTarget(
   projectName: string,
@@ -232,6 +233,8 @@ function updateProjects(tree: Tree, context: SchematicContext) {
 
     // Use @angular/build directly if there is no devkit package usage
     if (!hasAngularDevkitUsage) {
+      const karmaConfigFiles = new Set<string>();
+
       for (const [, target] of allWorkspaceTargets(workspace)) {
         switch (target.builder) {
           case Builders.Application:
@@ -245,9 +248,15 @@ function updateProjects(tree: Tree, context: SchematicContext) {
             break;
           case Builders.Karma:
             target.builder = '@angular/build:karma';
-            // Remove "builderMode" option since the builder will always use "application"
             for (const [, karmaOptions] of allTargetOptions(target)) {
+              // Remove "builderMode" option since the builder will always use "application"
               delete karmaOptions['builderMode'];
+
+              // Collect custom karma configurations for @angular-devkit/build-angular plugin removal
+              const karmaConfig = karmaOptions['karmaConfig'];
+              if (karmaConfig && typeof karmaConfig === 'string') {
+                karmaConfigFiles.add(karmaConfig);
+              }
             }
             break;
           case Builders.NgPackagr:
@@ -260,13 +269,10 @@ function updateProjects(tree: Tree, context: SchematicContext) {
       rules.push(
         addDependency('@angular/build', latestVersions.DevkitBuildAngular, {
           type: DependencyType.Dev,
-          // Always is set here since removePackageJsonDependency below does not automatically
-          // trigger the package manager execution.
-          install: InstallBehavior.Always,
           existing: ExistingBehavior.Replace,
         }),
+        removeDependency('@angular-devkit/build-angular'),
       );
-      removePackageJsonDependency(tree, '@angular-devkit/build-angular');
 
       // Add less dependency if any projects contain a Less stylesheet file.
       // This check does not consider Node.js packages due to the performance
@@ -292,172 +298,38 @@ function updateProjects(tree: Tree, context: SchematicContext) {
           }),
         );
       }
+
+      for (const karmaConfigFile of karmaConfigFiles) {
+        if (!tree.exists(karmaConfigFile)) {
+          continue;
+        }
+
+        try {
+          const originalKarmaConfigText = tree.readText(karmaConfigFile);
+          const updatedKarmaConfigText = originalKarmaConfigText
+            .replaceAll(`require('@angular-devkit/build-angular/plugins/karma'),`, '')
+            .replaceAll(`require('@angular-devkit/build-angular/plugins/karma')`, '');
+
+          if (updatedKarmaConfigText.includes('@angular-devkit/build-angular/plugins')) {
+            throw new Error(
+              'Migration does not support found usage of "@angular-devkit/build-angular".',
+            );
+          } else {
+            tree.overwrite(karmaConfigFile, updatedKarmaConfigText);
+          }
+        } catch (error) {
+          const reason = error instanceof Error ? `Reason: ${error.message}` : '';
+          context.logger.warn(
+            `Unable to update custom karma configuration file ("${karmaConfigFile}"). ` +
+              reason +
+              '\nReferences to the "@angular-devkit/build-angular" package within the file may need to be removed manually.',
+          );
+        }
+      }
     }
 
     return chain(rules);
   });
-}
-
-/**
- * Searches the schematic tree for files that have a `.less` extension.
- *
- * @param tree A Schematics tree instance to search
- * @returns true if Less stylesheet files are found; otherwise, false
- */
-function hasLessStylesheets(tree: Tree) {
-  const directories = [tree.getDir('/')];
-
-  let current;
-  while ((current = directories.pop())) {
-    for (const path of current.subfiles) {
-      if (path.endsWith('.less')) {
-        return true;
-      }
-    }
-
-    for (const path of current.subdirs) {
-      if (path === 'node_modules' || path.startsWith('.')) {
-        continue;
-      }
-      directories.push(current.dir(path));
-    }
-  }
-}
-
-/**
- * Searches for a Postcss configuration file within the workspace root
- * or any of the project roots.
- *
- * @param tree A Schematics tree instance to search
- * @param workspace A Workspace to check for projects
- * @returns true, if a Postcss configuration file is found; otherwise, false
- */
-function hasPostcssConfiguration(tree: Tree, workspace: WorkspaceDefinition) {
-  // Add workspace root
-  const searchDirectories = [''];
-
-  // Add each project root
-  for (const { root } of workspace.projects.values()) {
-    if (root) {
-      searchDirectories.push(root);
-    }
-  }
-
-  return searchDirectories.some(
-    (dir) =>
-      tree.exists(join(dir, 'postcss.config.json')) || tree.exists(join(dir, '.postcssrc.json')),
-  );
-}
-
-function* visit(
-  directory: DirEntry,
-): IterableIterator<[fileName: string, contents: string, sass: boolean]> {
-  for (const path of directory.subfiles) {
-    const sass = path.endsWith('.scss');
-    if (path.endsWith('.css') || sass) {
-      const entry = directory.file(path);
-      if (entry) {
-        const content = entry.content;
-
-        yield [entry.path, content.toString(), sass];
-      }
-    }
-  }
-
-  for (const path of directory.subdirs) {
-    if (path === 'node_modules' || path.startsWith('.')) {
-      continue;
-    }
-
-    yield* visit(directory.dir(path));
-  }
-}
-
-// Based on https://github.com/sass/dart-sass/blob/44d6bb6ac72fe6b93f5bfec371a1fffb18e6b76d/lib/src/importer/utils.dart
-function* potentialSassImports(
-  specifier: string,
-  base: string,
-  fromImport: boolean,
-): Iterable<string> {
-  const directory = join(base, dirname(specifier));
-  const extension = extname(specifier);
-  const hasStyleExtension = extension === '.scss' || extension === '.sass' || extension === '.css';
-  // Remove the style extension if present to allow adding the `.import` suffix
-  const filename = basename(specifier, hasStyleExtension ? extension : undefined);
-
-  if (hasStyleExtension) {
-    if (fromImport) {
-      yield join(directory, filename + '.import' + extension);
-      yield join(directory, '_' + filename + '.import' + extension);
-    }
-    yield join(directory, filename + extension);
-    yield join(directory, '_' + filename + extension);
-  } else {
-    if (fromImport) {
-      yield join(directory, filename + '.import.scss');
-      yield join(directory, filename + '.import.sass');
-      yield join(directory, filename + '.import.css');
-      yield join(directory, '_' + filename + '.import.scss');
-      yield join(directory, '_' + filename + '.import.sass');
-      yield join(directory, '_' + filename + '.import.css');
-    }
-    yield join(directory, filename + '.scss');
-    yield join(directory, filename + '.sass');
-    yield join(directory, filename + '.css');
-    yield join(directory, '_' + filename + '.scss');
-    yield join(directory, '_' + filename + '.sass');
-    yield join(directory, '_' + filename + '.css');
-  }
-}
-
-function updateStyleImports(tree: Tree, projectSourceRoot: string, buildTarget: TargetDefinition) {
-  const external = new Set<string>();
-  let needWorkspaceIncludePath = false;
-  for (const file of visit(tree.getDir(projectSourceRoot))) {
-    const [path, content, sass] = file;
-    const relativeBase = dirname(path);
-
-    let updater;
-    for (const { start, specifier, fromUse } of findImports(content, sass)) {
-      if (specifier[0] === '~') {
-        updater ??= tree.beginUpdate(path);
-        // start position includes the opening quote
-        updater.remove(start + 1, 1);
-      } else if (specifier[0] === '^') {
-        updater ??= tree.beginUpdate(path);
-        // start position includes the opening quote
-        updater.remove(start + 1, 1);
-        // Add to externalDependencies
-        external.add(specifier.slice(1));
-      } else if (
-        sass &&
-        [...potentialSassImports(specifier, relativeBase, !fromUse)].every(
-          (v) => !tree.exists(v),
-        ) &&
-        [...potentialSassImports(specifier, '/', !fromUse)].some((v) => tree.exists(v))
-      ) {
-        needWorkspaceIncludePath = true;
-      }
-    }
-    if (updater) {
-      tree.commitUpdate(updater);
-    }
-  }
-
-  if (needWorkspaceIncludePath) {
-    buildTarget.options ??= {};
-    buildTarget.options['stylePreprocessorOptions'] ??= {};
-    ((buildTarget.options['stylePreprocessorOptions'] as { includePaths?: string[] })[
-      'includePaths'
-    ] ??= []).push('.');
-  }
-
-  if (external.size > 0) {
-    buildTarget.options ??= {};
-    ((buildTarget.options['externalDependencies'] as string[] | undefined) ??= []).push(
-      ...external,
-    );
-  }
 }
 
 function deleteFile(path: string): Rule {
@@ -493,6 +365,7 @@ export default function (): Rule {
       rootJson.modify(['compilerOptions', 'esModuleInterop'], true);
       rootJson.modify(['compilerOptions', 'downlevelIteration'], undefined);
       rootJson.modify(['compilerOptions', 'allowSyntheticDefaultImports'], undefined);
+      rootJson.modify(['compilerOptions', 'moduleResolution'], 'bundler');
     }),
   ]);
 }

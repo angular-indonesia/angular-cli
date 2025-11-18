@@ -7,6 +7,7 @@
  */
 
 import type { ApplicationRef, Type } from '@angular/core';
+import type { BootstrapContext } from '@angular/platform-browser';
 import type { ɵgetRoutesFromAngularRouterConfig } from '@angular/ssr';
 import assert from 'node:assert';
 import * as fs from 'node:fs';
@@ -14,7 +15,7 @@ import * as path from 'node:path';
 import { workerData } from 'node:worker_threads';
 
 export interface RoutesExtractorWorkerData {
-  zonePackage: string;
+  zonePackage: string | undefined;
   indexFile: string;
   outputPath: string;
   serverBundlePath: string;
@@ -25,7 +26,7 @@ interface ServerBundleExports {
   AppServerModule?: Type<unknown>;
 
   /** Standalone application bootstrapping function. */
-  default?: (() => Promise<ApplicationRef>) | Type<unknown>;
+  default?: ((context: BootstrapContext) => Promise<ApplicationRef>) | Type<unknown>;
 
   /** Method to extract routes from the router config. */
   ɵgetRoutesFromAngularRouterConfig: typeof ɵgetRoutesFromAngularRouterConfig;
@@ -73,8 +74,10 @@ async function extract(): Promise<string[]> {
  * @returns A promise resolving to the extract function of the worker.
  */
 async function initialize() {
-  // Setup Zone.js
-  await import(zonePackage);
+  if (zonePackage) {
+    // Setup Zone.js
+    await import(zonePackage);
+  }
 
   return extract;
 }

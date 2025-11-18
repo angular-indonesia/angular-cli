@@ -28,9 +28,7 @@ function updateIndexFile(path: string): Rule {
   return async (host: Tree) => {
     const originalContent = host.readText(path);
 
-    const { RewritingStream } = await loadEsmModule<typeof import('parse5-html-rewriting-stream')>(
-      'parse5-html-rewriting-stream',
-    );
+    const { RewritingStream } = await import('parse5-html-rewriting-stream');
 
     const rewriter = new RewritingStream();
     let needsNoScript = true;
@@ -45,7 +43,6 @@ function updateIndexFile(path: string): Rule {
     rewriter.on('endTag', (endTag) => {
       if (endTag.tagName === 'head') {
         rewriter.emitRaw('  <link rel="manifest" href="manifest.webmanifest">\n');
-        rewriter.emitRaw('  <meta name="theme-color" content="#1976d2">\n');
       } else if (endTag.tagName === 'body' && needsNoScript) {
         rewriter.emitRaw(
           '  <noscript>Please enable JavaScript to continue using this application.</noscript>\n',
@@ -179,20 +176,4 @@ export default function (options: PwaOptions): Rule {
       ...[...indexFiles].map((path) => updateIndexFile(path)),
     ]);
   };
-}
-
-/**
- * This uses a dynamic import to load a module which may be ESM.
- * CommonJS code can load ESM code via a dynamic import. Unfortunately, TypeScript
- * will currently, unconditionally downlevel dynamic import into a require call.
- * require calls cannot load ESM code and will result in a runtime error. To workaround
- * this, a Function constructor is used to prevent TypeScript from changing the dynamic import.
- * Once TypeScript provides support for keeping the dynamic import this workaround can
- * be dropped.
- *
- * @param modulePath The path of the module to load.
- * @returns A Promise that resolves to the dynamically imported module.
- */
-function loadEsmModule<T>(modulePath: string | URL): Promise<T> {
-  return new Function('modulePath', `return import(modulePath);`)(modulePath) as Promise<T>;
 }

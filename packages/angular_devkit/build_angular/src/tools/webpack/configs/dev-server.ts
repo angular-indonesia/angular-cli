@@ -169,7 +169,7 @@ async function addProxyConfig(
     throw new Error(`Proxy configuration file ${proxyPath} does not exist.`);
   }
 
-  let proxyConfiguration: Record<string, object> | object[];
+  let proxyConfiguration;
 
   switch (extname(proxyPath)) {
     case '.json': {
@@ -190,39 +190,24 @@ async function addProxyConfig(
 
       break;
     }
-    case '.mjs':
-      // Load the ESM configuration file using the TypeScript dynamic import workaround.
-      // Once TypeScript provides support for keeping the dynamic import this workaround can be
-      // changed to a direct dynamic import.
-      proxyConfiguration = (
-        await loadEsmModule<{ default: Record<string, object> | object[] }>(
-          pathToFileURL(proxyPath),
-        )
-      ).default;
-      break;
-    case '.cjs':
-      proxyConfiguration = require(proxyPath);
-      break;
-    default:
-      // The file could be either CommonJS or ESM.
-      // CommonJS is tried first then ESM if loading fails.
+    default: {
       try {
-        proxyConfiguration = require(proxyPath);
+        proxyConfiguration = await import(proxyPath);
       } catch (e) {
         assertIsError(e);
-        if (e.code !== 'ERR_REQUIRE_ESM' && e.code !== 'ERR_REQUIRE_ASYNC_MODULE') {
+        if (e.code !== 'ERR_REQUIRE_ASYNC_MODULE') {
           throw e;
         }
 
-        // Load the ESM configuration file using the TypeScript dynamic import workaround.
-        // Once TypeScript provides support for keeping the dynamic import this workaround can be
-        // changed to a direct dynamic import.
-        proxyConfiguration = (
-          await loadEsmModule<{ default: Record<string, object> | object[] }>(
-            pathToFileURL(proxyPath),
-          )
-        ).default;
+        proxyConfiguration = await loadEsmModule<{ default: unknown }>(pathToFileURL(proxyPath));
       }
+
+      break;
+    }
+  }
+
+  if ('default' in proxyConfiguration) {
+    proxyConfiguration = proxyConfiguration.default;
   }
 
   return normalizeProxyConfiguration(proxyConfiguration);

@@ -22,14 +22,14 @@
   "homepage": "https://github.com/angular/angular-cli/tree/main/packages/ngtools/webpack",
   "peerDependencies": {
     "@angular/compiler-cli": "0.0.0-ANGULAR-FW-PEER-DEP",
-    "typescript": ">=5.8 <5.9",
+    "typescript": ">=5.9 <6.0",
     "webpack": "^5.54.0"
   },
   "devDependencies": {
     "@angular-devkit/core": "workspace:0.0.0-PLACEHOLDER",
-    "@angular/compiler": "20.0.0-rc.0",
-    "@angular/compiler-cli": "20.0.0-rc.0",
-    "typescript": "5.8.3",
-    "webpack": "5.99.8"
+    "@angular/compiler": "21.0.0-rc.2",
+    "@angular/compiler-cli": "21.0.0-rc.2",
+    "typescript": "5.9.3",
+    "webpack": "5.102.1"
   }
 }

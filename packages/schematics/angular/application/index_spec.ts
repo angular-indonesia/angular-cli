@@ -110,6 +110,19 @@ describe('Application Schematic', () => {
     expect(_extends).toBe('../../tsconfig.json');
   });
 
+  it('should set the right types in the tsconfig.spec.json when testRunner is karma', async () => {
+    const tree = await schematicRunner.runSchematic(
+      'application',
+      { ...defaultOptions, testRunner: 'karma' },
+      workspaceTree,
+    );
+
+    const {
+      compilerOptions: { types },
+    } = readJsonFile(tree, '/projects/foo/tsconfig.spec.json');
+    expect(types).toEqual(['jasmine']);
+  });
+
   it('should add project references in the root tsconfig.json', async () => {
     const tree = await schematicRunner.runSchematic('application', defaultOptions, workspaceTree);
 
@@ -268,6 +281,86 @@ describe('Application Schematic', () => {
       expect(pkg.devDependencies['typescript']).toEqual(latestVersions['typescript']);
     });
 
+    it('should include zone.js if "zoneless" option is false', async () => {
+      const tree = await schematicRunner.runSchematic(
+        'application',
+        {
+          ...defaultOptions,
+          zoneless: false,
+        },
+        workspaceTree,
+      );
+
+      const pkg = JSON.parse(tree.readContent('/package.json'));
+      expect(pkg.dependencies['zone.js']).toEqual(latestVersions['zone.js']);
+    });
+
+    it('should add "less" to devDependencies when Less is selected as the style option', async () => {
+      const tree = await schematicRunner.runSchematic(
+        'application',
+        {
+          ...defaultOptions,
+          style: Style.Less,
+        },
+        workspaceTree,
+      );
+
+      const pkg = JSON.parse(tree.readContent('/package.json'));
+      expect(pkg.devDependencies['less']).toEqual(latestVersions['less']);
+    });
+
+    it('should _not_ include zone.js if "zoneless" option is not present', async () => {
+      const tree = await schematicRunner.runSchematic(
+        'application',
+        {
+          ...defaultOptions,
+          zoneless: undefined,
+        },
+        workspaceTree,
+      );
+
+      const pkg = JSON.parse(tree.readContent('/package.json'));
+      expect(pkg.dependencies['zone.js']).toBeUndefined();
+    });
+
+    it('should not include zone.js if "zoneless" option is true', async () => {
+      const tree = await schematicRunner.runSchematic(
+        'application',
+        {
+          ...defaultOptions,
+          zoneless: true,
+        },
+        workspaceTree,
+      );
+
+      const pkg = JSON.parse(tree.readContent('/package.json'));
+      expect(pkg.dependencies['zone.js']).toBeUndefined();
+    });
+
+    it('should add karma dependencies when testRunner is karma', async () => {
+      const tree = await schematicRunner.runSchematic(
+        'application',
+        {
+          ...defaultOptions,
+          testRunner: 'karma',
+        },
+        workspaceTree,
+      );
+
+      const pkg = JSON.parse(tree.readContent('/package.json'));
+      expect(pkg.devDependencies['karma']).toEqual(latestVersions['karma']);
+      expect(pkg.devDependencies['karma-chrome-launcher']).toEqual(
+        latestVersions['karma-chrome-launcher'],
+      );
+      expect(pkg.devDependencies['karma-coverage']).toEqual(latestVersions['karma-coverage']);
+      expect(pkg.devDependencies['karma-jasmine']).toEqual(latestVersions['karma-jasmine']);
+      expect(pkg.devDependencies['karma-jasmine-html-reporter']).toEqual(
+        latestVersions['karma-jasmine-html-reporter'],
+      );
+      expect(pkg.devDependencies['jasmine-core']).toEqual(latestVersions['jasmine-core']);
+      expect(pkg.devDependencies['@types/jasmine']).toEqual(latestVersions['@types/jasmine']);
+    });
+
     it(`should not override existing users dependencies`, async () => {
       const oldPackageJson = workspaceTree.readContent('package.json');
       workspaceTree.overwrite(
@@ -333,14 +426,8 @@ describe('Application Schematic', () => {
       expect(buildOpt.index).toBeUndefined();
       expect(buildOpt.browser).toEqual('src/main.ts');
       expect(buildOpt.assets).toEqual([{ 'glob': '**/*', 'input': 'public' }]);
-      expect(buildOpt.polyfills).toEqual(['zone.js']);
+      expect(buildOpt.polyfills).toBeUndefined();
       expect(buildOpt.tsConfig).toEqual('tsconfig.app.json');
-
-      const testOpt = prj.architect.test.options;
-      expect(testOpt.tsConfig).toEqual('tsconfig.spec.json');
-      expect(testOpt.karmaConfig).toBeUndefined();
-      expect(testOpt.assets).toEqual([{ 'glob': '**/*', 'input': 'public' }]);
-      expect(testOpt.styles).toEqual(['src/styles.css']);
     });
 
     it('should set values in angular.json correctly when using a style preprocessor', async () => {
@@ -351,51 +438,21 @@ describe('Application Schematic', () => {
       const prj = config.projects.foo;
       const buildOpt = prj.architect.build.options;
       expect(buildOpt.styles).toEqual(['src/styles.sass']);
-      const testOpt = prj.architect.test.options;
-      expect(testOpt.styles).toEqual(['src/styles.sass']);
       expect(tree.exists('src/styles.sass')).toBe(true);
     });
 
-    it('sets "inlineStyleLanguage" in angular.json when using a style preprocessor', async () => {
-      const options = { ...defaultOptions, projectRoot: '', style: Style.Sass };
+    it('should set values in angular.json correctly when testRunner is karma', async () => {
+      const options = { ...defaultOptions, projectRoot: '', testRunner: 'karma' as const };
       const tree = await schematicRunner.runSchematic('application', options, workspaceTree);
 
       const config = JSON.parse(tree.readContent('/angular.json'));
       const prj = config.projects.foo;
-
-      const buildOpt = prj.architect.build.options;
-      expect(buildOpt.inlineStyleLanguage).toBe('sass');
-
-      const testOpt = prj.architect.test.options;
-      expect(testOpt.inlineStyleLanguage).toBe('sass');
-    });
-
-    it('does not set "inlineStyleLanguage" in angular.json when not using a style preprocessor', async () => {
-      const options = { ...defaultOptions, projectRoot: '' };
-      const tree = await schematicRunner.runSchematic('application', options, workspaceTree);
-
-      const config = JSON.parse(tree.readContent('/angular.json'));
-      const prj = config.projects.foo;
-
-      const buildOpt = prj.architect.build.options;
-      expect(buildOpt.inlineStyleLanguage).toBeUndefined();
-
-      const testOpt = prj.architect.test.options;
-      expect(testOpt.inlineStyleLanguage).toBeUndefined();
-    });
-
-    it('does not set "inlineStyleLanguage" in angular.json when using CSS styles', async () => {
-      const options = { ...defaultOptions, projectRoot: '', style: Style.Css };
-      const tree = await schematicRunner.runSchematic('application', options, workspaceTree);
-
-      const config = JSON.parse(tree.readContent('/angular.json'));
-      const prj = config.projects.foo;
-
-      const buildOpt = prj.architect.build.options;
-      expect(buildOpt.inlineStyleLanguage).toBeUndefined();
-
-      const testOpt = prj.architect.test.options;
-      expect(testOpt.inlineStyleLanguage).toBeUndefined();
+      const testOpt = prj.architect.test;
+      expect(testOpt.builder).toEqual('@angular/build:unit-test');
+      expect(testOpt.options.runner).toEqual('karma');
+      expect(testOpt.options.tsConfig).toBeUndefined();
+      expect(testOpt.options.assets).toBeUndefined();
+      expect(testOpt.options.styles).toBeUndefined();
     });
 
     it('should set the relative tsconfig paths', async () => {
@@ -422,15 +479,9 @@ describe('Application Schematic', () => {
       expect(project.root).toEqual('foo');
       const buildOpt = project.architect.build.options;
       expect(buildOpt.browser).toEqual('foo/src/main.ts');
-      expect(buildOpt.polyfills).toEqual(['zone.js']);
+      expect(buildOpt.polyfills).toBeUndefined();
       expect(buildOpt.tsConfig).toEqual('foo/tsconfig.app.json');
       expect(buildOpt.assets).toEqual([{ 'glob': '**/*', 'input': 'foo/public' }]);
-
-      const testOpt = project.architect.test.options;
-      expect(testOpt.tsConfig).toEqual('foo/tsconfig.spec.json');
-      expect(testOpt.karmaConfig).toBeUndefined();
-      expect(testOpt.assets).toEqual([{ 'glob': '**/*', 'input': 'foo/public' }]);
-      expect(testOpt.styles).toEqual(['foo/src/styles.css']);
 
       const appTsConfig = readJsonFile(tree, '/foo/tsconfig.app.json');
       expect(appTsConfig.extends).toEqual('../tsconfig.json');
@@ -594,8 +645,8 @@ describe('Application Schematic', () => {
     expect(moduleFiles.length).toEqual(0);
   });
 
-  it('should enable zone event coalescing by default', async () => {
-    const options = { ...defaultOptions, standalone: true };
+  it('should enable zone event coalescing by default for zone.js apps', async () => {
+    const options = { ...defaultOptions, standalone: true, zoneless: false };
 
     const tree = await schematicRunner.runSchematic('application', options, workspaceTree);
     const appConfig = tree.readContent('/projects/foo/src/app/app.config.ts');
@@ -636,12 +687,13 @@ describe('Application Schematic', () => {
   });
 
   describe('standalone=false', () => {
-    it('should add the ngZoneEventCoalescing option by default', async () => {
+    it('should add the ngZoneEventCoalescing option by default with zone.js apps', async () => {
       const tree = await schematicRunner.runSchematic(
         'application',
         {
           ...defaultOptions,
           standalone: false,
+          zoneless: false,
         },
         workspaceTree,
       );
@@ -744,7 +796,7 @@ describe('Application Schematic', () => {
       );
     });
 
-    it('should add provideZonelessChangeDetection() in app-module.ts when zoneless is true', async () => {
+    it('should not add provideZonelessChangeDetection() in app-module.ts when zoneless is true', async () => {
       const tree = await schematicRunner.runSchematic(
         'application',
         {
@@ -756,64 +808,135 @@ describe('Application Schematic', () => {
       );
       const path = '/projects/foo/src/app/app-module.ts';
       const fileContent = tree.readContent(path);
-      expect(fileContent).toContain('provideZonelessChangeDetection()');
+      expect(fileContent).not.toContain('provideZonelessChangeDetection()');
     });
 
-    it('should not add provideZonelessChangeDetection() in app-module.ts when zoneless is false', async () => {
+    it('should not add any change detection provider when zoneless is true', async () => {
       const tree = await schematicRunner.runSchematic(
         'application',
         {
           ...defaultOptions,
-          zoneless: false,
+          zoneless: true,
+        },
+        workspaceTree,
+      );
+      const path = '/projects/foo/src/app/app.config.ts';
+      const fileContent = tree.readContent(path);
+      expect(fileContent).not.toMatch(/provideZone(less)?ChangeDetection/gi);
+    });
+  });
+
+  it('should add fixture.whenStable() when zoneless application', async () => {
+    const tree = await schematicRunner.runSchematic(
+      'application',
+      {
+        ...defaultOptions,
+      },
+      workspaceTree,
+    );
+
+    const content = tree.readContent('/projects/foo/src/app/app.spec.ts');
+    expect(content).toContain('fixture.whenStable()');
+    expect(content).not.toContain('fixture.detectChanges()');
+  });
+
+  it('should not add fixture.whenStable() in initial spec files when its not zoneless application', async () => {
+    const tree = await schematicRunner.runSchematic(
+      'application',
+      {
+        ...defaultOptions,
+        zoneless: false,
+      },
+      workspaceTree,
+    );
+
+    const content = tree.readContent('/projects/foo/src/app/app.spec.ts');
+    expect(content).not.toContain('fixture.whenStable()');
+    expect(content).toContain('fixture.detectChanges()');
+  });
+
+  it('should call the tailwind schematic when style is tailwind', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const options = { ...defaultOptions, style: 'tailwind' as any };
+    const tree = await schematicRunner.runSchematic('application', options, workspaceTree);
+
+    expect(tree.exists('/projects/foo/.postcssrc.json')).toBe(true);
+
+    const packageJson = JSON.parse(tree.readContent('/package.json'));
+    expect(packageJson.devDependencies['tailwindcss']).toBeDefined();
+    expect(packageJson.devDependencies['postcss']).toBeDefined();
+    expect(packageJson.devDependencies['@tailwindcss/postcss']).toBeDefined();
+
+    const stylesContent = tree.readContent('/projects/foo/src/styles.css');
+    expect(stylesContent).toContain('@import "tailwindcss";');
+  });
+
+  describe(`fileNameStyleGuide: '2016'`, () => {
+    it('should create a component with the correct template and style urls', async () => {
+      const options = { ...defaultOptions, fileNameStyleGuide: '2016' as const };
+      const tree = await schematicRunner.runSchematic('application', options, workspaceTree);
+      const component = tree.readContent('/projects/foo/src/app/app.component.ts');
+      expect(component).toContain(`templateUrl: './app.component.html'`);
+      expect(component).toContain(`styleUrl: './app.component.css'`);
+    });
+
+    it('should create a test file with import from the path without suffix', async () => {
+      const options = { ...defaultOptions, fileNameStyleGuide: '2016' as const };
+      const tree = await schematicRunner.runSchematic('application', options, workspaceTree);
+      const componentSpec = tree.readContent('/projects/foo/src/app/app.component.spec.ts');
+      expect(componentSpec).toContain(`import { App } from './app.component'`);
+    });
+
+    describe('standalone: false', () => {
+      it('should create a component with the correct template and style urls', async () => {
+        const options = {
+          ...defaultOptions,
           standalone: false,
-        },
-        workspaceTree,
-      );
-      const path = '/projects/foo/src/app/app-module.ts';
-      const fileContent = tree.readContent(path);
-      expect(fileContent).not.toContain('provideZonelessChangeDetection()');
-    });
+          fileNameStyleGuide: '2016' as const,
+        };
+        const tree = await schematicRunner.runSchematic('application', options, workspaceTree);
+        const component = tree.readContent('/projects/foo/src/app/app.component.ts');
+        expect(component).toContain(`templateUrl: './app.component.html'`);
+        expect(component).toContain(`styleUrl: './app.component.css'`);
+      });
 
-    it('should add provideZonelessChangeDetection() when zoneless is true', async () => {
-      const tree = await schematicRunner.runSchematic(
-        'application',
-        {
+      it('should create a test file with import from the path without suffix', async () => {
+        const options = {
           ...defaultOptions,
-          zoneless: true,
-        },
-        workspaceTree,
-      );
-      const path = '/projects/foo/src/app/app.config.ts';
-      const fileContent = tree.readContent(path);
-      expect(fileContent).toContain('provideZonelessChangeDetection()');
-    });
+          standalone: false,
+          fileNameStyleGuide: '2016' as const,
+        };
+        const tree = await schematicRunner.runSchematic('application', options, workspaceTree);
+        const componentSpec = tree.readContent('/projects/foo/src/app/app.component.spec.ts');
+        expect(componentSpec).toContain(`import { App } from './app.component'`);
+      });
 
-    it('should not add provideZonelessChangeDetection() when zoneless is false', async () => {
-      const tree = await schematicRunner.runSchematic(
-        'application',
-        {
+      it('should create a module with the correct suffix', async () => {
+        const options = {
           ...defaultOptions,
-          zoneless: false,
-        },
-        workspaceTree,
-      );
-      const path = '/projects/foo/src/app/app.config.ts';
-      const fileContent = tree.readContent(path);
-      expect(fileContent).not.toContain('provideZonelessChangeDetection()');
-    });
+          standalone: false,
+          fileNameStyleGuide: '2016' as const,
+        };
+        const tree = await schematicRunner.runSchematic('application', options, workspaceTree);
+        const module = tree.readContent('/projects/foo/src/app/app.module.ts');
+        const main = tree.readContent('/projects/foo/src/main.ts');
+        expect(module).toContain(`import { App } from './app.component'`);
+        expect(main).toContain(`import { AppModule } from './app/app.module'`);
+      });
 
-    it('should not add provideZoneChangeDetection when zoneless is true', async () => {
-      const tree = await schematicRunner.runSchematic(
-        'application',
-        {
+      it('should create a routing module with the correct suffix', async () => {
+        const options = {
           ...defaultOptions,
-          zoneless: true,
-        },
-        workspaceTree,
-      );
-      const path = '/projects/foo/src/app/app.config.ts';
-      const fileContent = tree.readContent(path);
-      expect(fileContent).not.toContain('provideZoneChangeDetection');
+          standalone: false,
+          routing: true,
+          fileNameStyleGuide: '2016' as const,
+        };
+        const tree = await schematicRunner.runSchematic('application', options, workspaceTree);
+        const module = tree.readContent('/projects/foo/src/app/app.module.ts');
+        const routingModule = tree.readContent('/projects/foo/src/app/app-routing.module.ts');
+        expect(routingModule).toBeDefined();
+        expect(module).toContain(`import { AppRoutingModule } from './app-routing.module'`);
+      });
     });
   });
 });

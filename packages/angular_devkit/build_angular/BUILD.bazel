@@ -3,7 +3,7 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file at https://angular.dev/license
 
-load("@devinfra//bazel/api-golden:index_rjs.bzl", "api_golden_test_npm_package")
+load("@devinfra//bazel/api-golden:index.bzl", "api_golden_test_npm_package")
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("//tools:defaults.bzl", "copy_to_bin", "jasmine_test", "npm_package", "ts_project")
 load("//tools:ts_json_schema.bzl", "ts_json_schema")
@@ -174,6 +174,7 @@ ts_project(
         ":node_modules/source-map-loader",
         ":node_modules/source-map-support",
         ":node_modules/terser",
+        ":node_modules/tinyglobby",
         ":node_modules/tree-kill",
         ":node_modules/webpack",
         ":node_modules/webpack-dev-middleware",
@@ -184,6 +185,7 @@ ts_project(
         "//:node_modules/@angular/compiler-cli",
         "//:node_modules/@angular/core",
         "//:node_modules/@angular/localize",
+        "//:node_modules/@angular/platform-browser",
         "//:node_modules/@angular/platform-server",
         "//:node_modules/@angular/service-worker",
         "//:node_modules/@types/babel__core",
@@ -198,7 +200,6 @@ ts_project(
         "//:node_modules/@types/watchpack",
         "//:node_modules/esbuild",
         "//:node_modules/esbuild-wasm",
-        "//:node_modules/fast-glob",
         "//:node_modules/karma",
         "//:node_modules/karma-source-map-support",
         "//:node_modules/semver",
@@ -224,9 +225,8 @@ ts_project(
     deps = [
         ":build_angular",
         ":build_angular_test_utils",
-        ":node_modules/webpack",
+        ":node_modules/tinyglobby",
         "//:node_modules/@types/node",
-        "//:node_modules/fast-glob",
         "//:node_modules/prettier",
         "//:node_modules/typescript",
         "//packages/angular_devkit/architect/testing",
@@ -235,7 +235,7 @@ ts_project(
 )
 
 jasmine_test(
-    name = "build_angular_test",
+    name = "test",
     data = [":build_angular_test_lib"],
 )
 
@@ -391,8 +391,6 @@ LARGE_SPECS = {
             ":node_modules/@angular/build",
             ":node_modules/@angular-devkit/architect",
             ":node_modules/@angular-devkit/core",
-            ":node_modules/@angular-devkit/build-webpack",
-            "//modules/testing/builder",
 
             # Base dependencies for the application in hello-world-app.
             # Some tests also require extra dependencies.

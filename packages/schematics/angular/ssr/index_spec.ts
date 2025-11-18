@@ -109,7 +109,6 @@ describe('SSR Schematic', () => {
           routing: false,
           style: 'css',
           skipTests: false,
-          standalone: true,
         },
         appTree,
       );
@@ -182,7 +181,7 @@ describe('SSR Schematic', () => {
       build.builder = '@angular-devkit/build-angular:browser';
       build.options = {
         ...build.options,
-        main: build.options.browser,
+        main: 'projects/test-app/src/main.ts',
         browser: undefined,
       };
 

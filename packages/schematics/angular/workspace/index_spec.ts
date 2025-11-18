@@ -23,7 +23,6 @@ describe('Workspace Schematic', () => {
 
   it('should create all files of a workspace', async () => {
     const options = { ...defaultOptions };
-
     const tree = await schematicRunner.runSchematic('workspace', options);
     const files = tree.files;
     expect(files).toEqual(
@@ -58,7 +57,6 @@ describe('Workspace Schematic', () => {
     const pkg = JSON.parse(tree.readContent('/package.json'));
     expect(pkg.dependencies['@angular/core']).toEqual(latestVersions.Angular);
     expect(pkg.dependencies['rxjs']).toEqual(latestVersions['rxjs']);
-    expect(pkg.dependencies['zone.js']).toEqual(latestVersions['zone.js']);
     expect(pkg.devDependencies['typescript']).toEqual(latestVersions['typescript']);
   });
 
@@ -133,5 +131,11 @@ describe('Workspace Schematic', () => {
     expect(configurations).not.toContain(jasmine.objectContaining({ name: 'ng test' }));
     const { tasks } = parseJson(tree.readContent('.vscode/tasks.json').toString());
     expect(tasks).not.toContain(jasmine.objectContaining({ type: 'npm', script: 'test' }));
+  });
+
+  it('should include prettier config overrides for Angular templates', async () => {
+    const tree = await schematicRunner.runSchematic('workspace', defaultOptions);
+    const pkg = JSON.parse(tree.readContent('/package.json'));
+    expect(pkg.prettier).withContext('package.json#prettier is present').toBeTruthy();
   });
 });

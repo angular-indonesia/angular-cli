@@ -170,9 +170,9 @@ export type CollectionDescription<CollectionMetadataT extends object> = Collecti
 
 // @public (undocumented)
 export class CollectionImpl<CollectionT extends object, SchematicT extends object> implements Collection<CollectionT, SchematicT> {
-    constructor(_description: CollectionDescription<CollectionT>, _engine: SchematicEngine<CollectionT, SchematicT>, baseDescriptions?: Array<CollectionDescription<CollectionT>> | undefined);
+    constructor(_description: CollectionDescription<CollectionT>, _engine: SchematicEngine<CollectionT, SchematicT>, baseDescriptions?: CollectionDescription<CollectionT>[] | undefined);
     // (undocumented)
-    readonly baseDescriptions?: Array<CollectionDescription<CollectionT>> | undefined;
+    readonly baseDescriptions?: CollectionDescription<CollectionT>[] | undefined;
     // (undocumented)
     createSchematic(name: string, allowPrivate?: boolean): Schematic<CollectionT, SchematicT>;
     // (undocumented)
@@ -274,7 +274,7 @@ export interface DirEntry {
 // @public (undocumented)
 export interface DryRunCreateEvent {
     // (undocumented)
-    content: Buffer;
+    content: ArrayBufferLike;
     // (undocumented)
     kind: 'create';
     // (undocumented)
@@ -334,7 +334,7 @@ export class DryRunSink extends HostSink {
 // @public (undocumented)
 export interface DryRunUpdateEvent {
     // (undocumented)
-    content: Buffer;
+    content: ArrayBufferLike;
     // (undocumented)
     kind: 'update';
     // (undocumented)
@@ -495,13 +495,13 @@ export class HostSink extends SimpleSinkBase {
     // (undocumented)
     _done(): Observable<void>;
     // (undocumented)
-    protected _filesToCreate: Map<Path, Buffer<ArrayBufferLike>>;
+    protected _filesToCreate: Map<Path, ArrayBufferLike>;
     // (undocumented)
     protected _filesToDelete: Set<Path>;
     // (undocumented)
     protected _filesToRename: Set<[Path, Path]>;
     // (undocumented)
-    protected _filesToUpdate: Map<Path, Buffer<ArrayBufferLike>>;
+    protected _filesToUpdate: Map<Path, ArrayBufferLike>;
     // (undocumented)
     protected _force: boolean;
     // (undocumented)
@@ -637,7 +637,10 @@ export enum MergeStrategy {
 export function mergeWith(source: Source, strategy?: MergeStrategy): Rule;
 
 // @public (undocumented)
-export function move(from: string, to?: string): Rule;
+export function move(from: string, to: string): Rule;
+
+// @public (undocumented)
+export function move(to: string): Rule;
 
 // @public (undocumented)
 export function noop(): Rule;

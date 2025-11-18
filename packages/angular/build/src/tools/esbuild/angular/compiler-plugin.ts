@@ -13,11 +13,13 @@ import type {
   OnStartResult,
   OutputFile,
   PartialMessage,
+  PartialNote,
   Plugin,
   PluginBuild,
 } from 'esbuild';
 import assert from 'node:assert';
 import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import { maxWorkers, useTypeChecking } from '../../../utils/environment-options';
 import { AngularHostOptions } from '../../angular/angular-host';
@@ -29,12 +31,20 @@ import { SharedTSCompilationState, getSharedCompilationState } from './compilati
 import { ComponentStylesheetBundler } from './component-stylesheets';
 import { FileReferenceTracker } from './file-reference-tracker';
 import { setupJitPluginCallbacks } from './jit-plugin-callbacks';
+import { rewriteForBazel } from './rewrite-bazel-paths';
 import { SourceFileCache } from './source-file-cache';
 
 export interface CompilerPluginOptions {
   sourcemap: boolean | 'external';
   tsconfig: string;
   jit?: boolean;
+
+  /**
+   * Include class metadata and JIT information in built code.
+   * The Angular TestBed APIs require additional metadata for the Angular aspects of the application
+   * such as Components, Modules, Pipes, etc.
+   * TestBed may also leverage JIT capabilities during testing (e.g., overrideComponent).
+   */
   includeTestMetadata?: boolean;
 
   advancedOptimizations?: boolean;
@@ -63,11 +73,11 @@ export function createCompilerPlugin(
 
       // Initialize a worker pool for JavaScript transformations.
       // Webcontainers currently do not support this persistent cache store.
-      let cacheStore: import('../lmdb-cache-store').LmbdCacheStore | undefined;
+      let cacheStore: import('../lmdb-cache-store').LmdbCacheStore | undefined;
       if (pluginOptions.sourceFileCache?.persistentCachePath && !process.versions.webcontainer) {
         try {
-          const { LmbdCacheStore } = await import('../lmdb-cache-store');
-          cacheStore = new LmbdCacheStore(
+          const { LmdbCacheStore } = await import('../lmdb-cache-store');
+          cacheStore = new LmdbCacheStore(
             path.join(pluginOptions.sourceFileCache.persistentCachePath, 'angular-compiler.db'),
           );
         } catch (e) {
@@ -89,7 +99,7 @@ export function createCompilerPlugin(
           sourcemap: !!pluginOptions.sourcemap,
           thirdPartySourcemaps: pluginOptions.thirdPartySourcemaps,
           advancedOptimizations: pluginOptions.advancedOptimizations,
-          jit: pluginOptions.jit,
+          jit: pluginOptions.jit || pluginOptions.includeTestMetadata,
         },
         maxWorkers,
         cacheStore?.createCache('jstransformer'),
@@ -404,8 +414,8 @@ export function createCompilerPlugin(
       });
 
       build.onLoad({ filter: /\.[cm]?[jt]sx?$/ }, async (args) => {
-        const request = path.normalize(
-          pluginOptions.fileReplacements?.[path.normalize(args.path)] ?? args.path,
+        const request = rewriteForBazel(
+          path.normalize(pluginOptions.fileReplacements?.[path.normalize(args.path)] ?? args.path),
         );
         const isJS = /\.[cm]?js$/.test(request);
 
@@ -433,11 +443,23 @@ export function createCompilerPlugin(
             return undefined;
           }
 
+          const diangosticRoot = build.initialOptions.absWorkingDir ?? '';
+
+          // Evaluate whether the file requires the Angular compiler transpilation.
+          // If not, issue a warning but allow bundler to process the file (no type-checking).
+          const directContents = await readFile(request, 'utf-8');
+          if (!requiresAngularCompiler(directContents)) {
+            return {
+              warnings: [createMissingFileDiagnostic(request, args.path, diangosticRoot, false)],
+              contents,
+              loader: 'ts',
+              resolveDir: path.dirname(request),
+            };
+          }
+
           // Otherwise return an error
           return {
-            errors: [
-              createMissingFileError(request, args.path, build.initialOptions.absWorkingDir ?? ''),
-            ],
+            errors: [createMissingFileDiagnostic(request, args.path, diangosticRoot, true)],
           };
         } else if (typeof contents === 'string' && (useTypeScriptTranspilation || isJS)) {
           // A string indicates untransformed output from the TS/NG compiler.
@@ -471,13 +493,14 @@ export function createCompilerPlugin(
         return {
           contents,
           loader,
+          resolveDir: path.dirname(request),
         };
       });
 
       build.onLoad(
         { filter: /\.[cm]?js$/ },
         createCachedLoad(pluginOptions.loadResultCache, async (args) => {
-          let request = args.path;
+          let request = rewriteForBazel(args.path);
           if (pluginOptions.fileReplacements) {
             const replacement = pluginOptions.fileReplacements[path.normalize(args.path)];
             if (replacement) {
@@ -498,6 +521,7 @@ export function createCompilerPlugin(
               return {
                 contents,
                 loader: 'js',
+                resolveDir: path.dirname(request),
                 watchFiles: request !== args.path ? [request] : undefined,
               };
             },
@@ -718,6 +742,7 @@ function createCompilerOptionsTransformer(
       externalRuntimeStyles: pluginOptions.externalRuntimeStyles,
       _enableHmr: !!pluginOptions.templateUpdates,
       supportTestBed: !!pluginOptions.includeTestMetadata,
+      supportJitMode: !!pluginOptions.includeTestMetadata,
     };
   };
 }
@@ -751,23 +776,46 @@ function bundleWebWorker(
   }
 }
 
-function createMissingFileError(request: string, original: string, root: string): PartialMessage {
+function createMissingFileDiagnostic(
+  request: string,
+  original: string,
+  root: string,
+  angular: boolean,
+): PartialMessage {
   const relativeRequest = path.relative(root, request);
-  const error = {
-    text: `File '${relativeRequest}' is missing from the TypeScript compilation.`,
-    notes: [
-      {
-        text: `Ensure the file is part of the TypeScript program via the 'files' or 'include' property.`,
-      },
-    ],
-  };
+  const notes: PartialNote[] = [];
+
+  if (angular) {
+    notes.push({
+      text:
+        `Files containing Angular metadata ('@Component'/'@Directive'/etc.) must be part of the TypeScript compilation.` +
+        ` You can ensure the file is part of the TypeScript program via the 'files' or 'include' property.`,
+    });
+  } else {
+    notes.push({
+      text:
+        `The file will be bundled and included in the output but will not be type-checked at build time.` +
+        ` To remove this message you can add the file to the TypeScript program via the 'files' or 'include' property.`,
+    });
+  }
 
   const relativeOriginal = path.relative(root, original);
   if (relativeRequest !== relativeOriginal) {
-    error.notes.push({
+    notes.push({
       text: `File is requested from a file replacement of '${relativeOriginal}'.`,
     });
   }
 
-  return error;
+  const diagnostic = {
+    text: `File '${relativeRequest}' not found in TypeScript compilation.`,
+    notes,
+  };
+
+  return diagnostic;
+}
+
+const POTENTIAL_METADATA_REGEX = /@angular\/core|@Component|@Directive|@Injectable|@Pipe|@NgModule/;
+
+function requiresAngularCompiler(contents: string): boolean {
+  return POTENTIAL_METADATA_REGEX.test(contents);
 }
