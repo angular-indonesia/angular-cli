@@ -31,6 +31,11 @@ describe('Jasmine to Vitest Transformer', () => {
         input: `jasmine.clock().mockDate(new Date('2025-01-01'));`,
         expected: `vi.setSystemTime(new Date('2025-01-01'));`,
       },
+      {
+        description: 'should transform jasmine.clock().mockDate() to vi.setSystemTime(new Date())',
+        input: `jasmine.clock().mockDate();`,
+        expected: `vi.setSystemTime(new Date());`,
+      },
     ];
 
     testCases.forEach(({ description, input, expected }) => {
@@ -127,7 +132,6 @@ describe('Jasmine to Vitest Transformer', () => {
             return a.toString() === b.toString();
           });
         `,
-        // eslint-disable-next-line max-len
         expected: `// TODO: vitest-migration: jasmine.addCustomEqualityTester is not supported. Please manually migrate to expect.addEqualityTesters(). See: https://vitest.dev/api/expect.html#expect-addequalitytesters
           jasmine.addCustomEqualityTester((a, b) => {
             return a.toString() === b.toString();

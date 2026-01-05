@@ -13,6 +13,8 @@
  */
 
 import { join } from 'node:path';
+import npa from 'npm-package-arg';
+import { maxSatisfying } from 'semver';
 import { PackageManagerError } from './error';
 import { Host } from './host';
 import { Logger } from './logger';
@@ -155,12 +157,14 @@ export class PackageManager {
       return { stdout: '', stderr: '' };
     }
 
-    return this.host.runCommand(this.descriptor.binary, finalArgs, {
+    const commandResult = await this.host.runCommand(this.descriptor.binary, finalArgs, {
       ...runOptions,
       cwd: executionDirectory,
       stdio: 'pipe',
       env: finalEnv,
     });
+
+    return { stdout: commandResult.stdout.trim(), stderr: commandResult.stderr.trim() };
   }
 
   /**
@@ -190,20 +194,56 @@ export class PackageManager {
 
     let stdout;
     let stderr;
+    let exitCode;
+    let thrownError;
     try {
       ({ stdout, stderr } = await this.#run(args, runOptions));
+      exitCode = 0;
     } catch (e) {
-      if (e instanceof PackageManagerError && typeof e.exitCode === 'number' && e.exitCode !== 0) {
-        // Some package managers exit with a non-zero code when the package is not found.
+      thrownError = e;
+      if (e instanceof PackageManagerError) {
+        stdout = e.stdout;
+        stderr = e.stderr;
+        exitCode = e.exitCode;
+      } else {
+        // Re-throw unexpected errors
+        throw e;
+      }
+    }
+
+    // Yarn classic can exit with code 0 even when an error occurs.
+    // To ensure we capture these cases, we will always attempt to parse a
+    // structured error from the output, regardless of the exit code.
+    const getError = this.descriptor.outputParsers.getError;
+    const parsedError =
+      getError?.(stdout, this.options.logger) ?? getError?.(stderr, this.options.logger) ?? null;
+
+    if (parsedError) {
+      this.options.logger?.debug(
+        `[${this.descriptor.binary}] Structured error (code: ${parsedError.code}): ${parsedError.summary}`,
+      );
+
+      // Special case for 'not found' errors (e.g., E404). Return null for these.
+      if (this.descriptor.isNotFound(parsedError)) {
         if (cache && cacheKey) {
           cache.set(cacheKey, null);
         }
 
         return null;
+      } else {
+        // For all other structured errors, throw a more informative error.
+        throw new PackageManagerError(parsedError.summary, stdout, stderr, exitCode);
       }
-      throw e;
     }
 
+    // If an error was originally thrown and we didn't parse a more specific
+    // structured error, re-throw the original error now.
+    if (thrownError) {
+      throw thrownError;
+    }
+
+    // If we reach this point, the command succeeded and no structured error was found.
+    // We can now safely parse the successful output.
     try {
       const result = parser(stdout, this.options.logger);
       if (cache && cacheKey) {
@@ -215,7 +255,7 @@ export class PackageManager {
       const message = `Failed to parse package manager output: ${
         e instanceof Error ? e.message : ''
       }`;
-      throw new PackageManagerError(message, stdout, stderr, 0);
+      throw new PackageManagerError(message, stdout, stderr, exitCode);
     }
   }
 
@@ -353,7 +393,7 @@ export class PackageManager {
    * @param options.bypassCache If true, ignores the in-memory cache and fetches fresh data.
    * @returns A promise that resolves to the `PackageManifest` object, or `null` if the package is not found.
    */
-  async getPackageManifest(
+  async getRegistryManifest(
     packageName: string,
     version: string,
     options: { timeout?: number; registry?: string; bypassCache?: boolean } = {},
@@ -367,11 +407,119 @@ export class PackageManager {
 
     const cacheKey = options.registry ? `${specifier}|${options.registry}` : specifier;
 
-    return this.#fetchAndParse(
+    const manifest = await this.#fetchAndParse(
       commandArgs,
-      (stdout, logger) => this.descriptor.outputParsers.getPackageManifest(stdout, logger),
+      (stdout, logger) => this.descriptor.outputParsers.getRegistryManifest(stdout, logger),
       { ...options, cache: this.#manifestCache, cacheKey },
     );
+
+    // If the provided version was not a specific version, also cache the specific fetched version
+    if (manifest && manifest.version !== version) {
+      const manifestSpecifier = `${manifest.name}@${manifest.version}`;
+      const manifestCacheKey = options.registry
+        ? `${manifestSpecifier}|${options.registry}`
+        : manifestSpecifier;
+      this.#manifestCache.set(manifestCacheKey, manifest);
+    }
+
+    return manifest;
+  }
+
+  /**
+   * Fetches the manifest for a package.
+   *
+   * This method can resolve manifests for packages from the registry, as well
+   * as those specified by file paths, directory paths, and remote tarballs.
+   * Caching is only supported for registry packages.
+   *
+   * @param specifier The package specifier to resolve the manifest for.
+   * @param options Options for the fetch.
+   * @returns A promise that resolves to the `PackageManifest` object, or `null` if the package is not found.
+   */
+  async getManifest(
+    specifier: string | npa.Result,
+    options: { timeout?: number; registry?: string; bypassCache?: boolean } = {},
+  ): Promise<PackageManifest | null> {
+    const { name, type, fetchSpec } = typeof specifier === 'string' ? npa(specifier) : specifier;
+
+    switch (type) {
+      case 'range':
+      case 'version':
+      case 'tag': {
+        if (!name) {
+          throw new Error(`Could not parse package name from specifier: ${specifier}`);
+        }
+
+        // `fetchSpec` is the version, range, or tag.
+        let versionSpec = fetchSpec ?? 'latest';
+        if (this.descriptor.requiresManifestVersionLookup) {
+          if (type === 'tag' || !fetchSpec) {
+            const metadata = await this.getRegistryMetadata(name, options);
+            if (!metadata) {
+              return null;
+            }
+            versionSpec = metadata['dist-tags'][versionSpec];
+          } else if (type === 'range') {
+            const metadata = await this.getRegistryMetadata(name, options);
+            if (!metadata) {
+              return null;
+            }
+            versionSpec = maxSatisfying(metadata.versions, fetchSpec) ?? '';
+          }
+          if (!versionSpec) {
+            return null;
+          }
+        }
+
+        return this.getRegistryManifest(name, versionSpec, options);
+      }
+      case 'directory': {
+        if (!fetchSpec) {
+          throw new Error(`Could not parse directory path from specifier: ${specifier}`);
+        }
+
+        const manifestPath = join(fetchSpec, 'package.json');
+        const manifest = await this.host.readFile(manifestPath);
+
+        return JSON.parse(manifest);
+      }
+      case 'file':
+      case 'remote':
+      case 'git': {
+        if (!fetchSpec) {
+          throw new Error(`Could not parse location from specifier: ${specifier}`);
+        }
+
+        // Caching is not supported for non-registry specifiers.
+        const { workingDirectory, cleanup } = await this.acquireTempPackage(fetchSpec, {
+          ...options,
+          ignoreScripts: true,
+        });
+
+        try {
+          // Discover the package name by reading the temporary `package.json` file.
+          // The package manager will have added the package to the `dependencies`.
+          const tempManifest = await this.host.readFile(join(workingDirectory, 'package.json'));
+          const { dependencies } = JSON.parse(tempManifest) as PackageManifest;
+          const packageName = dependencies && Object.keys(dependencies)[0];
+
+          if (!packageName) {
+            throw new Error(`Could not determine package name for specifier: ${specifier}`);
+          }
+
+          // The package will be installed in `<temp>/node_modules/<name>`.
+          const packagePath = join(workingDirectory, 'node_modules', packageName);
+          const manifestPath = join(packagePath, 'package.json');
+          const manifest = await this.host.readFile(manifestPath);
+
+          return JSON.parse(manifest);
+        } finally {
+          await cleanup();
+        }
+      }
+      default:
+        throw new Error(`Unsupported package specifier type: ${type}`);
+    }
   }
 
   /**
@@ -379,14 +527,14 @@ export class PackageManager {
    * responsible for managing the lifecycle of the temporary directory by calling
    * the returned `cleanup` function.
    *
-   * @param packageName The name of the package to install.
+   * @param specifier The specifier of the package to install.
    * @param options Options for the installation.
    * @returns A promise that resolves to an object containing the temporary path
    *   and a cleanup function.
    */
   async acquireTempPackage(
-    packageName: string,
-    options: { registry?: string } = {},
+    specifier: string,
+    options: { registry?: string; ignoreScripts?: boolean } = {},
   ): Promise<{ workingDirectory: string; cleanup: () => Promise<void> }> {
     const workingDirectory = await this.host.createTempDirectory();
     const cleanup = () => this.host.deleteDirectory(workingDirectory);
@@ -396,7 +544,10 @@ export class PackageManager {
     // Writing an empty package.json file beforehand prevents this.
     await this.host.writeFile(join(workingDirectory, 'package.json'), '{}');
 
-    const args: readonly string[] = [this.descriptor.addCommand, packageName];
+    const flags = [options.ignoreScripts ? this.descriptor.ignoreScriptsFlag : ''].filter(
+      (flag) => flag,
+    );
+    const args: readonly string[] = [this.descriptor.addCommand, specifier, ...flags];
 
     try {
       await this.#run(args, { ...options, cwd: workingDirectory });

@@ -7,17 +7,25 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import colors from 'ansi-colors';
 import path from 'node:path';
-import yargsParser from 'yargs-parser';
+import { parseArgs, styleText } from 'node:util';
 
-const args = yargsParser(process.argv.slice(2), {
-  boolean: ['verbose'],
-  configuration: {
-    'camel-case-expansion': false,
+const { values, positionals } = parseArgs({
+  args: process.argv.slice(2),
+  options: {
+    verbose: {
+      type: 'boolean',
+    },
   },
+  allowPositionals: true,
+  strict: false, // Allow unknown options to pass through.
 });
-const scriptName = args._.shift();
+
+const scriptName = positionals.shift();
+const args = {
+  ...values,
+  _: positionals,
+};
 
 const cwd = process.cwd();
 const scriptDir = import.meta.dirname;
@@ -26,15 +34,15 @@ process.chdir(path.join(scriptDir, '..'));
 const originalConsole = { ...console };
 console.warn = function (...args) {
   const [m, ...rest] = args;
-  originalConsole.warn(colors.yellow(m), ...rest);
+  originalConsole.warn(styleText(['yellow'], m), ...rest);
 };
 console.error = function (...args) {
   const [m, ...rest] = args;
-  originalConsole.error(colors.red(m), ...rest);
+  originalConsole.error(styleText(['red'], m), ...rest);
 };
 
 try {
-  const script = await import(`./${scriptName}.mjs`);
+  const script = await import(`./${scriptName}.mts`);
   const exitCode = await script.default(args, cwd);
   process.exitCode = typeof exitCode === 'number' ? exitCode : 0;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

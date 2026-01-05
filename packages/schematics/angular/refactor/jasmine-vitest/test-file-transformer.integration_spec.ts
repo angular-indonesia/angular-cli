@@ -11,10 +11,17 @@ import { format } from 'prettier';
 import { transformJasmineToVitest } from './test-file-transformer';
 import { RefactorReporter } from './utils/refactor-reporter';
 
-async function expectTransformation(input: string, expected: string): Promise<void> {
+async function expectTransformation(
+  input: string,
+  expected: string,
+  options: { addImports: boolean; browserMode: boolean } = {
+    addImports: false,
+    browserMode: false,
+  },
+): Promise<void> {
   const logger = new logging.NullLogger();
   const reporter = new RefactorReporter(logger);
-  const transformed = transformJasmineToVitest('spec.ts', input, reporter, { addImports: false });
+  const transformed = transformJasmineToVitest('spec.ts', input, reporter, options);
   const formattedTransformed = await format(transformed, { parser: 'typescript' });
   const formattedExpected = await format(expected, { parser: 'typescript' });
 
@@ -255,14 +262,15 @@ describe('Jasmine to Vitest Transformer - Integration Tests', () => {
       });
     `;
 
+    /* eslint-disable max-len */
     const vitestCode = `
       describe('Complex Scenarios', () => {
         let serviceMock;
 
         beforeEach(() => {
           serviceMock = {
-            getData: vi.fn().mockReturnValue(expect.any(String)),
-            process: vi.fn().mockReturnValue(undefined),
+            getData: vi.fn().mockName("MyService.getData").mockReturnValue(expect.any(String)),
+            process: vi.fn().mockName("MyService.process").mockReturnValue(undefined),
           };
         });
 
@@ -274,6 +282,7 @@ describe('Jasmine to Vitest Transformer - Integration Tests', () => {
 
         it('should handle array contents checking', () => {
           const arr = [1, 2, 3];
+          // TODO: vitest-migration: Verify this matches strict array content (multiset equality). Vitest's arrayContaining is a subset check.
           expect(arr).toHaveLength(3);
           expect(arr).toEqual(expect.arrayContaining([3, 2, 1]));
         });
@@ -299,6 +308,7 @@ describe('Jasmine to Vitest Transformer - Integration Tests', () => {
         });
       });
     `;
+    /* eslint-enable max-len */
 
     await expectTransformation(jasmineCode, vitestCode);
   });
@@ -386,6 +396,44 @@ describe('Jasmine to Vitest Transformer - Integration Tests', () => {
     await expectTransformation(jasmineCode, vitestCode);
   });
 
+  it('should not transform toHaveClass in browser mode', async () => {
+    const jasmineCode = `
+      describe('toHaveClass in browser mode', () => {
+        let el: HTMLElement;
+
+        beforeEach(() => {
+          el = document.createElement('div');
+        });
+
+        it('should handle DOM matchers like toHaveClass', () => {
+          el.classList.add('my-class');
+          expect(el).withContext('element should have my-class').toHaveClass('my-class');
+          el.classList.remove('my-class');
+          expect(el).not.toHaveClass('my-class');
+        });
+      });
+    `;
+
+    const vitestCode = `
+      describe('toHaveClass in browser mode', () => {
+        let el: HTMLElement;
+
+        beforeEach(() => {
+          el = document.createElement('div');
+        });
+
+        it('should handle DOM matchers like toHaveClass', () => {
+          el.classList.add('my-class');
+          expect(el, 'element should have my-class').toHaveClass('my-class');
+          el.classList.remove('my-class');
+          expect(el).not.toHaveClass('my-class');
+        });
+      });
+    `;
+
+    await expectTransformation(jasmineCode, vitestCode, { addImports: false, browserMode: true });
+  });
+
   it('should add TODOs for unsupported Jasmine features', async () => {
     const jasmineCode = `
       describe('Unsupported Features', () => {
@@ -416,7 +464,6 @@ describe('Jasmine to Vitest Transformer - Integration Tests', () => {
       });
     `;
 
-    /* eslint-disable max-len */
     const vitestCode = `
       describe('Unsupported Features', () => {
         beforeAll(() => {
@@ -448,7 +495,6 @@ describe('Jasmine to Vitest Transformer - Integration Tests', () => {
         });
       });
     `;
-    /* eslint-enable max-len */
 
     await expectTransformation(jasmineCode, vitestCode);
   });

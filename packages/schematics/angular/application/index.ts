@@ -23,6 +23,7 @@ import {
   url,
 } from '@angular-devkit/schematics';
 import { Schema as ComponentOptions, Style as ComponentStyle } from '../component/schema';
+import { addTestRunnerDependencies } from '../utility/dependencies';
 import {
   DependencyType,
   ExistingBehavior,
@@ -34,7 +35,7 @@ import { latestVersions } from '../utility/latest-versions';
 import { relativePathToWorkspaceRoot } from '../utility/paths';
 import { getWorkspace, updateWorkspace } from '../utility/workspace';
 import { Builders, ProjectType } from '../utility/workspace-models';
-import { Schema as ApplicationOptions, Style } from './schema';
+import { Schema as ApplicationOptions, Style, TestRunner } from './schema';
 
 const APPLICATION_DEV_DEPENDENCIES = [
   { name: '@angular/compiler-cli', version: latestVersions.Angular },
@@ -187,62 +188,7 @@ function addDependenciesToPackageJson(options: ApplicationOptions): Rule {
   }
 
   if (!options.skipTests) {
-    if (options.testRunner === 'vitest') {
-      rules.push(
-        addDependency('vitest', latestVersions['vitest'], {
-          type: DependencyType.Dev,
-          existing: ExistingBehavior.Skip,
-          install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
-        }),
-        addDependency('jsdom', latestVersions['jsdom'], {
-          type: DependencyType.Dev,
-          existing: ExistingBehavior.Skip,
-          install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
-        }),
-      );
-    } else {
-      rules.push(
-        addDependency('karma', latestVersions['karma'], {
-          type: DependencyType.Dev,
-          existing: ExistingBehavior.Skip,
-          install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
-        }),
-        addDependency('karma-chrome-launcher', latestVersions['karma-chrome-launcher'], {
-          type: DependencyType.Dev,
-          existing: ExistingBehavior.Skip,
-          install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
-        }),
-        addDependency('karma-coverage', latestVersions['karma-coverage'], {
-          type: DependencyType.Dev,
-          existing: ExistingBehavior.Skip,
-          install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
-        }),
-        addDependency('karma-jasmine', latestVersions['karma-jasmine'], {
-          type: DependencyType.Dev,
-          existing: ExistingBehavior.Skip,
-          install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
-        }),
-        addDependency(
-          'karma-jasmine-html-reporter',
-          latestVersions['karma-jasmine-html-reporter'],
-          {
-            type: DependencyType.Dev,
-            existing: ExistingBehavior.Skip,
-            install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
-          },
-        ),
-        addDependency('jasmine-core', latestVersions['jasmine-core'], {
-          type: DependencyType.Dev,
-          existing: ExistingBehavior.Skip,
-          install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
-        }),
-        addDependency('@types/jasmine', latestVersions['@types/jasmine'], {
-          type: DependencyType.Dev,
-          existing: ExistingBehavior.Skip,
-          install: options.skipInstall ? InstallBehavior.None : InstallBehavior.Auto,
-        }),
-      );
-    }
+    rules.push(...addTestRunnerDependencies(options.testRunner, !!options.skipInstall));
   }
 
   return chain(rules);
@@ -392,17 +338,15 @@ function addAppToWorkspaceFile(options: ApplicationOptions, appDir: string): Rul
       test:
         options.skipTests || options.minimal
           ? undefined
-          : options.testRunner === 'vitest'
-            ? {
-                builder: Builders.BuildUnitTest,
-                options: {},
-              }
-            : {
-                builder: Builders.BuildUnitTest,
-                options: {
-                  runner: 'karma',
-                },
-              },
+          : {
+              builder: Builders.BuildUnitTest,
+              options:
+                options.testRunner === TestRunner.Vitest
+                  ? {}
+                  : {
+                      runner: 'karma',
+                    },
+            },
     },
   };
 

@@ -4,36 +4,28 @@ module(
     name = "angular_cli",
 )
 
-bazel_dep(name = "yq.bzl", version = "0.3.1")
-bazel_dep(name = "rules_nodejs", version = "6.6.1")
-bazel_dep(name = "aspect_rules_js", version = "2.8.1")
-bazel_dep(name = "aspect_rules_ts", version = "3.7.1")
-bazel_dep(name = "rules_pkg", version = "0.8.1")
-
-# Alow for usage of rules_pkg@0.8.1 even though other deps want a later verison.
-multiple_version_override(
-    module_name = "rules_pkg",
-    versions = [
-        "0.8.1",
-        "1.1.0",
-    ],
-)
-
-bazel_dep(name = "aspect_bazel_lib", version = "2.21.2")
-bazel_dep(name = "bazel_skylib", version = "1.8.2")
-bazel_dep(name = "aspect_rules_esbuild", version = "0.24.0")
-bazel_dep(name = "aspect_rules_jasmine", version = "2.0.0")
+bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "yq.bzl", version = "0.3.2")
+bazel_dep(name = "rules_nodejs", version = "6.6.2")
+bazel_dep(name = "aspect_rules_js", version = "2.8.3")
+bazel_dep(name = "aspect_rules_ts", version = "3.8.1")
+bazel_dep(name = "rules_pkg", version = "1.1.0")
+bazel_dep(name = "rules_cc", version = "0.2.15")
+bazel_dep(name = "aspect_bazel_lib", version = "2.22.0")
+bazel_dep(name = "bazel_skylib", version = "1.9.0")
+bazel_dep(name = "aspect_rules_esbuild", version = "0.25.0")
+bazel_dep(name = "aspect_rules_jasmine", version = "2.0.2")
 bazel_dep(name = "rules_angular")
 git_override(
     module_name = "rules_angular",
-    commit = "74d8baec22a5ffd3a1a36bac252399fa125a6c4b",
+    commit = "7133b97252508f8528e5c5818a9a73cacc2e2a0e",
     remote = "https://github.com/devversion/rules_angular.git",
 )
 
 bazel_dep(name = "devinfra")
 git_override(
     module_name = "devinfra",
-    commit = "c855fffb4b01bc06e743eb3bdfd54c866af09ad8",
+    commit = "942d738d8f4d65b161d06e6c399fefec318cdbfe",
     remote = "https://github.com/angular/dev-infra.git",
 )
 
@@ -47,12 +39,12 @@ git_override(
 bazel_dep(name = "rules_browsers")
 git_override(
     module_name = "rules_browsers",
-    commit = "6a699bf3e896690e2923cf3ade29fbd4e492e366",
+    commit = "8ef3e996d5fc040a35770f860987d8b9cad8ef3d",
     remote = "https://github.com/devversion/rules_browsers.git",
 )
 
 node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node")
-node.toolchain(node_version = "24.0.0")
+node.toolchain(node_version_from_nvmrc = "//:.nvmrc")
 use_repo(
     node,
     "nodejs_darwin_amd64",
@@ -104,8 +96,13 @@ use_repo(
     "node24_windows_amd64",
 )
 
-# This is needed following https://github.com/bazel-contrib/rules_nodejs/pull/3859
-register_toolchains("//:node22_windows_no_exec_config_toolchain")
+pnpm = use_extension("@aspect_rules_js//npm:extensions.bzl", "pnpm")
+pnpm.pnpm(
+    name = "pnpm",
+    pnpm_version = "10.26.0",
+    pnpm_version_integrity = "sha512-Oz9scl6+cSUGwKsa1BM8+GsfS2h+/85iqbOLTXLjlUJC5kMZD8UfoWQpScc19APevUT1yw7dZXq+Y6i2p+HkAg==",
+)
+use_repo(pnpm, "pnpm")
 
 npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm")
 npm.npm_translate_lock(
@@ -146,7 +143,6 @@ npm.npm_translate_lock(
     },
     npmrc = "//:.npmrc",
     pnpm_lock = "//:pnpm-lock.yaml",
-    verify_node_modules_ignored = "//:.bazelignore",
 )
 use_repo(npm, "npm")
 
@@ -172,4 +168,6 @@ register_toolchains(
     "@devinfra//bazel/git-toolchain:git_macos_x86_toolchain",
     "@devinfra//bazel/git-toolchain:git_macos_arm64_toolchain",
     "@devinfra//bazel/git-toolchain:git_windows_toolchain",
+    "//tools/toolchains:dummy_cc_windows_no_exec_toolchain",
+    "//tools/toolchains:node22_windows_no_exec_toolchain",
 )

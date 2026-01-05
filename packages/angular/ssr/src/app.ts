@@ -25,7 +25,19 @@ import { InlineCriticalCssProcessor } from './utils/inline-critical-css';
 import { LRUCache } from './utils/lru-cache';
 import { AngularBootstrap, renderAngular } from './utils/ng';
 import { promiseWithAbort } from './utils/promise';
+import { createRedirectResponse } from './utils/redirect';
 import { buildPathWithParams, joinUrlParts, stripLeadingSlash } from './utils/url';
+
+/**
+ * A set of well-known URLs that are not handled by Angular.
+ *
+ * These URLs are typically for static assets or endpoints that should
+ * bypass the Angular routing and rendering process.
+ */
+const WELL_KNOWN_NON_ANGULAR_URLS: ReadonlySet<string> = new Set<string>([
+  '/favicon.ico',
+  '/.well-known/appspecific/com.chrome.devtools.json',
+]);
 
 /**
  * Maximum number of critical CSS entries the cache can store.
@@ -166,6 +178,10 @@ export class AngularServerApp {
    */
   async handle(request: Request, requestContext?: unknown): Promise<Response | null> {
     const url = new URL(request.url);
+    if (WELL_KNOWN_NON_ANGULAR_URLS.has(url.pathname)) {
+      return null;
+    }
+
     this.router ??= await ServerRouter.from(this.manifest, url);
     const matchedRoute = this.router.match(url);
 
@@ -175,8 +191,15 @@ export class AngularServerApp {
     }
 
     const { redirectTo, status, renderMode } = matchedRoute;
+
     if (redirectTo !== undefined) {
-      return createRedirectResponse(buildPathWithParams(redirectTo, url.pathname), status);
+      return createRedirectResponse(
+        joinUrlParts(
+          request.headers.get('X-Forwarded-Prefix') ?? '',
+          buildPathWithParams(redirectTo, url.pathname),
+        ),
+        status,
+      );
     }
 
     if (renderMode === RenderMode.Prerender) {
@@ -329,7 +352,7 @@ export class AngularServerApp {
     }
 
     if (result.redirectTo) {
-      return createRedirectResponse(result.redirectTo, status);
+      return createRedirectResponse(result.redirectTo, responseInit.status);
     }
 
     if (renderMode === RenderMode.Prerender) {
@@ -523,21 +546,4 @@ function appendPreloadHintsToHtml(html: string, preload: readonly string[]): str
     ...preload.map((val) => `<link rel="modulepreload" href="${val}">`),
     html.slice(bodyCloseIdx),
   ].join('\n');
-}
-
-/**
- * Creates an HTTP redirect response with a specified location and status code.
- *
- * @param location - The URL to which the response should redirect.
- * @param status - The HTTP status code for the redirection. Defaults to 302 (Found).
- *                 See: https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static#status
- * @returns A `Response` object representing the HTTP redirect.
- */
-function createRedirectResponse(location: string, status = 302): Response {
-  return new Response(null, {
-    status,
-    headers: {
-      'Location': location,
-    },
-  });
 }

@@ -20,7 +20,7 @@ ts_project(
     ),
     args = [
         "--lib",
-        "dom,es2020",
+        "dom,es2022",
     ],
     data = [
         "//packages/angular/ssr/third_party/beasties:beasties_bundled",
@@ -61,6 +61,7 @@ ng_package(
         "//packages/angular/ssr/third_party/beasties:beasties_dts",
     ],
     package = "@angular/ssr",
+    readme_md = ":README.md",
     rollup_runtime_deps = [
         "//:node_modules/@babel/core",
         "//:node_modules/@rollup/plugin-commonjs",
@@ -80,7 +81,6 @@ pkg_tar(
     name = "npm_package_archive",
     srcs = [":npm_package"],
     extension = "tgz",
-    strip_prefix = "./npm_package",
     # should not be built unless it is a dependency of another rule
     tags = ["manual"],
 )

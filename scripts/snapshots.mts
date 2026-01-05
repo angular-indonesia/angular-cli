@@ -10,9 +10,9 @@ import { execSync, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import build from './build.mjs';
-import jsonHelp, { createTemporaryProject } from './json-help.mjs';
-import { PackageInfo, packages } from './packages.mjs';
+import build from './build.mts';
+import jsonHelp, { createTemporaryProject } from './json-help.mts';
+import { type PackageInfo, packages } from './packages.mts';
 
 const __dirname = import.meta.dirname;
 

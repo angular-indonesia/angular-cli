@@ -121,12 +121,18 @@ export default function (options: Schema): Rule {
       const content = tree.readText(file);
       const newContent = transformJasmineToVitest(file, content, reporter, {
         addImports: !!options.addImports,
+        browserMode: !!options.browerMode,
       });
 
       if (content !== newContent) {
         tree.overwrite(file, newContent);
         reporter.incrementTransformedFiles();
       }
+    }
+
+    if (options.report) {
+      const reportContent = reporter.generateReportContent();
+      tree.create(`jasmine-vitest-${new Date().toISOString()}.md`, reportContent);
     }
 
     reporter.printSummary(options.verbose);

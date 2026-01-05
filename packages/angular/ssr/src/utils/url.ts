@@ -22,7 +22,7 @@
  */
 export function stripTrailingSlash(url: string): string {
   // Check if the last character of the URL is a slash
-  return url.length > 1 && url[url.length - 1] === '/' ? url.slice(0, -1) : url;
+  return url.length > 1 && url.at(-1) === '/' ? url.slice(0, -1) : url;
 }
 
 /**
@@ -75,7 +75,7 @@ export function addLeadingSlash(url: string): string {
  */
 export function addTrailingSlash(url: string): string {
   // Check if the URL already end with a slash
-  return url[url.length - 1] === '/' ? url : `${url}/`;
+  return url.at(-1) === '/' ? url : `${url}/`;
 }
 
 /**
@@ -106,7 +106,7 @@ export function joinUrlParts(...parts: string[]): string {
     if (part[0] === '/') {
       normalizedPart = normalizedPart.slice(1);
     }
-    if (part[part.length - 1] === '/') {
+    if (part.at(-1) === '/') {
       normalizedPart = normalizedPart.slice(0, -1);
     }
     if (normalizedPart !== '') {
@@ -219,4 +219,19 @@ export function stripMatrixParams(pathname: string): string {
   // Use a regular expression to remove matrix parameters.
   // This regex finds all occurrences of a semicolon followed by any characters
   return pathname.includes(';') ? pathname.replace(MATRIX_PARAMS_REGEX, '') : pathname;
+}
+
+/**
+ * Constructs a decoded URL string from its components.
+ *
+ * This function joins the pathname (with trailing slash removed), search, and hash,
+ * and then decodes the result.
+ *
+ * @param pathname - The path of the URL.
+ * @param search - The query string of the URL (including '?').
+ * @param hash - The hash fragment of the URL (including '#').
+ * @returns The constructed and decoded URL string.
+ */
+export function constructUrl(pathname: string, search: string, hash: string): string {
+  return decodeURIComponent([stripTrailingSlash(pathname), search, hash].join(''));
 }

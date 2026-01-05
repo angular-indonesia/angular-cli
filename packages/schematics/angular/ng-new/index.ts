@@ -25,7 +25,7 @@ import {
 import { Schema as ApplicationOptions } from '../application/schema';
 import { JSONFile } from '../utility/json-file';
 import { Schema as WorkspaceOptions } from '../workspace/schema';
-import { Schema as NgNewOptions } from './schema';
+import { Schema as NgNewOptions, TestRunner } from './schema';
 
 export default function (options: NgNewOptions): Rule {
   if (!options.directory) {
@@ -67,16 +67,21 @@ export default function (options: NgNewOptions): Rule {
     mergeWith(
       apply(empty(), [
         schematic('workspace', workspaceOptions),
+        (tree: Tree) => {
+          if (options.testRunner === TestRunner.Karma) {
+            const file = new JSONFile(tree, 'angular.json');
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const schematics = file.get(['schematics']) ?? ({} as any);
+            (schematics['@schematics/angular:application'] ??= {}).testRunner = TestRunner.Karma;
+            (schematics['@schematics/angular:library'] ??= {}).testRunner = TestRunner.Karma;
+
+            file.modify(['schematics'], schematics);
+          }
+        },
         options.createApplication ? schematic('application', applicationOptions) : noop,
         schematic('ai-config', {
           tool: options.aiConfig?.length ? options.aiConfig : undefined,
         }),
-        (tree: Tree) => {
-          if (options.testRunner === 'karma') {
-            const file = new JSONFile(tree, 'angular.json');
-            file.modify(['schematics', '@schematics/angular:application', 'testRunner'], 'karma');
-          }
-        },
         move(options.directory),
       ]),
     ),

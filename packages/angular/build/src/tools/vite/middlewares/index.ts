@@ -16,3 +16,5 @@ export {
 export { createAngularHeadersMiddleware } from './headers-middleware';
 export { createAngularComponentMiddleware } from './component-middleware';
 export { createChromeDevtoolsMiddleware } from './chrome-devtools-middleware';
+export { patchHostValidationMiddleware } from './host-check-middleware';
+export { patchBaseMiddleware } from './base-middleware';

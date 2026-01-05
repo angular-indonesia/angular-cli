@@ -9,6 +9,7 @@
 import assert from 'node:assert';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { platform } from 'node:os';
 import path from 'node:path';
 import type {
   BrowserConfigOptions,
@@ -127,7 +128,7 @@ export async function createVitestConfigPlugin(
         },
         resolve: {
           mainFields: ['es2020', 'module', 'main'],
-          conditions: ['es2015', 'es2020', 'module'],
+          conditions: ['es2015', 'es2020', 'module', ...(browser ? ['browser'] : [])],
         },
       };
 
@@ -153,7 +154,11 @@ export async function createVitestConfigPlugin(
 
       return {
         test: {
-          coverage: await generateCoverageOption(options.coverage, projectName),
+          coverage: await generateCoverageOption(
+            options.coverage,
+            testConfig?.coverage,
+            projectName,
+          ),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(reporters ? ({ reporters } as any) : {}),
           projects: [projectConfig],
@@ -163,14 +168,39 @@ export async function createVitestConfigPlugin(
   };
 }
 
+async function loadResultFile(file: ResultFile): Promise<string> {
+  if (file.origin === 'memory') {
+    return new TextDecoder('utf-8').decode(file.contents);
+  }
+
+  return readFile(file.inputPath, 'utf-8');
+}
+
 export function createVitestPlugins(pluginOptions: PluginOptions): VitestPlugins {
   const { workspaceRoot, buildResultFiles, testFileToEntryPoint } = pluginOptions;
+  const isWindows = platform() === 'win32';
 
   return [
     {
       name: 'angular:test-in-memory-provider',
       enforce: 'pre',
       resolveId: (id, importer) => {
+        // Fast path for test entry points.
+        if (testFileToEntryPoint.has(id)) {
+          return id;
+        }
+
+        // Workaround for Vitest in Windows when a fully qualified absolute path is provided with
+        // a superfluous leading slash. This can currently occur with the `@vitest/coverage-v8` provider
+        // when it uses `removeStartsWith(url, FILE_PROTOCOL)` to convert a file URL resulting in
+        // `/D:/tmp_dir/...` instead of `D:/tmp_dir/...`.
+        if (id[0] === '/' && isWindows) {
+          const slicedId = id.slice(1);
+          if (path.isAbsolute(slicedId)) {
+            return slicedId;
+          }
+        }
+
         if (importer && (id[0] === '.' || id[0] === '/')) {
           let fullPath;
           if (testFileToEntryPoint.has(importer)) {
@@ -185,15 +215,28 @@ export function createVitestPlugins(pluginOptions: PluginOptions): VitestPlugins
           }
         }
 
-        if (testFileToEntryPoint.has(id)) {
-          return id;
+        // Determine the base directory for resolution.
+        let baseDir: string;
+        if (importer) {
+          // If the importer is a test entry point, resolve relative to the workspace root.
+          // Otherwise, resolve relative to the importer's directory.
+          baseDir = testFileToEntryPoint.has(importer) ? workspaceRoot : path.dirname(importer);
+        } else {
+          // If there's no importer, assume the id is relative to the workspace root.
+          baseDir = workspaceRoot;
         }
 
-        assert(buildResultFiles.size > 0, 'buildResult must be available for resolving.');
-        const relativePath = path.relative(workspaceRoot, id);
+        // Construct the full, absolute path and normalize it to POSIX format.
+        const fullPath = toPosixPath(path.join(baseDir, id));
+
+        // Check if the resolved path corresponds to a known build artifact.
+        const relativePath = path.relative(workspaceRoot, fullPath);
         if (buildResultFiles.has(toPosixPath(relativePath))) {
-          return id;
+          return fullPath;
         }
+
+        // If the module cannot be resolved from the build artifacts, let other plugins handle it.
+        return undefined;
       },
       load: async (id) => {
         assert(buildResultFiles.size > 0, 'buildResult must be available for in-memory loading.');
@@ -217,17 +260,10 @@ export function createVitestPlugins(pluginOptions: PluginOptions): VitestPlugins
 
         const outputFile = buildResultFiles.get(outputPath);
         if (outputFile) {
+          const code = await loadResultFile(outputFile);
           const sourceMapPath = outputPath + '.map';
           const sourceMapFile = buildResultFiles.get(sourceMapPath);
-          const code =
-            outputFile.origin === 'memory'
-              ? Buffer.from(outputFile.contents).toString('utf-8')
-              : await readFile(outputFile.inputPath, 'utf-8');
-          const sourceMapText = sourceMapFile
-            ? sourceMapFile.origin === 'memory'
-              ? Buffer.from(sourceMapFile.contents).toString('utf-8')
-              : await readFile(sourceMapFile.inputPath, 'utf-8')
-            : undefined;
+          const sourceMapText = sourceMapFile ? await loadResultFile(sourceMapFile) : undefined;
 
           // Vitest will include files in the coverage report if the sourcemap contains no sources.
           // For builder-internal generated code chunks, which are typically helper functions,
@@ -271,11 +307,12 @@ export function createVitestPlugins(pluginOptions: PluginOptions): VitestPlugins
 }
 
 async function generateCoverageOption(
-  coverage: NormalizedUnitTestBuilderOptions['coverage'],
+  optionsCoverage: NormalizedUnitTestBuilderOptions['coverage'],
+  configCoverage: VitestCoverageOption | undefined,
   projectName: string,
 ): Promise<VitestCoverageOption> {
   let defaultExcludes: string[] = [];
-  if (coverage.exclude) {
+  if (optionsCoverage.exclude) {
     try {
       const vitestConfig = await import('vitest/config');
       defaultExcludes = vitestConfig.coverageConfigDefaults.exclude;
@@ -283,28 +320,31 @@ async function generateCoverageOption(
   }
 
   return {
-    enabled: coverage.enabled,
     excludeAfterRemap: true,
+    reportsDirectory:
+      configCoverage?.reportsDirectory ?? toPosixPath(path.join('coverage', projectName)),
+    ...(optionsCoverage.enabled !== undefined ? { enabled: optionsCoverage.enabled } : {}),
     // Vitest performs a pre-check and a post-check for sourcemaps.
     // The pre-check uses the bundled files, so specific bundled entry points and chunks need to be included.
     // The post-check uses the original source files, so the user's include is used.
-    ...(coverage.include ? { include: ['spec-*.js', 'chunk-*.js', ...coverage.include] } : {}),
-    reportsDirectory: toPosixPath(path.join('coverage', projectName)),
-    thresholds: coverage.thresholds,
-    watermarks: coverage.watermarks,
+    ...(optionsCoverage.include
+      ? { include: ['spec-*.js', 'chunk-*.js', ...optionsCoverage.include] }
+      : {}),
+    thresholds: optionsCoverage.thresholds,
+    watermarks: optionsCoverage.watermarks,
     // Special handling for `exclude`/`reporters` due to an undefined value causing upstream failures
-    ...(coverage.exclude
+    ...(optionsCoverage.exclude
       ? {
           exclude: [
             // Augment the default exclude https://vitest.dev/config/#coverage-exclude
             // with the user defined exclusions
-            ...coverage.exclude,
+            ...optionsCoverage.exclude,
             ...defaultExcludes,
           ],
         }
       : {}),
-    ...(coverage.reporters
-      ? ({ reporter: coverage.reporters } satisfies VitestCoverageOption)
+    ...(optionsCoverage.reporters
+      ? ({ reporter: optionsCoverage.reporters } satisfies VitestCoverageOption)
       : {}),
   };
 }

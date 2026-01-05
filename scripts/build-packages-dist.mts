@@ -12,7 +12,7 @@
  * distribution folder within the project.
  */
 
-import { BuiltPackage } from '@angular/ng-dev';
+import type { BuiltPackage } from '@angular/ng-dev';
 import { execSync } from 'node:child_process';
 import {
   chmodSync,
@@ -75,7 +75,7 @@ function buildReleasePackages(
   // List of targets to build. e.g. "packages/angular/cli:npm_package"
   const targets = exec(queryPackagesCmd, true).split(/\r?\n/);
   const packageNames = getPackageNamesOfTargets(targets);
-  const bazelBinPath = exec(`${bazelCmd} info bazel-bin`, true);
+  const bazelBinPath = join(import.meta.dirname, '../dist/bin');
   const getBazelOutputPath = (pkgName: string) =>
     join(bazelBinPath, 'packages', pkgName, 'npm_package');
   const getDistPath = (pkgName: string) => join(distPath, pkgName);

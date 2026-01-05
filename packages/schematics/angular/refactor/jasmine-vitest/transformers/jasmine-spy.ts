@@ -153,7 +153,7 @@ export function transformSpies(node: ts.Node, refactorCtx: RefactorContext): ts.
           }
           default: {
             const category = 'unsupported-spy-strategy';
-            reporter.recordTodo(category);
+            reporter.recordTodo(category, sourceFile, node);
             addTodoComment(node, category, { name: strategyName });
             break;
           }
@@ -202,7 +202,7 @@ export function transformSpies(node: ts.Node, refactorCtx: RefactorContext): ts.
         'Found unsupported `jasmine.spyOnAllFunctions()`.',
       );
       const category = 'spyOnAllFunctions';
-      reporter.recordTodo(category);
+      reporter.recordTodo(category, sourceFile, node);
       addTodoComment(node, category);
 
       return node;
@@ -227,25 +227,28 @@ export function transformCreateSpyObj(
     'Transformed `jasmine.createSpyObj()` to an object literal with `vi.fn()`.',
   );
 
-  if (node.arguments.length < 2) {
+  const firstArg = node.arguments[0];
+  const hasBaseName = ts.isStringLiteral(firstArg);
+  const baseName = hasBaseName ? firstArg.text : undefined;
+  const methods = hasBaseName ? node.arguments[1] : firstArg;
+  const propertiesArg = hasBaseName ? node.arguments[2] : node.arguments[1];
+  let properties: ts.PropertyAssignment[] = [];
+
+  if (node.arguments.length < 2 && hasBaseName) {
     const category = 'createSpyObj-single-argument';
-    reporter.recordTodo(category);
+    reporter.recordTodo(category, sourceFile, node);
     addTodoComment(node, category);
 
     return node;
   }
 
-  const methods = node.arguments[1];
-  const propertiesArg = node.arguments[2];
-  let properties: ts.PropertyAssignment[] = [];
-
   if (ts.isArrayLiteralExpression(methods)) {
-    properties = createSpyObjWithArray(methods);
+    properties = createSpyObjWithArray(methods, baseName);
   } else if (ts.isObjectLiteralExpression(methods)) {
-    properties = createSpyObjWithObject(methods);
+    properties = createSpyObjWithObject(methods, baseName);
   } else {
     const category = 'createSpyObj-dynamic-variable';
-    reporter.recordTodo(category);
+    reporter.recordTodo(category, sourceFile, node);
     addTodoComment(node, category);
 
     return node;
@@ -256,7 +259,7 @@ export function transformCreateSpyObj(
       properties.push(...(propertiesArg.properties as unknown as ts.PropertyAssignment[]));
     } else {
       const category = 'createSpyObj-dynamic-property-map';
-      reporter.recordTodo(category);
+      reporter.recordTodo(category, sourceFile, node);
       addTodoComment(node, category);
     }
   }
@@ -264,13 +267,28 @@ export function transformCreateSpyObj(
   return ts.factory.createObjectLiteralExpression(properties, true);
 }
 
-function createSpyObjWithArray(methods: ts.ArrayLiteralExpression): ts.PropertyAssignment[] {
+function createSpyObjWithArray(
+  methods: ts.ArrayLiteralExpression,
+  baseName: string | undefined,
+): ts.PropertyAssignment[] {
   return methods.elements
     .map((element) => {
       if (ts.isStringLiteral(element)) {
+        const mockFn = createViCallExpression('fn');
+        const methodName = element.text;
+        let finalExpression: ts.Expression = mockFn;
+
+        if (baseName) {
+          finalExpression = ts.factory.createCallExpression(
+            createPropertyAccess(finalExpression, 'mockName'),
+            undefined,
+            [ts.factory.createStringLiteral(`${baseName}.${methodName}`)],
+          );
+        }
+
         return ts.factory.createPropertyAssignment(
-          ts.factory.createIdentifier(element.text),
-          createViCallExpression('fn'),
+          ts.factory.createIdentifier(methodName),
+          finalExpression,
         );
       }
 
@@ -279,13 +297,25 @@ function createSpyObjWithArray(methods: ts.ArrayLiteralExpression): ts.PropertyA
     .filter((p): p is ts.PropertyAssignment => !!p);
 }
 
-function createSpyObjWithObject(methods: ts.ObjectLiteralExpression): ts.PropertyAssignment[] {
+function createSpyObjWithObject(
+  methods: ts.ObjectLiteralExpression,
+  baseName: string | undefined,
+): ts.PropertyAssignment[] {
   return methods.properties
     .map((prop) => {
       if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
         const methodName = prop.name.text;
         const returnValue = prop.initializer;
-        const mockFn = createViCallExpression('fn');
+        let mockFn = createViCallExpression('fn');
+
+        if (baseName) {
+          mockFn = ts.factory.createCallExpression(
+            createPropertyAccess(mockFn, 'mockName'),
+            undefined,
+            [ts.factory.createStringLiteral(`${baseName}.${methodName}`)],
+          );
+        }
+
         const mockReturnValue = createPropertyAccess(mockFn, 'mockReturnValue');
 
         return ts.factory.createPropertyAssignment(
@@ -456,7 +486,7 @@ export function transformSpyCallInspection(node: ts.Node, refactorCtx: RefactorC
           node.parent.name.text !== 'args'
         ) {
           const category = 'mostRecent-without-args';
-          reporter.recordTodo(category);
+          reporter.recordTodo(category, sourceFile, node);
           addTodoComment(node, category);
         }
 

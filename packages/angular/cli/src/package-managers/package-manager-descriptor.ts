@@ -12,15 +12,19 @@
  * package-manager-specific commands, flags, and output parsing.
  */
 
+import { ErrorInfo } from './error';
 import { Logger } from './logger';
 import { PackageManifest, PackageMetadata } from './package-metadata';
 import { InstalledPackage } from './package-tree';
 import {
   parseNpmLikeDependencies,
+  parseNpmLikeError,
   parseNpmLikeManifest,
   parseNpmLikeMetadata,
   parseYarnClassicDependencies,
-  parseYarnLegacyManifest,
+  parseYarnClassicError,
+  parseYarnClassicManifest,
+  parseYarnClassicMetadata,
   parseYarnModernDependencies,
 } from './parsers';
 
@@ -73,6 +77,9 @@ export interface PackageManagerDescriptor {
   /** The command to fetch the registry manifest of a package. */
   readonly getManifestCommand: readonly string[];
 
+  /** Whether a specific version lookup is needed prior to fetching a registry manifest. */
+  readonly requiresManifestVersionLookup?: boolean;
+
   /** A function that formats the arguments for field-filtered registry views. */
   readonly viewCommandFieldArgFormatter?: (fields: readonly string[]) => string[];
 
@@ -82,15 +89,33 @@ export interface PackageManagerDescriptor {
     listDependencies: (stdout: string, logger?: Logger) => Map<string, InstalledPackage>;
 
     /** A function to parse the output of `getManifestCommand` for a specific version. */
-    getPackageManifest: (stdout: string, logger?: Logger) => PackageManifest | null;
+    getRegistryManifest: (stdout: string, logger?: Logger) => PackageManifest | null;
 
     /** A function to parse the output of `getManifestCommand` for the full package metadata. */
     getRegistryMetadata: (stdout: string, logger?: Logger) => PackageMetadata | null;
+
+    /** A function to parse the output when a command fails. */
+    getError?: (output: string, logger?: Logger) => ErrorInfo | null;
   };
+
+  /** A function that checks if a structured error represents a "package not found" error. */
+  readonly isNotFound: (error: ErrorInfo) => boolean;
 }
 
 /** A type that represents the name of a supported package manager. */
 export type PackageManagerName = keyof typeof SUPPORTED_PACKAGE_MANAGERS;
+
+/** A set of error codes that are known to indicate a "package not found" error. */
+const NOT_FOUND_ERROR_CODES = new Set(['E404']);
+
+/**
+ * A shared function to check if a structured error represents a "package not found" error.
+ * @param error The structured error to check.
+ * @returns True if the error code is a known "not found" code, false otherwise.
+ */
+function isKnownNotFound(error: ErrorInfo): boolean {
+  return NOT_FOUND_ERROR_CODES.has(error.code);
+}
 
 /**
  * A map of supported package managers to their descriptors.
@@ -122,9 +147,11 @@ export const SUPPORTED_PACKAGE_MANAGERS = {
     viewCommandFieldArgFormatter: (fields) => [...fields],
     outputParsers: {
       listDependencies: parseNpmLikeDependencies,
-      getPackageManifest: parseNpmLikeManifest,
+      getRegistryManifest: parseNpmLikeManifest,
       getRegistryMetadata: parseNpmLikeMetadata,
+      getError: parseNpmLikeError,
     },
+    isNotFound: isKnownNotFound,
   },
   yarn: {
     binary: 'yarn',
@@ -144,9 +171,11 @@ export const SUPPORTED_PACKAGE_MANAGERS = {
     viewCommandFieldArgFormatter: (fields) => ['--fields', fields.join(',')],
     outputParsers: {
       listDependencies: parseYarnModernDependencies,
-      getPackageManifest: parseNpmLikeManifest,
+      getRegistryManifest: parseNpmLikeManifest,
       getRegistryMetadata: parseNpmLikeMetadata,
+      getError: parseNpmLikeError,
     },
+    isNotFound: isKnownNotFound,
   },
   'yarn-classic': {
     binary: 'yarn',
@@ -165,12 +194,15 @@ export const SUPPORTED_PACKAGE_MANAGERS = {
     getRegistryOptions: (registry: string) => ({ args: ['--registry', registry] }),
     versionCommand: ['--version'],
     listDependenciesCommand: ['list', '--depth=0', '--json'],
-    getManifestCommand: ['info', '--json'],
+    getManifestCommand: ['info', '--json', '--verbose'],
+    requiresManifestVersionLookup: true,
     outputParsers: {
       listDependencies: parseYarnClassicDependencies,
-      getPackageManifest: parseYarnLegacyManifest,
-      getRegistryMetadata: parseNpmLikeMetadata,
+      getRegistryManifest: parseYarnClassicManifest,
+      getRegistryMetadata: parseYarnClassicMetadata,
+      getError: parseYarnClassicError,
     },
+    isNotFound: isKnownNotFound,
   },
   pnpm: {
     binary: 'pnpm',
@@ -190,9 +222,11 @@ export const SUPPORTED_PACKAGE_MANAGERS = {
     viewCommandFieldArgFormatter: (fields) => [...fields],
     outputParsers: {
       listDependencies: parseNpmLikeDependencies,
-      getPackageManifest: parseNpmLikeManifest,
+      getRegistryManifest: parseNpmLikeManifest,
       getRegistryMetadata: parseNpmLikeMetadata,
+      getError: parseNpmLikeError,
     },
+    isNotFound: isKnownNotFound,
   },
   bun: {
     binary: 'bun',
@@ -209,12 +243,13 @@ export const SUPPORTED_PACKAGE_MANAGERS = {
     versionCommand: ['--version'],
     listDependenciesCommand: ['pm', 'ls', '--json'],
     getManifestCommand: ['pm', 'view', '--json'],
-    viewCommandFieldArgFormatter: (fields) => [...fields],
     outputParsers: {
       listDependencies: parseNpmLikeDependencies,
-      getPackageManifest: parseNpmLikeManifest,
+      getRegistryManifest: parseNpmLikeManifest,
       getRegistryMetadata: parseNpmLikeMetadata,
+      getError: parseNpmLikeError,
     },
+    isNotFound: isKnownNotFound,
   },
 } satisfies Record<string, PackageManagerDescriptor>;
 

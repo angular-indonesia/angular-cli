@@ -174,7 +174,11 @@ function updateProjects(tree: Tree, context: SchematicContext) {
       }
 
       const buildTarget = project.targets.get('build');
-      if (!buildTarget || buildTarget.builder === Builders.Application) {
+      if (
+        !buildTarget ||
+        buildTarget.builder === Builders.Application ||
+        buildTarget.builder === Builders.BuildApplication
+      ) {
         continue;
       }
 
@@ -362,10 +366,16 @@ export default function (): Rule {
     ),
     // Update main tsconfig
     updateJsonFile('tsconfig.json', (rootJson) => {
-      rootJson.modify(['compilerOptions', 'esModuleInterop'], true);
+      const module = rootJson.get(['compilerOptions', 'module']);
+      const hasPreserveModule = typeof module === 'string' && module.toLowerCase() === 'preserve';
+
+      if (!hasPreserveModule) {
+        rootJson.modify(['compilerOptions', 'esModuleInterop'], true);
+        rootJson.modify(['compilerOptions', 'moduleResolution'], 'bundler');
+      }
+
       rootJson.modify(['compilerOptions', 'downlevelIteration'], undefined);
       rootJson.modify(['compilerOptions', 'allowSyntheticDefaultImports'], undefined);
-      rootJson.modify(['compilerOptions', 'moduleResolution'], 'bundler');
     }),
   ]);
 }

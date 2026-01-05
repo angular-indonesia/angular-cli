@@ -6,22 +6,13 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import { SchematicDescription, UnsuccessfulWorkflowExecution } from '@angular-devkit/schematics';
-import {
-  FileSystemCollectionDescription,
-  FileSystemSchematicDescription,
-  NodeWorkflow,
-} from '@angular-devkit/schematics/tools';
+import { NodeWorkflow } from '@angular-devkit/schematics/tools';
 import { Listr } from 'listr2';
-import { SpawnSyncReturns, execSync, spawnSync } from 'node:child_process';
 import { existsSync, promises as fs } from 'node:fs';
 import { createRequire } from 'node:module';
 import * as path from 'node:path';
-import { join, resolve } from 'node:path';
 import npa from 'npm-package-arg';
-import * as semver from 'semver';
 import { Argv } from 'yargs';
-import { PackageManager } from '../../../lib/config/workspace-schema';
 import {
   CommandModule,
   CommandModuleError,
@@ -29,26 +20,30 @@ import {
   Options,
 } from '../../command-builder/command-module';
 import { SchematicEngineHost } from '../../command-builder/utilities/schematic-engine-host';
-import { subscribeToWorkflow } from '../../command-builder/utilities/schematic-workflow';
-import { colors, figures } from '../../utilities/color';
+import { PackageManager, PackageManifest, createPackageManager } from '../../package-managers';
+import { colors } from '../../utilities/color';
 import { disableVersionCheck } from '../../utilities/environment-options';
 import { assertIsError } from '../../utilities/error';
-import { writeErrorToLogFile } from '../../utilities/log-file';
-import {
-  PackageIdentifier,
-  PackageManifest,
-  fetchPackageManifest,
-  fetchPackageMetadata,
-} from '../../utilities/package-metadata';
 import {
   PackageTreeNode,
   findPackageJson,
   getProjectDependencies,
   readPackageJson,
 } from '../../utilities/package-tree';
-import { askChoices } from '../../utilities/prompt';
-import { isTTY } from '../../utilities/tty';
-import { VERSION } from '../../utilities/version';
+import {
+  checkCLIVersion,
+  coerceVersionNumber,
+  runTempBinary,
+  shouldForcePackageManager,
+} from './utilities/cli-version';
+import { ANGULAR_PACKAGES_REGEXP } from './utilities/constants';
+import { checkCleanGit } from './utilities/git';
+import {
+  commitChanges,
+  executeMigration,
+  executeMigrations,
+  executeSchematic,
+} from './utilities/migration';
 
 interface UpdateCommandArgs {
   packages?: string[];
@@ -63,21 +58,8 @@ interface UpdateCommandArgs {
   'create-commits': boolean;
 }
 
-interface MigrationSchematicDescription
-  extends SchematicDescription<FileSystemCollectionDescription, FileSystemSchematicDescription> {
-  version?: string;
-  optional?: boolean;
-  recommended?: boolean;
-  documentation?: string;
-}
-
-interface MigrationSchematicDescriptionWithVersion extends MigrationSchematicDescription {
-  version: string;
-}
-
 class CommandError extends Error {}
 
-const ANGULAR_PACKAGES_REGEXP = /^@(?:angular|nguniversal)\//;
 const UPDATE_SCHEMATIC_COLLECTION = path.join(__dirname, 'schematic/collection.json');
 
 export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs> {
@@ -87,7 +69,7 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
 
   command = 'update [packages..]';
   describe = 'Updates your workspace and its dependencies. See https://update.angular.dev/.';
-  longDescriptionPath = join(__dirname, 'long-description.md');
+  longDescriptionPath = path.join(__dirname, 'long-description.md');
 
   builder(localYargs: Argv): Argv<UpdateCommandArgs> {
     return localYargs
@@ -161,7 +143,7 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
         const { logger } = this.context;
 
         // This allows the user to easily reset any changes from the update.
-        if (packages?.length && !this.checkCleanGit()) {
+        if (packages?.length && !checkCleanGit(this.context.root)) {
           if (allowDirty) {
             logger.warn(
               'Repository is not clean. Update changes will be mixed with pre-existing changes.',
@@ -187,14 +169,21 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
   }
 
   async run(options: Options<UpdateCommandArgs>): Promise<number | void> {
-    const { logger, packageManager } = this.context;
+    const { logger } = this.context;
+    // Instantiate the package manager
+    const packageManager = await createPackageManager({
+      cwd: this.context.root,
+      logger,
+      configuredPackageManager: this.context.packageManager.name,
+    });
 
     // Check if the current installed CLI version is older than the latest compatible version.
     // Skip when running `ng update` without a package name as this will not trigger an actual update.
     if (!disableVersionCheck && options.packages?.length) {
-      const cliVersionToInstall = await this.checkCLIVersion(
+      const cliVersionToInstall = await checkCLIVersion(
         options.packages,
-        options.verbose,
+        logger,
+        packageManager,
         options.next,
       );
 
@@ -204,11 +193,15 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
             `Installing a temporary Angular CLI versioned ${cliVersionToInstall} to perform the update.`,
         );
 
-        return this.runTempBinary(`@angular/cli@${cliVersionToInstall}`, process.argv.slice(2));
+        return runTempBinary(
+          `@angular/cli@${cliVersionToInstall}`,
+          packageManager,
+          process.argv.slice(2),
+        );
       }
     }
 
-    const packages: PackageIdentifier[] = [];
+    const packages: npa.Result[] = [];
     for (const request of options.packages ?? []) {
       try {
         const packageIdentifier = npa(request);
@@ -237,7 +230,7 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
           packageIdentifier.type = 'tag';
         }
 
-        packages.push(packageIdentifier as PackageIdentifier);
+        packages.push(packageIdentifier);
       } catch (e) {
         assertIsError(e);
         logger.error(e.message);
@@ -254,7 +247,7 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
 
     const workflow = new NodeWorkflow(this.context.root, {
       packageManager: packageManager.name,
-      packageManagerForce: this.packageManagerForce(options.verbose),
+      packageManagerForce: await shouldForcePackageManager(packageManager, logger, options.verbose),
       // __dirname -> favor @schematics/update from this package
       // Otherwise, use packages from the active workspace (migrations)
       resolvePaths: this.resolvePaths,
@@ -264,8 +257,9 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
 
     if (packages.length === 0) {
       // Show status
-      const { success } = await this.executeSchematic(
+      const { success } = await executeSchematic(
         workflow,
+        logger,
         UPDATE_SCHEMATIC_COLLECTION,
         'update',
         {
@@ -282,214 +276,13 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
 
     return options.migrateOnly
       ? this.migrateOnly(workflow, (options.packages ?? [])[0], rootDependencies, options)
-      : this.updatePackagesAndMigrate(workflow, rootDependencies, options, packages);
-  }
-
-  private async executeSchematic(
-    workflow: NodeWorkflow,
-    collection: string,
-    schematic: string,
-    options: Record<string, unknown> = {},
-  ): Promise<{ success: boolean; files: Set<string> }> {
-    const { logger } = this.context;
-    const workflowSubscription = subscribeToWorkflow(workflow, logger);
-
-    // TODO: Allow passing a schematic instance directly
-    try {
-      await workflow
-        .execute({
-          collection,
-          schematic,
+      : this.updatePackagesAndMigrate(
+          workflow,
+          rootDependencies,
           options,
-          logger,
-        })
-        .toPromise();
-
-      return { success: !workflowSubscription.error, files: workflowSubscription.files };
-    } catch (e) {
-      if (e instanceof UnsuccessfulWorkflowExecution) {
-        logger.error(`${figures.cross} Migration failed. See above for further details.\n`);
-      } else {
-        assertIsError(e);
-        const logPath = writeErrorToLogFile(e);
-        logger.fatal(
-          `${figures.cross} Migration failed: ${e.message}\n` +
-            `  See "${logPath}" for further details.\n`,
+          packages,
+          packageManager,
         );
-      }
-
-      return { success: false, files: workflowSubscription.files };
-    } finally {
-      workflowSubscription.unsubscribe();
-    }
-  }
-
-  /**
-   * @return Whether or not the migration was performed successfully.
-   */
-  private async executeMigration(
-    workflow: NodeWorkflow,
-    packageName: string,
-    collectionPath: string,
-    migrationName: string,
-    commit?: boolean,
-  ): Promise<number> {
-    const { logger } = this.context;
-    const collection = workflow.engine.createCollection(collectionPath);
-    const name = collection.listSchematicNames().find((name) => name === migrationName);
-    if (!name) {
-      logger.error(`Cannot find migration '${migrationName}' in '${packageName}'.`);
-
-      return 1;
-    }
-
-    logger.info(colors.cyan(`** Executing '${migrationName}' of package '${packageName}' **\n`));
-    const schematic = workflow.engine.createSchematic(name, collection);
-
-    return this.executePackageMigrations(workflow, [schematic.description], packageName, commit);
-  }
-
-  /**
-   * @return Whether or not the migrations were performed successfully.
-   */
-  private async executeMigrations(
-    workflow: NodeWorkflow,
-    packageName: string,
-    collectionPath: string,
-    from: string,
-    to: string,
-    commit?: boolean,
-  ): Promise<number> {
-    const collection = workflow.engine.createCollection(collectionPath);
-    const migrationRange = new semver.Range(
-      '>' + (semver.prerelease(from) ? from.split('-')[0] + '-0' : from) + ' <=' + to.split('-')[0],
-    );
-
-    const requiredMigrations: MigrationSchematicDescriptionWithVersion[] = [];
-    const optionalMigrations: MigrationSchematicDescriptionWithVersion[] = [];
-
-    for (const name of collection.listSchematicNames()) {
-      const schematic = workflow.engine.createSchematic(name, collection);
-      const description = schematic.description as MigrationSchematicDescription;
-
-      description.version = coerceVersionNumber(description.version);
-      if (!description.version) {
-        continue;
-      }
-
-      if (semver.satisfies(description.version, migrationRange, { includePrerelease: true })) {
-        (description.optional ? optionalMigrations : requiredMigrations).push(
-          description as MigrationSchematicDescriptionWithVersion,
-        );
-      }
-    }
-
-    if (requiredMigrations.length === 0 && optionalMigrations.length === 0) {
-      return 0;
-    }
-
-    // Required migrations
-    if (requiredMigrations.length) {
-      this.context.logger.info(
-        colors.cyan(`** Executing migrations of package '${packageName}' **\n`),
-      );
-
-      requiredMigrations.sort(
-        (a, b) => semver.compare(a.version, b.version) || a.name.localeCompare(b.name),
-      );
-
-      const result = await this.executePackageMigrations(
-        workflow,
-        requiredMigrations,
-        packageName,
-        commit,
-      );
-
-      if (result === 1) {
-        return 1;
-      }
-    }
-
-    // Optional migrations
-    if (optionalMigrations.length) {
-      this.context.logger.info(
-        colors.magenta(`** Optional migrations of package '${packageName}' **\n`),
-      );
-
-      optionalMigrations.sort(
-        (a, b) => semver.compare(a.version, b.version) || a.name.localeCompare(b.name),
-      );
-
-      const migrationsToRun = await this.getOptionalMigrationsToRun(
-        optionalMigrations,
-        packageName,
-      );
-
-      if (migrationsToRun?.length) {
-        return this.executePackageMigrations(workflow, migrationsToRun, packageName, commit);
-      }
-    }
-
-    return 0;
-  }
-
-  private async executePackageMigrations(
-    workflow: NodeWorkflow,
-    migrations: MigrationSchematicDescription[],
-    packageName: string,
-    commit = false,
-  ): Promise<1 | 0> {
-    const { logger } = this.context;
-    for (const migration of migrations) {
-      const { title, description } = getMigrationTitleAndDescription(migration);
-
-      logger.info(colors.cyan(figures.pointer) + ' ' + colors.bold(title));
-
-      if (description) {
-        logger.info('  ' + description);
-      }
-
-      const { success, files } = await this.executeSchematic(
-        workflow,
-        migration.collection.name,
-        migration.name,
-      );
-      if (!success) {
-        return 1;
-      }
-
-      let modifiedFilesText: string;
-      switch (files.size) {
-        case 0:
-          modifiedFilesText = 'No changes made';
-          break;
-        case 1:
-          modifiedFilesText = '1 file modified';
-          break;
-        default:
-          modifiedFilesText = `${files.size} files modified`;
-          break;
-      }
-
-      logger.info(`  Migration completed (${modifiedFilesText}).`);
-
-      // Commit migration
-      if (commit) {
-        const commitPrefix = `${packageName} migration - ${migration.name}`;
-        const commitMessage = migration.description
-          ? `${commitPrefix}\n\n${migration.description}`
-          : commitPrefix;
-        const committed = this.commit(commitMessage);
-        if (!committed) {
-          // Failed to commit, something went wrong. Abort the update.
-          return 1;
-        }
-      }
-
-      logger.info(''); // Extra trailing newline.
-    }
-
-    return 0;
   }
 
   private async migrateOnly(
@@ -575,8 +368,9 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
     }
 
     if (options.name) {
-      return this.executeMigration(
+      return executeMigration(
         workflow,
+        logger,
         packageName,
         migrations,
         options.name,
@@ -591,8 +385,9 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
       return 1;
     }
 
-    return this.executeMigrations(
+    return executeMigrations(
       workflow,
+      logger,
       packageName,
       migrations,
       from,
@@ -606,7 +401,8 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
     workflow: NodeWorkflow,
     rootDependencies: Map<string, PackageTreeNode>,
     options: Options<UpdateCommandArgs>,
-    packages: PackageIdentifier[],
+    packages: npa.Result[],
+    packageManager: PackageManager,
   ): Promise<number> {
     const { logger } = this.context;
 
@@ -617,13 +413,14 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
     };
 
     const requests: {
-      identifier: PackageIdentifier;
+      identifier: npa.Result;
       node: PackageTreeNode;
     }[] = [];
 
     // Validate packages actually are part of the workspace
     for (const pkg of packages) {
-      const node = rootDependencies.get(pkg.name);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const node = rootDependencies.get(pkg.name!);
       if (!node?.package) {
         logger.error(`Package '${pkg.name}' is not a dependency.`);
 
@@ -649,62 +446,14 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
     for (const { identifier: requestIdentifier, node } of requests) {
       const packageName = requestIdentifier.name;
 
-      let metadata;
+      let manifest: PackageManifest | null = null;
       try {
-        // Metadata requests are internally cached; multiple requests for same name
-        // does not result in additional network traffic
-        metadata = await fetchPackageMetadata(packageName, logger, {
-          verbose: options.verbose,
-        });
+        manifest = await packageManager.getManifest(requestIdentifier);
       } catch (e) {
         assertIsError(e);
-        logger.error(`Error fetching metadata for '${packageName}': ` + e.message);
+        logger.error(`Error fetching manifest for '${packageName}': ` + e.message);
 
         return 1;
-      }
-
-      // Try to find a package version based on the user requested package specifier
-      // registry specifier types are either version, range, or tag
-      let manifest: PackageManifest | undefined;
-      switch (requestIdentifier.type) {
-        case 'tag':
-          manifest = metadata.tags[requestIdentifier.fetchSpec];
-          // If not found and next option was used and user did not provide a specifier, try latest.
-          // Package may not have a next tag.
-          if (
-            !manifest &&
-            requestIdentifier.fetchSpec === 'next' &&
-            requestIdentifier.rawSpec === '*'
-          ) {
-            manifest = metadata.tags['latest'];
-          }
-          break;
-        case 'version':
-          manifest = metadata.versions[requestIdentifier.fetchSpec];
-          break;
-        case 'range':
-          for (const potentialManifest of Object.values(metadata.versions)) {
-            // Ignore deprecated package versions
-            if (potentialManifest.deprecated) {
-              continue;
-            }
-            // Only consider versions that are within the range
-            if (
-              !semver.satisfies(potentialManifest.version, requestIdentifier.fetchSpec, {
-                loose: true,
-              })
-            ) {
-              continue;
-            }
-            // Update the used manifest if current potential is newer than existing or there is not one yet
-            if (
-              !manifest ||
-              semver.gt(potentialManifest.version, manifest.version, { loose: true })
-            ) {
-              manifest = potentialManifest;
-            }
-          }
-          break;
       }
 
       if (!manifest) {
@@ -756,8 +505,9 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
       return 0;
     }
 
-    const { success } = await this.executeSchematic(
+    const { success } = await executeSchematic(
       workflow,
+      logger,
       UPDATE_SCHEMATIC_COLLECTION,
       'update',
       {
@@ -770,8 +520,8 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
     );
 
     if (success) {
-      const { root: commandRoot, packageManager } = this.context;
-      const installArgs = this.packageManagerForce(options.verbose) ? ['--force'] : [];
+      const { root: commandRoot } = this.context;
+      const force = await shouldForcePackageManager(packageManager, logger, options.verbose);
       const tasks = new Listr([
         {
           title: 'Cleaning node modules directory',
@@ -793,9 +543,11 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
         {
           title: 'Installing packages',
           async task() {
-            const installationSuccess = await packageManager.installAll(installArgs, commandRoot);
-
-            if (!installationSuccess) {
+            try {
+              await packageManager.install({
+                force,
+              });
+            } catch (e) {
               throw new CommandError('Unable to install packages');
             }
           },
@@ -814,7 +566,9 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
     }
 
     if (success && options.createCommits) {
-      if (!this.commit(`Angular CLI update for packages - ${packagesToUpdate.join(', ')}`)) {
+      if (
+        !commitChanges(logger, `Angular CLI update for packages - ${packagesToUpdate.join(', ')}`)
+      ) {
         return 1;
       }
     }
@@ -894,8 +648,9 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
             return 1;
           }
         }
-        const result = await this.executeMigrations(
+        const result = await executeMigrations(
           workflow,
+          logger,
           migration.package,
           migrations,
           migration.from,
@@ -912,329 +667,4 @@ export default class UpdateCommandModule extends CommandModule<UpdateCommandArgs
 
     return success ? 0 : 1;
   }
-
-  /**
-   * @return Whether or not the commit was successful.
-   */
-  private commit(message: string): boolean {
-    const { logger } = this.context;
-
-    // Check if a commit is needed.
-    let commitNeeded: boolean;
-    try {
-      commitNeeded = hasChangesToCommit();
-    } catch (err) {
-      logger.error(`  Failed to read Git tree:\n${(err as SpawnSyncReturns<string>).stderr}`);
-
-      return false;
-    }
-
-    if (!commitNeeded) {
-      logger.info('  No changes to commit after migration.');
-
-      return true;
-    }
-
-    // Commit changes and abort on error.
-    try {
-      createCommit(message);
-    } catch (err) {
-      logger.error(
-        `Failed to commit update (${message}):\n${(err as SpawnSyncReturns<string>).stderr}`,
-      );
-
-      return false;
-    }
-
-    // Notify user of the commit.
-    const hash = findCurrentGitSha();
-    const shortMessage = message.split('\n')[0];
-    if (hash) {
-      logger.info(`  Committed migration step (${getShortHash(hash)}): ${shortMessage}.`);
-    } else {
-      // Commit was successful, but reading the hash was not. Something weird happened,
-      // but nothing that would stop the update. Just log the weirdness and continue.
-      logger.info(`  Committed migration step: ${shortMessage}.`);
-      logger.warn('  Failed to look up hash of most recent commit, continuing anyways.');
-    }
-
-    return true;
-  }
-
-  private checkCleanGit(): boolean {
-    try {
-      const topLevel = execSync('git rev-parse --show-toplevel', {
-        encoding: 'utf8',
-        stdio: 'pipe',
-      });
-      const result = execSync('git status --porcelain', { encoding: 'utf8', stdio: 'pipe' });
-      if (result.trim().length === 0) {
-        return true;
-      }
-
-      // Only files inside the workspace root are relevant
-      for (const entry of result.split('\n')) {
-        const relativeEntry = path.relative(
-          path.resolve(this.context.root),
-          path.resolve(topLevel.trim(), entry.slice(3).trim()),
-        );
-
-        if (!relativeEntry.startsWith('..') && !path.isAbsolute(relativeEntry)) {
-          return false;
-        }
-      }
-    } catch {}
-
-    return true;
-  }
-
-  /**
-   * Checks if the current installed CLI version is older or newer than a compatible version.
-   * @returns the version to install or null when there is no update to install.
-   */
-  private async checkCLIVersion(
-    packagesToUpdate: string[],
-    verbose = false,
-    next = false,
-  ): Promise<string | null> {
-    const { version } = await fetchPackageManifest(
-      `@angular/cli@${this.getCLIUpdateRunnerVersion(packagesToUpdate, next)}`,
-      this.context.logger,
-      {
-        verbose,
-        usingYarn: this.context.packageManager.name === PackageManager.Yarn,
-      },
-    );
-
-    return VERSION.full === version ? null : version;
-  }
-
-  private getCLIUpdateRunnerVersion(
-    packagesToUpdate: string[] | undefined,
-    next: boolean,
-  ): string | number {
-    if (next) {
-      return 'next';
-    }
-
-    const updatingAngularPackage = packagesToUpdate?.find((r) => ANGULAR_PACKAGES_REGEXP.test(r));
-    if (updatingAngularPackage) {
-      // If we are updating any Angular package we can update the CLI to the target version because
-      // migrations for @angular/core@13 can be executed using Angular/cli@13.
-      // This is same behaviour as `npx @angular/cli@13 update @angular/core@13`.
-
-      // `@angular/cli@13` -> ['', 'angular/cli', '13']
-      // `@angular/cli` -> ['', 'angular/cli']
-      const tempVersion = coerceVersionNumber(updatingAngularPackage.split('@')[2]);
-
-      return semver.parse(tempVersion)?.major ?? 'latest';
-    }
-
-    // When not updating an Angular package we cannot determine which schematic runtime the migration should to be executed in.
-    // Typically, we can assume that the `@angular/cli` was updated previously.
-    // Example: Angular official packages are typically updated prior to NGRX etc...
-    // Therefore, we only update to the latest patch version of the installed major version of the Angular CLI.
-
-    // This is important because we might end up in a scenario where locally Angular v12 is installed, updating NGRX from 11 to 12.
-    // We end up using Angular ClI v13 to run the migrations if we run the migrations using the CLI installed major version + 1 logic.
-    return VERSION.major;
-  }
-
-  private async runTempBinary(packageName: string, args: string[] = []): Promise<number> {
-    const { success, tempNodeModules } = await this.context.packageManager.installTemp(packageName);
-    if (!success) {
-      return 1;
-    }
-
-    // Remove version/tag etc... from package name
-    // Ex: @angular/cli@latest -> @angular/cli
-    const packageNameNoVersion = packageName.substring(0, packageName.lastIndexOf('@'));
-    const pkgLocation = join(tempNodeModules, packageNameNoVersion);
-    const packageJsonPath = join(pkgLocation, 'package.json');
-
-    // Get a binary location for this package
-    let binPath: string | undefined;
-    if (existsSync(packageJsonPath)) {
-      const content = await fs.readFile(packageJsonPath, 'utf-8');
-      if (content) {
-        const { bin = {} } = JSON.parse(content) as { bin: Record<string, string> };
-        const binKeys = Object.keys(bin);
-
-        if (binKeys.length) {
-          binPath = resolve(pkgLocation, bin[binKeys[0]]);
-        }
-      }
-    }
-
-    if (!binPath) {
-      throw new Error(`Cannot locate bin for temporary package: ${packageNameNoVersion}.`);
-    }
-
-    const { status, error } = spawnSync(process.execPath, [binPath, ...args], {
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        NG_DISABLE_VERSION_CHECK: 'true',
-        NG_CLI_ANALYTICS: 'false',
-      },
-    });
-
-    if (status === null && error) {
-      throw error;
-    }
-
-    return status ?? 0;
-  }
-
-  private packageManagerForce(verbose: boolean): boolean {
-    // npm 7+ can fail due to it incorrectly resolving peer dependencies that have valid SemVer
-    // ranges during an update. Update will set correct versions of dependencies within the
-    // package.json file. The force option is set to workaround these errors.
-    // Example error:
-    // npm ERR! Conflicting peer dependency: @angular/compiler-cli@14.0.0-rc.0
-    // npm ERR! node_modules/@angular/compiler-cli
-    // npm ERR!   peer @angular/compiler-cli@"^14.0.0 || ^14.0.0-rc" from @angular-devkit/build-angular@14.0.0-rc.0
-    // npm ERR!   node_modules/@angular-devkit/build-angular
-    // npm ERR!     dev @angular-devkit/build-angular@"~14.0.0-rc.0" from the root project
-    if (
-      this.context.packageManager.name === PackageManager.Npm &&
-      this.context.packageManager.version &&
-      semver.gte(this.context.packageManager.version, '7.0.0')
-    ) {
-      if (verbose) {
-        this.context.logger.info(
-          'NPM 7+ detected -- enabling force option for package installation',
-        );
-      }
-
-      return true;
-    }
-
-    return false;
-  }
-
-  private async getOptionalMigrationsToRun(
-    optionalMigrations: MigrationSchematicDescription[],
-    packageName: string,
-  ): Promise<MigrationSchematicDescription[] | undefined> {
-    const { logger } = this.context;
-    const numberOfMigrations = optionalMigrations.length;
-    logger.info(
-      `This package has ${numberOfMigrations} optional migration${
-        numberOfMigrations > 1 ? 's' : ''
-      } that can be executed.`,
-    );
-
-    if (!isTTY()) {
-      for (const migration of optionalMigrations) {
-        const { title } = getMigrationTitleAndDescription(migration);
-        logger.info(colors.cyan(figures.pointer) + ' ' + colors.bold(title));
-        logger.info(colors.gray(`  ng update ${packageName} --name ${migration.name}`));
-        logger.info(''); // Extra trailing newline.
-      }
-
-      return undefined;
-    }
-
-    logger.info(
-      'Optional migrations may be skipped and executed after the update process, if preferred.',
-    );
-    logger.info(''); // Extra trailing newline.
-
-    const answer = await askChoices(
-      `Select the migrations that you'd like to run`,
-      optionalMigrations.map((migration) => {
-        const { title, documentation } = getMigrationTitleAndDescription(migration);
-
-        return {
-          name: `[${colors.white(migration.name)}] ${title}${documentation ? ` (${documentation})` : ''}`,
-          value: migration.name,
-          checked: migration.recommended,
-        };
-      }),
-      null,
-    );
-
-    logger.info(''); // Extra trailing newline.
-
-    return optionalMigrations.filter(({ name }) => answer?.includes(name));
-  }
-}
-
-/**
- * @return Whether or not the working directory has Git changes to commit.
- */
-function hasChangesToCommit(): boolean {
-  // List all modified files not covered by .gitignore.
-  // If any files are returned, then there must be something to commit.
-
-  return execSync('git ls-files -m -d -o --exclude-standard').toString() !== '';
-}
-
-/**
- * Precondition: Must have pending changes to commit, they do not need to be staged.
- * Postcondition: The Git working tree is committed and the repo is clean.
- * @param message The commit message to use.
- */
-function createCommit(message: string) {
-  // Stage entire working tree for commit.
-  execSync('git add -A', { encoding: 'utf8', stdio: 'pipe' });
-
-  // Commit with the message passed via stdin to avoid bash escaping issues.
-  execSync('git commit --no-verify -F -', { encoding: 'utf8', stdio: 'pipe', input: message });
-}
-
-/**
- * @return The Git SHA hash of the HEAD commit. Returns null if unable to retrieve the hash.
- */
-function findCurrentGitSha(): string | null {
-  try {
-    return execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: 'pipe' }).trim();
-  } catch {
-    return null;
-  }
-}
-
-function getShortHash(commitHash: string): string {
-  return commitHash.slice(0, 9);
-}
-
-function coerceVersionNumber(version: string | undefined): string | undefined {
-  if (!version) {
-    return undefined;
-  }
-
-  if (!/^\d{1,30}\.\d{1,30}\.\d{1,30}/.test(version)) {
-    const match = version.match(/^\d{1,30}(\.\d{1,30})*/);
-
-    if (!match) {
-      return undefined;
-    }
-
-    if (!match[1]) {
-      version = version.substring(0, match[0].length) + '.0.0' + version.substring(match[0].length);
-    } else if (!match[2]) {
-      version = version.substring(0, match[0].length) + '.0' + version.substring(match[0].length);
-    } else {
-      return undefined;
-    }
-  }
-
-  return semver.valid(version) ?? undefined;
-}
-
-function getMigrationTitleAndDescription(migration: MigrationSchematicDescription): {
-  title: string;
-  description: string;
-  documentation?: string;
-} {
-  const [title, ...description] = migration.description.split('. ');
-
-  return {
-    title: title.endsWith('.') ? title : title + '.',
-    description: description.join('.\n  '),
-    documentation: migration.documentation
-      ? new URL(migration.documentation, 'https://angular.dev').href
-      : undefined,
-  };
 }

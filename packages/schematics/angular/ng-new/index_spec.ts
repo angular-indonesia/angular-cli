@@ -7,7 +7,7 @@
  */
 
 import { SchematicTestRunner } from '@angular-devkit/schematics/testing';
-import { Schema as NgNewOptions } from './schema';
+import { Schema as NgNewOptions, TestRunner } from './schema';
 
 describe('Ng New Schematic', () => {
   const schematicRunner = new SchematicTestRunner(
@@ -159,7 +159,7 @@ describe('Ng New Schematic', () => {
   });
 
   it(`should set 'testRunner' to 'karma'`, async () => {
-    const options = { ...defaultOptions, testRunner: 'karma' as const };
+    const options = { ...defaultOptions, testRunner: TestRunner.Karma };
     const tree = await schematicRunner.runSchematic('ng-new', options);
 
     const {
@@ -178,11 +178,12 @@ describe('Ng New Schematic', () => {
   });
 
   it(`should set 'testRunner' to 'karma' in workspace schematic options`, async () => {
-    const options = { ...defaultOptions, testRunner: 'karma' as const };
+    const options = { ...defaultOptions, testRunner: TestRunner.Karma };
     const tree = await schematicRunner.runSchematic('ng-new', options);
 
     const { schematics } = JSON.parse(tree.readContent('/bar/angular.json'));
     expect(schematics['@schematics/angular:application'].testRunner).toBe('karma');
+    expect(schematics['@schematics/angular:library'].testRunner).toBe('karma');
   });
 
   it(`should not add type to class name when file name style guide is '2016'`, async () => {

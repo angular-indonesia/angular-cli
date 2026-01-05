@@ -6,10 +6,11 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import { PlatformLocation } from '@angular/common';
+import { APP_BASE_HREF, PlatformLocation } from '@angular/common';
 import {
   ApplicationRef,
   type PlatformRef,
+  REQUEST,
   type StaticProvider,
   type Type,
   ɵConsole,
@@ -23,7 +24,7 @@ import {
 } from '@angular/platform-server';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Console } from '../console';
-import { stripIndexHtmlFromURL, stripTrailingSlash } from './url';
+import { addTrailingSlash, joinUrlParts, stripIndexHtmlFromURL, stripTrailingSlash } from './url';
 
 /**
  * Represents the bootstrap mechanism for an Angular application.
@@ -107,13 +108,19 @@ export async function renderAngular(
 
     if (!routerIsProvided) {
       hasNavigationError = false;
-    } else if (lastSuccessfulNavigation) {
+    } else if (lastSuccessfulNavigation?.finalUrl) {
       hasNavigationError = false;
-      const { pathname, search, hash } = envInjector.get(PlatformLocation);
-      const finalUrl = [stripTrailingSlash(pathname), search, hash].join('');
 
-      if (urlToRender.href !== new URL(finalUrl, urlToRender.origin).href) {
-        redirectTo = finalUrl;
+      const requestPrefix =
+        envInjector.get(APP_BASE_HREF, null, { optional: true }) ??
+        envInjector.get(REQUEST, null, { optional: true })?.headers.get('X-Forwarded-Prefix');
+
+      const { pathname, search, hash } = envInjector.get(PlatformLocation);
+      const finalUrl = constructDecodedUrl({ pathname, search, hash }, requestPrefix);
+      const urlToRenderString = constructDecodedUrl(urlToRender, requestPrefix);
+
+      if (urlToRenderString !== finalUrl) {
+        redirectTo = [pathname, search, hash].join('');
       }
     }
 
@@ -170,4 +177,37 @@ function asyncDestroyPlatform(platformRef: PlatformRef): Promise<void> {
       resolve();
     }, 0);
   });
+}
+
+/**
+ * Constructs a decoded URL string from its components, ensuring consistency for comparison.
+ *
+ * This function takes a URL-like object (containing `pathname`, `search`, and `hash`),
+ * strips the trailing slash from the pathname, joins the components, and then decodes
+ * the entire string. This normalization is crucial for accurately comparing URLs
+ * that might differ only in encoding or trailing slashes.
+ *
+ * @param url - An object containing the URL components:
+ *   - `pathname`: The path of the URL.
+ *   - `search`: The query string of the URL (including '?').
+ *   - `hash`: The hash fragment of the URL (including '#').
+ * @param prefix - An optional prefix (e.g., `APP_BASE_HREF`) to prepend to the pathname
+ * if it is not already present.
+ * @returns The constructed and decoded URL string.
+ */
+function constructDecodedUrl(
+  url: { pathname: string; search: string; hash: string },
+  prefix?: string | null,
+): string {
+  const { pathname, hash, search } = url;
+  const urlParts: string[] = [];
+  if (prefix && !addTrailingSlash(pathname).startsWith(addTrailingSlash(prefix))) {
+    urlParts.push(joinUrlParts(prefix, pathname));
+  } else {
+    urlParts.push(stripTrailingSlash(pathname));
+  }
+
+  urlParts.push(search, hash);
+
+  return decodeURIComponent(urlParts.join(''));
 }

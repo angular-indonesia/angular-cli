@@ -1,7 +1,0 @@
-load("//tools:defaults.bzl", "copy_to_bin")
-
-copy_to_bin(
-    name = "assets",
-    srcs = glob(["**"]),
-    visibility = ["//visibility:public"],
-)

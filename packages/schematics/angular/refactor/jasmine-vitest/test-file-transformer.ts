@@ -57,6 +57,19 @@ import { RefactorReporter } from './utils/refactor-reporter';
 const BLANK_LINE_PLACEHOLDER = '// __PRESERVE_BLANK_LINE__';
 
 /**
+ * Vitest function names that should be imported when using the --add-imports option.
+ */
+const VITEST_FUNCTION_NAMES = new Set([
+  'describe',
+  'it',
+  'expect',
+  'beforeEach',
+  'afterEach',
+  'beforeAll',
+  'afterAll',
+]);
+
+/**
  * Replaces blank lines in the content with a placeholder to prevent TypeScript's printer
  * from removing them. This ensures that the original formatting of blank lines is preserved.
  * @param content The source code content.
@@ -152,7 +165,7 @@ export function transformJasmineToVitest(
   filePath: string,
   content: string,
   reporter: RefactorReporter,
-  options: { addImports: boolean },
+  options: { addImports: boolean; browserMode: boolean },
 ): string {
   const contentWithPlaceholders = preserveBlankLines(content);
 
@@ -183,13 +196,15 @@ export function transformJasmineToVitest(
       if (ts.isCallExpression(transformedNode)) {
         if (options.addImports && ts.isIdentifier(transformedNode.expression)) {
           const name = transformedNode.expression.text;
-          if (name === 'describe' || name === 'it' || name === 'expect') {
+          if (VITEST_FUNCTION_NAMES.has(name)) {
             addVitestValueImport(pendingVitestValueImports, name);
           }
         }
 
         for (const transformer of callExpressionTransformers) {
-          transformedNode = transformer(transformedNode, refactorCtx);
+          if (!(options.browserMode && transformer === transformToHaveClass)) {
+            transformedNode = transformer(transformedNode, refactorCtx);
+          }
         }
       } else if (ts.isPropertyAccessExpression(transformedNode)) {
         for (const transformer of propertyAccessExpressionTransformers) {
