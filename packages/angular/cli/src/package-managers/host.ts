@@ -14,8 +14,8 @@
  */
 
 import { type SpawnOptions, spawn } from 'node:child_process';
-import { Stats } from 'node:fs';
-import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { Stats, constants } from 'node:fs';
+import { copyFile, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PackageManagerError } from './error';
@@ -46,10 +46,19 @@ export interface Host {
   readFile(path: string): Promise<string>;
 
   /**
+   * Copies a file from the source path to the destination path.
+   * @param src The path to the source file.
+   * @param dest The path to the destination file.
+   * @returns A promise that resolves when the copy is complete.
+   */
+  copyFile(src: string, dest: string): Promise<void>;
+
+  /**
    * Creates a new, unique temporary directory.
+   * @param baseDir The base directory in which to create the temporary directory.
    * @returns A promise that resolves to the absolute path of the created directory.
    */
-  createTempDirectory(): Promise<string>;
+  createTempDirectory(baseDir?: string): Promise<string>;
 
   /**
    * Deletes a directory recursively.
@@ -93,8 +102,9 @@ export const NodeJS_HOST: Host = {
   stat,
   readdir,
   readFile: (path: string) => readFile(path, { encoding: 'utf8' }),
+  copyFile: (src, dest) => copyFile(src, dest, constants.COPYFILE_FICLONE),
   writeFile,
-  createTempDirectory: () => mkdtemp(join(tmpdir(), 'angular-cli-')),
+  createTempDirectory: (baseDir?: string) => mkdtemp(join(baseDir ?? tmpdir(), 'angular-cli-')),
   deleteDirectory: (path: string) => rm(path, { recursive: true, force: true }),
   runCommand: async (
     command: string,

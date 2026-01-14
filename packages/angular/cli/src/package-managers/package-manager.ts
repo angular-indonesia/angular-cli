@@ -59,6 +59,12 @@ export interface PackageManagerOptions {
 
   /** A logger instance for debugging and dry run output. */
   logger?: Logger;
+
+  /**
+   * The path to use as the base for temporary directories.
+   * If not specified, the system's temporary directory will be used.
+   */
+  tempDirectory?: string;
 }
 
 /**
@@ -308,11 +314,13 @@ export class PackageManager {
       force?: boolean;
       registry?: string;
       ignoreScripts?: boolean;
+      ignorePeerDependencies?: boolean;
     } = { ignoreScripts: true },
   ): Promise<void> {
     const flags = [
       options.force ? this.descriptor.forceFlag : '',
       options.ignoreScripts ? this.descriptor.ignoreScriptsFlag : '',
+      options.ignorePeerDependencies ? (this.descriptor.ignorePeerDependenciesFlag ?? '') : '',
     ].filter((flag) => flag);
     const args = [...this.descriptor.installCommand, ...flags];
 
@@ -536,13 +544,25 @@ export class PackageManager {
     specifier: string,
     options: { registry?: string; ignoreScripts?: boolean } = {},
   ): Promise<{ workingDirectory: string; cleanup: () => Promise<void> }> {
-    const workingDirectory = await this.host.createTempDirectory();
+    const workingDirectory = await this.host.createTempDirectory(this.options.tempDirectory);
     const cleanup = () => this.host.deleteDirectory(workingDirectory);
 
     // Some package managers, like yarn classic, do not write a package.json when adding a package.
     // This can cause issues with subsequent `require.resolve` calls.
     // Writing an empty package.json file beforehand prevents this.
     await this.host.writeFile(join(workingDirectory, 'package.json'), '{}');
+
+    // Copy configuration files if the package manager requires it (e.g., bun).
+    if (this.descriptor.copyConfigFromProject) {
+      for (const configFile of this.descriptor.configFiles) {
+        try {
+          const configPath = join(this.cwd, configFile);
+          await this.host.copyFile(configPath, join(workingDirectory, configFile));
+        } catch {
+          // Ignore missing config files.
+        }
+      }
+    }
 
     const flags = [options.ignoreScripts ? this.descriptor.ignoreScriptsFlag : ''].filter(
       (flag) => flag,

@@ -10,7 +10,7 @@ import { Listr, ListrRenderer, ListrTaskWrapper, color, figures } from 'listr2';
 import assert from 'node:assert';
 import fs from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import npa from 'npm-package-arg';
 import semver, { Range, compare, intersects, prerelease, satisfies, valid } from 'semver';
 import { Argv } from 'yargs';
@@ -26,6 +26,7 @@ import {
 import {
   NgAddSaveDependency,
   PackageManager,
+  PackageManagerError,
   PackageManifest,
   PackageMetadata,
   createPackageManager,
@@ -33,6 +34,7 @@ import {
 import { assertIsError } from '../../utilities/error';
 import { isTTY } from '../../utilities/tty';
 import { VERSION } from '../../utilities/version';
+import { getCacheConfig } from '../cache/utilities';
 
 class CommandError extends Error {}
 
@@ -83,6 +85,18 @@ const BUILT_IN_SCHEMATICS = {
   tailwindcss: {
     collection: '@schematics/angular',
     name: 'tailwind',
+  },
+  '@vitest/browser-playwright': {
+    collection: '@schematics/angular',
+    name: 'vitest-browser',
+  },
+  '@vitest/browser-webdriverio': {
+    collection: '@schematics/angular',
+    name: 'vitest-browser',
+  },
+  '@vitest/browser-preview': {
+    collection: '@schematics/angular',
+    name: 'vitest-browser',
   },
 } as const;
 
@@ -260,6 +274,7 @@ export default class AddCommandModule
               ...options,
               collection: builtInSchematic.collection,
               schematicName: builtInSchematic.name,
+              package: packageName,
             });
           }
         }
@@ -298,10 +313,32 @@ export default class AddCommandModule
     context: AddCommandTaskContext,
     task: AddCommandTaskWrapper,
   ): Promise<void> {
+    let tempDirectory: string | undefined;
+    const tempOptions = ['node_modules'];
+
+    const cacheConfig = getCacheConfig(this.context.workspace);
+    if (cacheConfig.enabled) {
+      const cachePath = resolve(this.context.root, cacheConfig.path);
+      if (!relative(this.context.root, cachePath).startsWith('..')) {
+        tempOptions.push(cachePath);
+      }
+    }
+
+    for (const tempOption of tempOptions) {
+      try {
+        const directory = resolve(this.context.root, tempOption);
+        if ((await fs.stat(directory)).isDirectory()) {
+          tempDirectory = directory;
+          break;
+        }
+      } catch {}
+    }
+
     context.packageManager = await createPackageManager({
       cwd: this.context.root,
       logger: this.context.logger,
       dryRun: context.dryRun,
+      tempDirectory,
     });
     task.output = `Using package manager: ${color.dim(context.packageManager.name)}`;
   }
@@ -553,36 +590,47 @@ export default class AddCommandModule
     // Only show if installation will actually occur
     task.title = 'Installing package';
 
-    if (context.savePackage === false) {
-      task.title += ' in temporary location';
+    try {
+      if (context.savePackage === false) {
+        task.title += ' in temporary location';
 
-      // Temporary packages are located in a different directory
-      // Hence we need to resolve them using the temp path
-      const { workingDirectory } = await packageManager.acquireTempPackage(
-        packageIdentifier.toString(),
-        {
-          registry,
-        },
-      );
+        // Temporary packages are located in a different directory
+        // Hence we need to resolve them using the temp path
+        const { workingDirectory } = await packageManager.acquireTempPackage(
+          packageIdentifier.toString(),
+          {
+            registry,
+          },
+        );
 
-      const tempRequire = createRequire(workingDirectory + '/');
-      assert(context.collectionName, 'Collection name should always be available');
-      const resolvedCollectionPath = tempRequire.resolve(
-        join(context.collectionName, 'package.json'),
-      );
+        const tempRequire = createRequire(workingDirectory + '/');
+        assert(context.collectionName, 'Collection name should always be available');
+        const resolvedCollectionPath = tempRequire.resolve(
+          join(context.collectionName, 'package.json'),
+        );
 
-      context.collectionName = dirname(resolvedCollectionPath);
-    } else {
-      await packageManager.add(
-        packageIdentifier.toString(),
-        'none',
-        savePackage !== 'dependencies',
-        false,
-        true,
-        {
-          registry,
-        },
-      );
+        context.collectionName = dirname(resolvedCollectionPath);
+      } else {
+        await packageManager.add(
+          packageIdentifier.toString(),
+          'none',
+          savePackage !== 'dependencies',
+          false,
+          true,
+          {
+            registry,
+          },
+        );
+      }
+    } catch (e) {
+      if (e instanceof PackageManagerError) {
+        const output = e.stderr || e.stdout;
+        if (output) {
+          throw new CommandError(`Package installation failed: ${e.message}\nOutput: ${output}`);
+        }
+      }
+
+      throw e;
     }
   }
 
